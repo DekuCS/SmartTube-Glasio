@@ -16,6 +16,7 @@ import org.junit.Test
 class BrowseStateTest {
     private val home = BrowseSection(MediaGroup.TYPE_HOME, "Home", BrowseSection.TYPE_ROW, -1)
     private val subs = BrowseSection(MediaGroup.TYPE_SUBSCRIPTIONS, "Subs", BrowseSection.TYPE_GRID, -1)
+    private val history = BrowseSection(MediaGroup.TYPE_HISTORY, "History", BrowseSection.TYPE_GRID, -1)
     private val settingsSection = BrowseSection(MediaGroup.TYPE_SETTINGS, "Settings", BrowseSection.TYPE_SETTINGS_GRID, -1)
 
     private fun video(id: String) = Video().apply { videoId = id }
@@ -62,9 +63,10 @@ class BrowseStateTest {
     @Test
     fun gridSectionKeepsEverythingInOneRow() {
         val state = stateOnHome()
-        state.selectTab(subs.id)
-        state.updateSection(group(subs, 1, VideoGroup.ACTION_APPEND, "a"))
-        state.updateSection(group(subs, 2, VideoGroup.ACTION_APPEND, "b"))
+        state.sections.add(history)
+        state.selectTab(history.id)
+        state.updateSection(group(history, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.updateSection(group(history, 2, VideoGroup.ACTION_APPEND, "b"))
         assertEquals(1, state.rows.size)
         assertTrue(state.rows[0].isGrid)
         assertEquals(listOf("a", "b"), state.ids())

@@ -119,73 +119,107 @@ private fun FeedColumn(
     }
 }
 
-/** Rows or a grid of cards, depending on the section. Positions survive a row leaving the screen. */
+/** Items a row takes in the vertical list: one for a row, a heading (if titled) and the lines for a grid. */
+private fun itemCount(row: VideoRow): Int =
+    if (row.isGrid) (if (row.title != null) 1 else 0) + (row.videos.size + GRID_COLUMNS - 1) / GRID_COLUMNS else 1
+
+/** Index in the vertical list of the item that holds the card, which is also what a card reports as its row. */
+private fun outerIndex(rows: List<VideoRow>, rowIndex: Int, cardIndex: Int): Int {
+    val before = (0 until rowIndex).sumOf { itemCount(rows[it]) }
+    val row = rows[rowIndex]
+    return if (row.isGrid) before + (if (row.title != null) 1 else 0) + cardIndex / GRID_COLUMNS else before
+}
+
+/**
+ * Rows of cards and grids, one below the other. The usual section is one or the other; Subscriptions
+ * is rows with a grid under them. Positions survive a row leaving the screen.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Feed(state: BrowseState, actions: FeedActions) {
     val rows = state.rows
     val listState = rememberLazyListState()
     val rowStates = remember { HashMap<String, LazyListState>() }
-    val grid = rows.firstOrNull()?.isGrid == true
+    val gridOnly = rows.firstOrNull()?.isGrid == true
 
     val pending = state.pendingFocus
     LaunchedEffect(pending) {
         if (pending != null && !scrollTo(pending, state, listState, rowStates)) state.pendingFocus = null
     }
 
-    if (grid) {
-        val row = rows[0]
-        val lines = (row.videos.size + GRID_COLUMNS - 1) / GRID_COLUMNS
-        FeedColumn(
-            state, GridCardTop, listState,
-            PaddingValues(bottom = 400.dp),
-            spacing = 44.dp - CardBleed * 2,
-        ) {
-            items(lines, key = { "line$it" }, contentType = { "line" }) { line ->
-                Row(
-                    Modifier.padding(start = SidePadding, top = CardBleed, bottom = CardBleed),
-                    horizontalArrangement = Arrangement.spacedBy(CardGap),
-                ) {
-                    val end = minOf((line + 1) * GRID_COLUMNS, row.videos.size)
-                    for (index in line * GRID_COLUMNS until end) {
-                        val video = row.videos[index]
-                        key(videoKey(video)) {
-                            FeedCard(state, actions, row, video, index, line)
+    val density = LocalDensity.current
+    val rowSpec = remember(density) { MarginSpec(with(density) { SidePadding.toPx() }) }
+    FeedColumn(
+        state,
+        if (gridOnly) GridCardTop else RowCardTop,
+        listState,
+        if (gridOnly) PaddingValues(bottom = 400.dp) else PaddingValues(top = ListTopPadding, bottom = 400.dp),
+        spacing = if (gridOnly) 44.dp - CardBleed * 2 else 44.dp - CardBleed,
+    ) {
+        var first = 0
+        rows.forEachIndexed { rowIndex, row ->
+            val start = first
+            first += itemCount(row)
+            if (row.isGrid) {
+                gridItems(state, actions, row, start)
+            } else {
+                item(key = row.id, contentType = "row") {
+                    Column {
+                        RowHeading(row.title)
+                        Spacer(Modifier.height(18.dp - CardBleed))
+                        CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
+                            LazyRow(
+                                state = rowStates.getOrPut(row.id) { LazyListState() },
+                                contentPadding = PaddingValues(start = SidePadding, end = SidePadding, top = CardBleed, bottom = CardBleed),
+                                horizontalArrangement = Arrangement.spacedBy(CardGap),
+                            ) {
+                                itemsIndexed(row.videos, key = { _, video -> videoKey(video) }, contentType = { _, _ -> "card" }) { index, video ->
+                                    FeedCard(state, actions, row, video, index, start)
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-    } else {
-        val density = LocalDensity.current
-        val rowSpec = remember(density) { MarginSpec(with(density) { SidePadding.toPx() }) }
-        FeedColumn(
-            state, RowCardTop, listState,
-            PaddingValues(top = ListTopPadding, bottom = 400.dp),
-            spacing = 44.dp - CardBleed,
+    }
+}
+
+@Composable
+private fun RowHeading(title: String?) {
+    BasicText(
+        title.orEmpty(),
+        style = RowTitleStyle,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(start = SidePadding).height(40.dp),
+    )
+}
+
+/** A grid cut into lines of [GRID_COLUMNS], under a heading if it has a title. [first] is the index of its first item. */
+private fun LazyListScope.gridItems(state: BrowseState, actions: FeedActions, row: VideoRow, first: Int) {
+    val headed = row.title != null
+    if (headed) {
+        item(key = "${row.id}:heading", contentType = "heading") {
+            Column {
+                RowHeading(row.title)
+                Spacer(Modifier.height(18.dp - CardBleed))
+            }
+        }
+    }
+    val lines = (row.videos.size + GRID_COLUMNS - 1) / GRID_COLUMNS
+    val firstLine = first + (if (headed) 1 else 0)
+    items(lines, key = { "${row.id}:line$it" }, contentType = { "line" }) { line ->
+        Row(
+            Modifier.padding(start = SidePadding, top = CardBleed, bottom = CardBleed),
+            horizontalArrangement = Arrangement.spacedBy(CardGap),
         ) {
-            itemsIndexed(rows, key = { _, row -> row.id }, contentType = { _, _ -> "row" }) { rowIndex, row ->
-                Column {
-                    BasicText(
-                        row.title.orEmpty(),
-                        style = RowTitleStyle,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = SidePadding).height(40.dp),
-                    )
-                    Spacer(Modifier.height(18.dp - CardBleed))
-                    CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
-                        LazyRow(
-                            state = rowStates.getOrPut(row.id) { LazyListState() },
-                            contentPadding = PaddingValues(start = SidePadding, end = SidePadding, top = CardBleed, bottom = CardBleed),
-                            horizontalArrangement = Arrangement.spacedBy(CardGap),
-                        ) {
-                            itemsIndexed(row.videos, key = { _, video -> videoKey(video) }, contentType = { _, _ -> "card" }) { index, video ->
-                                FeedCard(state, actions, row, video, index, rowIndex)
-                            }
-                        }
-                    }
+            val end = minOf((line + 1) * GRID_COLUMNS, row.videos.size)
+            for (index in line * GRID_COLUMNS until end) {
+                val video = row.videos[index]
+                key(videoKey(video)) {
+                    FeedCard(state, actions, row, video, index, firstLine + line)
                 }
             }
         }
@@ -204,7 +238,7 @@ private suspend fun scrollTo(
     val row = state.rows[rowIndex]
     val cardIndex = row.videos.indexOfFirst { videoKey(it) == key.videoId }
     if (cardIndex < 0) return false
-    val outer = if (row.isGrid) cardIndex / GRID_COLUMNS else rowIndex
+    val outer = outerIndex(state.rows, rowIndex, cardIndex)
     if (listState.layoutInfo.visibleItemsInfo.none { it.index == outer }) listState.scrollToItem(outer)
     val rowState = rowStates[row.id] ?: return true
     if (rowState.layoutInfo.visibleItemsInfo.none { it.index == cardIndex }) rowState.scrollToItem(cardIndex)

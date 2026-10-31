@@ -38,6 +38,9 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
     private val keys = HashSet<String>()
     internal var requestedMoreAt = -1
 
+    /** False for a row that has no next page. */
+    internal var pageable = true
+
     /** YouTube often repeats shown videos in a continuation. A page of repeats allows the next request. */
     internal fun add(items: List<Video>, atStart: Boolean = false) {
         val fresh = items.filter { keys.add(videoKey(it)) }
@@ -51,6 +54,13 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
         videos.removeAll(predicate)
         keys.clear()
         videos.forEach { keys.add(videoKey(it)) }
+    }
+
+    /** Takes videos out of this row only. Unlike [removeWhere], their groups keep them. */
+    internal fun drop(gone: Set<String>) {
+        if (videos.none { videoKey(it) in gone }) return
+        videos.removeAll { videoKey(it) in gone }
+        keys.removeAll(gone)
     }
 
     /**
@@ -71,7 +81,9 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
 }
 
 /** What the presenter has told the screen, plus where focus is. */
-class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() }) {
+class BrowseState(
+    private val rowTitle: (Int) -> String = { "" },
+    private val authorOf: (Video) -> String? = { it.getAuthor() }) {
     /** All sections of the presenter, in its order: its selectSection() passes indexes into this list. */
     val sections = mutableStateListOf<BrowseSection>()
     var shown by mutableStateOf<List<Int>>(emptyList())
@@ -116,10 +128,31 @@ class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() })
 
     fun selectTab(id: Int) {
         selected = id
+        epoch++
+        subscriptions.reset()
         clearContent()
     }
 
+    /** Grows with every tab selection, so an answer to a request of an earlier visit can be told apart. */
+    var epoch = 0
+        private set
+
+    private val subscriptions = SubscriptionsFeed(rows, rowTitle)
+
+    private val isSubscriptionGrid: Boolean
+        get() = selected == MediaGroup.TYPE_SUBSCRIPTIONS && selectedSection?.type.let { it != null && it != BrowseSection.TYPE_ROW }
+
+    /**
+     * The first page of the history, for "Continue watching" on the Subscriptions tab. [epoch] is the one
+     * the request was made under; an answer that is late, or for another tab, is dropped.
+     */
+    fun updateHistory(group: VideoGroup, epoch: Int) {
+        if (epoch != this.epoch || !isSubscriptionGrid) return
+        subscriptions.onHistory(group.videos.orEmpty(), group)
+    }
+
     fun clearContent() {
+        subscriptions.restart()
         rows.clear()
         settings.clear()
         error = null
@@ -133,6 +166,7 @@ class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() })
     fun updateSection(group: VideoGroup) {
         if (!acceptsContent(group.section)) return
         val grid = selectedSection?.let { it.type != BrowseSection.TYPE_ROW } ?: false
+        val feedRows = isSubscriptionGrid
         val rowId = if (grid) VideoRow.GRID_ID else group.id.toString()
         val videos = group.videos.orEmpty()
 
@@ -151,12 +185,18 @@ class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() })
                 rows.forEach { it.sync(videos) }
                 return
             }
-            VideoGroup.ACTION_REPLACE ->
+            VideoGroup.ACTION_REPLACE -> {
+                if (feedRows) subscriptions.restart()
                 if (grid || group.position == -1) rows.clear() else rows.removeAll { it.id == rowId }
+            }
         }
         if (videos.isEmpty()) return
 
         error = null
+        if (feedRows) {
+            subscriptions.onFeed(group, videos.toList(), atStart = group.action == VideoGroup.ACTION_PREPEND)
+            return
+        }
         val row = rows.firstOrNull { it.id == rowId }
         row?.group = group
         when {
@@ -212,7 +252,7 @@ class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() })
 
     /** The video to continue from, at most once per size of the row. */
     fun takeMoreRequest(row: VideoRow): Video? {
-        if (row.requestedMoreAt == row.videos.size) return null
+        if (!row.pageable || row.requestedMoreAt == row.videos.size) return null
         row.requestedMoreAt = row.videos.size
         return row.videos.lastOrNull()
     }
@@ -221,6 +261,7 @@ class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() })
         selected != Sections.SEARCH_SECTION_ID && (section == null || section.id == selected)
 
     private fun removeFromRows(predicate: (Video) -> Boolean) {
+        subscriptions.forget(predicate)
         rows.forEach { it.removeWhere(predicate) }
         rows.removeAll { it.videos.isEmpty() }
     }

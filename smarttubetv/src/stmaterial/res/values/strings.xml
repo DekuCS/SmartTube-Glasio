@@ -29,6 +29,9 @@
     <string translatable="false" name="material_editor_keep_one">At least one section must stay in the menu</string>
     <string translatable="false" name="material_editor_was_reset">Sections reset</string>
     <string translatable="false" name="material_editor_displaced">%1$s moved to Hidden: the menu holds %2$d</string>
+    <string translatable="false" name="material_row_continue">Continue watching</string>
+    <string translatable="false" name="material_row_new">New in subscriptions</string>
+    <string translatable="false" name="material_row_earlier">Earlier</string>
     <string translatable="false" name="material_section_subscriptions">Subscriptions</string>
     <string translatable="false" name="material_section_home">Home</string>
     <string translatable="false" name="material_section_history">History</string>

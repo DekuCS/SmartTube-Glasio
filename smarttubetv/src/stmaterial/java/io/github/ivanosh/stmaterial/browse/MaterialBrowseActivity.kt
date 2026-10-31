@@ -15,6 +15,8 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.BrowsePresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView
 import com.liskovsoft.smartyoutubetv2.tv.ui.common.LeanbackActivity
+import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
+import io.github.ivanosh.stmaterial.data.HistorySource
 import io.github.ivanosh.stmaterial.data.SectionStore
 import io.github.ivanosh.stmaterial.logic.EditorState
 import io.github.ivanosh.stmaterial.logic.Sections
@@ -28,7 +30,8 @@ import com.liskovsoft.smartyoutubetv2.tv.R
  * The presenter lifecycle follows NovaBrowseActivity in margantcovka/SmartTube-New (MIT).
  */
 class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
-    private val state = BrowseState()
+    private val state = BrowseState(rowTitle = { getString(it) })
+    private val history = HistorySource { YouTubeServiceManager.instance().contentService.historyObserve }
     private val handler = Handler(Looper.getMainLooper())
     private val loadSelected = Runnable { load() }
     private lateinit var presenter: BrowsePresenter
@@ -155,13 +158,17 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(loadSelected)
+        history.dispose()
         presenter.onViewDestroyed()
     }
 
     /** The selection shows at once. The load waits, so holding the key does not load every tab it passes. */
     private fun select(id: Int, immediately: Boolean) {
         handler.removeCallbacks(loadSelected)
-        if (id != state.selected) state.selectTab(id)
+        if (id != state.selected) {
+            history.dispose()
+            state.selectTab(id)
+        }
         when {
             id == Sections.SEARCH_SECTION_ID -> state.loading = false
             immediately -> load()
@@ -178,6 +185,19 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
             (section.data as? ErrorFragmentData)?.let(::showError)
         }
         presenter.onSectionFocused(section.id)
+        loadHistory(section)
+    }
+
+    /**
+     * "Continue watching" on Subscriptions: one request for the first page of the history. Signed out, there
+     * is nothing to ask for, and the presenter shows its sign-in prompt. A failure only leaves the row out.
+     */
+    private fun loadHistory(section: BrowseSection) {
+        history.dispose()
+        if (section.id != MediaGroup.TYPE_SUBSCRIPTIONS || section.type == BrowseSection.TYPE_ROW) return
+        if (!YouTubeServiceManager.instance().signInService.isSigned) return
+        val epoch = state.epoch
+        history.load { state.updateHistory(VideoGroup.from(it), epoch) }
     }
 
     private val isLoadPending: Boolean get() = handler.hasCallbacks(loadSelected)
