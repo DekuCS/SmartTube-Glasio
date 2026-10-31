@@ -55,8 +55,9 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     implementation 'androidx.appcompat:appcompat:' + appCompatXVersion
-    testImplementation 'junit:junit:' + junitVersion
-    testImplementation 'org.robolectric:robolectric:' + robolectricVersion
+    testImplementation 'junit:junit:4.13.2' // MATERIAL: Robolectric 4.17 needs JUnit 4.13
+    testImplementation('org.robolectric:robolectric:4.17') { exclude group: 'androidx.test.espresso' } // MATERIAL: 4.6.1 cannot read JDK 17 class files
+    testImplementation 'androidx.work:work-testing:' + workVersion // MATERIAL: WorkManagerTestInitHelper for the local backup job tests
 
     implementation project(':sharedutils')
     implementation project(':fragment-1.1.0')

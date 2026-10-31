@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+    <!-- MATERIAL: Robolectric 4.17 (needed on JDK 17) pulls androidx.test libs with minSdk 21 into unit tests -->
+    <uses-sdk tools:overrideLibrary="androidx.test.monitor, androidx.test.core, androidx.test.ext.junit, androidx.test.runner, androidx.test.services.storage, androidx.tracing.tracing, androidx.test.platform" />
+</manifest>
