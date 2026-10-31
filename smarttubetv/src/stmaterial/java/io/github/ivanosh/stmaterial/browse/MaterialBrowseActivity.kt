@@ -1,5 +1,6 @@
 package io.github.ivanosh.stmaterial.browse
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,7 +16,11 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView
 import com.liskovsoft.smartyoutubetv2.tv.ui.common.LeanbackActivity
 import io.github.ivanosh.stmaterial.data.SectionStore
+import io.github.ivanosh.stmaterial.logic.EditorState
 import io.github.ivanosh.stmaterial.logic.Sections
+import io.github.ivanosh.stmaterial.logic.resolveStart
+import java.util.concurrent.Executors
+import com.liskovsoft.smartyoutubetv2.tv.R
 
 /**
  * The tabbed home screen. Sections, loading, sign-in and the player stay in the SmartTube presenters;
@@ -28,6 +33,8 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     private val handler = Handler(Looper.getMainLooper())
     private val loadSelected = Runnable { load() }
     private lateinit var presenter: BrowsePresenter
+    private lateinit var store: SectionStore
+    private val saver = Executors.newSingleThreadExecutor()
     private var initializing = false
 
     private val actions = object : BrowseActions {
@@ -40,6 +47,28 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
                 Sections.SEARCH_SECTION_ID -> SearchPresenter.instance(this@MaterialBrowseActivity).startSearch(null)
                 MediaGroup.TYPE_SETTINGS -> if (id != state.selected) select(id, immediately = true)
             }
+        }
+
+        override fun onOpenFirst(id: Int) {
+            state.start = id
+            saveAsync(state.shown, id)
+        }
+
+        override fun onHide(id: Int) {
+            val shown = state.shown - id
+            if (shown.isEmpty()) return
+            state.shown = shown
+            val start = resolveStart(state.start, shown)
+            if (id == state.start) {
+                state.start = start
+                state.message = getString(R.string.material_start_moved, titleOf(start))
+            }
+            saveAsync(shown, start)
+            if (id == state.selected) state.tabs().firstOrNull()?.let { select(it, immediately = true) }
+        }
+
+        override fun onCustomize() {
+            startActivity(Intent(this@MaterialBrowseActivity, MaterialSectionsEditorActivity::class.java))
         }
 
         override fun onErrorAction(error: ErrorData) {
@@ -65,10 +94,10 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // First, because on the first run it writes the section list the presenter reads.
-        val store = SectionStore(this)
-        val saved = store.load().shown
-        state.shown = saved
+        store = SectionStore(this)
+        state.shown = store.load().shown
         val startSection = store.startSection()
+        state.start = startSection
 
         presenter = BrowsePresenter.instance(this)
         presenter.setView(this)
@@ -84,7 +113,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
             ?: state.tabs().firstOrNull()
         target?.let { select(it, immediately = true) }
 
-        setContentView(ComposeView(this).apply { setContent { BrowseScreen(state, startSection, actions) } })
+        setContentView(ComposeView(this).apply { setContent { BrowseScreen(state, actions) } })
         // The screen is opaque, a window background would only be one more fill per frame.
         window.setBackgroundDrawable(null)
     }
@@ -92,7 +121,30 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     override fun onResume() {
         super.onResume()
         presenter.onViewResumed()
+        reloadSections()
     }
+
+    /** The editor has stored a new list while this screen was stopped. */
+    private fun reloadSections() {
+        val saved = store.load().shown
+        state.start = store.startSection()
+        if (saved == state.shown) return
+        state.shown = saved
+        presenter.updateSections()
+    }
+
+    /**
+     * Storing mirrors the list to SidebarService, which writes its whole state on every change, so it
+     * runs off the main thread. Nothing here reads the sidebar until the editor or the next start.
+     */
+    private fun saveAsync(shown: List<Int>, start: Int) {
+        val edited = EditorState(shown, emptyList(), emptySet(), Sections.LIMIT)
+        saver.execute { store.save(edited, start) }
+    }
+
+    private fun titleOf(id: Int): String =
+        if (id == Sections.SEARCH_SECTION_ID) getString(R.string.material_search)
+        else state.sections.firstOrNull { it.id == id }?.title.orEmpty()
 
     override fun onPause() {
         super.onPause()
@@ -102,6 +154,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(loadSelected)
+        saver.shutdown()
         presenter.onViewDestroyed()
     }
 

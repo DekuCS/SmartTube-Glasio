@@ -77,6 +77,12 @@ class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() })
     var shown by mutableStateOf<List<Int>>(emptyList())
     var selected by mutableStateOf<Int?>(null)
         private set
+
+    /** The tab that opens first. */
+    var start by mutableIntStateOf(Sections.START_DEFAULT)
+
+    /** A short line over the screen, or null. */
+    var message by mutableStateOf<String?>(null)
     val rows = mutableStateListOf<VideoRow>()
     val settings = mutableStateListOf<SettingsItem>()
     var focused by mutableStateOf<FocusKey?>(null)

@@ -28,9 +28,13 @@ class SectionStore(context: Context) {
         return EditorState(shown, hidden, emptySet(), Sections.LIMIT)
     }
 
-    fun save(state: EditorState<Int>) {
+    /** [start], if given, is stored with the order, so that the mirror runs once. */
+    fun save(state: EditorState<Int>, start: Int? = null) {
         val shown = resolveTabs(state.shown, Sections.KNOWN)
-        prefs.edit().putString(KEY_ORDER, shown.joinToString(",")).apply()
+        prefs.edit().apply {
+            putString(KEY_ORDER, shown.joinToString(","))
+            if (start != null) putInt(KEY_START, start)
+        }.apply()
         mirror(shown)
     }
 

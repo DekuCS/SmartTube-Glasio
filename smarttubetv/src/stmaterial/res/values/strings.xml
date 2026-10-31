@@ -8,4 +8,40 @@
     <string translatable="false" name="material_retry">Retry</string>
     <string translatable="false" name="material_loading">Loading…</string>
     <string translatable="false" name="material_empty">Nothing here yet</string>
+    <string translatable="false" name="material_menu_open_first">Open first</string>
+    <string translatable="false" name="material_menu_hide">Hide</string>
+    <string translatable="false" name="material_menu_customize">Customize sections</string>
+    <string translatable="false" name="material_start_moved">%1$s opens first now</string>
+    <string translatable="false" name="material_editor_subtitle">Settings always stays in the menu.</string>
+    <string translatable="false" name="material_editor_in_menu">In menu</string>
+    <string translatable="false" name="material_editor_hidden">Hidden</string>
+    <string translatable="false" name="material_editor_count">%1$s · %2$d of %3$d</string>
+    <string translatable="false" name="material_editor_total">%1$d in all, scroll</string>
+    <string translatable="false" name="material_editor_moving">Moving</string>
+    <string translatable="false" name="material_editor_reset">Reset to default</string>
+    <string translatable="false" name="material_editor_hint_select">select</string>
+    <string translatable="false" name="material_editor_hint_list">other list</string>
+    <string translatable="false" name="material_editor_hint_pick">pick up</string>
+    <string translatable="false" name="material_editor_hint_save">save</string>
+    <string translatable="false" name="material_editor_hint_reorder">reorder</string>
+    <string translatable="false" name="material_editor_hint_move">to the other list</string>
+    <string translatable="false" name="material_editor_hint_drop">put down</string>
+    <string translatable="false" name="material_editor_keep_one">At least one section must stay in the menu</string>
+    <string translatable="false" name="material_editor_was_reset">Sections reset</string>
+    <string translatable="false" name="material_editor_displaced">%1$s moved to Hidden: the menu holds %2$d</string>
+    <string translatable="false" name="material_section_subscriptions">Subscriptions</string>
+    <string translatable="false" name="material_section_home">Home</string>
+    <string translatable="false" name="material_section_history">History</string>
+    <string translatable="false" name="material_section_playlists">Playlists</string>
+    <string translatable="false" name="material_section_trending">Trending</string>
+    <string translatable="false" name="material_section_live">Live</string>
+    <string translatable="false" name="material_section_my_videos">My videos</string>
+    <string translatable="false" name="material_section_gaming">Gaming</string>
+    <string translatable="false" name="material_section_news">News</string>
+    <string translatable="false" name="material_section_music">Music</string>
+    <string translatable="false" name="material_section_sports">Sports</string>
+    <string translatable="false" name="material_section_queue">Playback queue</string>
+    <string translatable="false" name="material_section_notifications">Notifications</string>
+    <string translatable="false" name="material_section_blocked">Blocked Channels</string>
+    <string translatable="false" name="material_section_kids">Kids</string>
 </resources>

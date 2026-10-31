@@ -30,6 +30,13 @@ class SectionsTest {
     }
 
     @Test
+    fun channelsIsNotAddable() {
+        // A two-pane multi-grid section that the browse screen cannot show.
+        assertFalse(MediaGroup.TYPE_CHANNEL_UPLOADS in Sections.HIDDEN_ADDABLE)
+        assertFalse(MediaGroup.TYPE_CHANNEL_UPLOADS in known)
+    }
+
+    @Test
     fun resolveTabsSkipsUnknownKeepsOrder() {
         val saved = listOf(MediaGroup.TYPE_HISTORY, 4242, MediaGroup.TYPE_MUSIC, MediaGroup.TYPE_HOME)
         assertEquals(

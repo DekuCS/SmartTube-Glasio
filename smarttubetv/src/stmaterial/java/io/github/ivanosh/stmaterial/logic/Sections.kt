@@ -16,7 +16,10 @@ object Sections {
         SEARCH_SECTION_ID
     )
 
-    /** Shorts is excluded from v1; Settings is an icon outside the tab count. */
+    /**
+ * Shorts and Channels are excluded from v1 (Channels is a two-pane multi-grid the browse screen does not
+ * support); Settings is an icon outside the tab count.
+ */
     val HIDDEN_ADDABLE: List<Int> = listOf(
         MediaGroup.TYPE_TRENDING,
         MediaGroup.TYPE_LIVE,
@@ -25,7 +28,6 @@ object Sections {
         MediaGroup.TYPE_NEWS,
         MediaGroup.TYPE_MUSIC,
         MediaGroup.TYPE_SPORTS,
-        MediaGroup.TYPE_CHANNEL_UPLOADS,
         MediaGroup.TYPE_PLAYBACK_QUEUE,
         MediaGroup.TYPE_NOTIFICATIONS,
         MediaGroup.TYPE_BLOCKED_CHANNELS,

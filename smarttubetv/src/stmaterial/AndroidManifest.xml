@@ -16,5 +16,10 @@
             android:launchMode="singleInstance"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
             android:screenOrientation="unspecified" />
+
+        <activity
+            android:name="io.github.ivanosh.stmaterial.browse.MaterialSectionsEditorActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified" />
     </application>
 </manifest>

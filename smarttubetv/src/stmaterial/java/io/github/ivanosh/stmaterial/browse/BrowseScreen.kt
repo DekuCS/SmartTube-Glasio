@@ -15,7 +15,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
+import io.github.ivanosh.stmaterial.ui.ContextMenu
+import io.github.ivanosh.stmaterial.ui.MenuItem
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,10 +55,14 @@ import io.github.ivanosh.stmaterial.ui.Tabs
 interface BrowseActions : FeedActions {
     fun onTabFocused(id: Int)
     fun onTabClicked(id: Int)
+    fun onOpenFirst(id: Int)
+    fun onHide(id: Int)
+    fun onCustomize()
     fun onErrorAction(error: ErrorData)
 }
 
 private const val TABS_ANIMATION_MS = 200
+private const val MESSAGE_MS = 3000L
 private val TabsTravel = 132.dp
 
 // The content starts below the bar and not under it: focus search takes a list as one rectangle first,
@@ -63,7 +78,7 @@ private fun Modifier.contentArea(): Modifier = layout { measurable, constraints 
 }
 
 @Composable
-fun BrowseScreen(state: BrowseState, startSection: Int, actions: BrowseActions) {
+fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
     MaterialTvTheme {
         val requesters = remember { HashMap<Int, FocusRequester>() }
         val requesterFor = { id: Int -> requesters.getOrPut(id) { FocusRequester() } }
@@ -71,6 +86,8 @@ fun BrowseScreen(state: BrowseState, startSection: Int, actions: BrowseActions) 
         var contentFocused by remember { mutableStateOf(false) }
         val repeatGuard = remember { KeyRepeatGuard() }
         var backPressed by remember { mutableStateOf(false) }
+        // The tab whose menu is open, and the tab that gets focus back when it closes.
+        var menuFor by remember { mutableStateOf<Int?>(null) }
 
         fun focusTabs() {
             val ids = state.tabs()
@@ -80,13 +97,29 @@ fun BrowseScreen(state: BrowseState, startSection: Int, actions: BrowseActions) 
 
         // Nothing holds focus: the first frame, or what had it is gone (error replaced, card removed,
         // section cleared). A card takes it back if there is one, otherwise the selected tab.
-        val orphaned = !barFocused && !contentFocused
+        val orphaned = !barFocused && !contentFocused && menuFor == null
         val hasTabs = state.tabs().isNotEmpty()
         LaunchedEffect(orphaned, hasTabs) {
             if (!orphaned || !hasTabs) return@LaunchedEffect
             withFrameNanos { }
             val card = if (state.focused != null) state.restoreFocus() else null
             if (card != null) state.pendingFocus = card else focusTabs()
+        }
+
+        var menuClosedOn by remember { mutableStateOf<Int?>(null) }
+        LaunchedEffect(menuFor) {
+            val origin = menuClosedOn
+            if (menuFor == null && origin != null) {
+                menuClosedOn = null
+                withFrameNanos { }
+                if (origin == MediaGroup.TYPE_SETTINGS || origin in state.tabs()) requesterFor(origin).requestFocus() else focusTabs()
+            }
+        }
+        LaunchedEffect(state.message) {
+            if (state.message != null) {
+                delay(MESSAGE_MS)
+                state.message = null
+            }
         }
 
         // The presenter moved the selection (account change, say) while focus was on the bar.
@@ -98,7 +131,7 @@ fun BrowseScreen(state: BrowseState, startSection: Int, actions: BrowseActions) 
         val searchTitle = stringResource(R.string.material_search)
         val tabs = state.tabs().map { id ->
             val title = if (id == Sections.SEARCH_SECTION_ID) searchTitle else state.sections.firstOrNull { it.id == id }?.title.orEmpty()
-            TabItem(id, title, id == startSection)
+            TabItem(id, title, id == state.start)
         }
 
         Box(
@@ -146,12 +179,48 @@ fun BrowseScreen(state: BrowseState, startSection: Int, actions: BrowseActions) 
                     actions.onTabFocused(it)
                 },
                 onClick = actions::onTabClicked,
+                onLongPress = { menuFor = it },
                 modifier = Modifier
                     .onFocusChanged { barFocused = it.hasFocus }
                     .graphicsLayer { translationY = -TabsTravel.toPx() * tabsAway.value },
             )
+            state.message?.let { Message(it, Modifier.align(Alignment.BottomCenter)) }
+            menuFor?.let { id ->
+                val openFirst = stringResource(R.string.material_menu_open_first)
+                val hide = stringResource(R.string.material_menu_hide)
+                val customize = stringResource(R.string.material_menu_customize)
+                val items = buildList {
+                    if (id != MediaGroup.TYPE_SETTINGS) {
+                        add(MenuItem(openFirst) { actions.onOpenFirst(id) })
+                        // The last tab cannot go: a screen without tabs has no way back to them.
+                        if (id in state.shown && state.tabs().size > 1) add(MenuItem(hide) { actions.onHide(id) })
+                    }
+                    add(MenuItem(customize) { actions.onCustomize() })
+                }
+                ContextMenu(
+                    items = items,
+                    onDismiss = {
+                        menuClosedOn = id
+                        menuFor = null
+                    },
+                    alignEnd = id == MediaGroup.TYPE_SETTINGS,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun Message(text: String, modifier: Modifier) {
+    Text(
+        text,
+        style = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Medium, color = Palette.OnBackground),
+        modifier = modifier
+            .padding(bottom = 48.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Palette.Tile)
+            .padding(horizontal = 32.dp, vertical = 14.dp),
+    )
 }
 
 @Composable
