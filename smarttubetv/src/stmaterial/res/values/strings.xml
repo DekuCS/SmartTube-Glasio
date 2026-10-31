@@ -2,4 +2,10 @@
 <resources>
     <string translatable="false" name="app_name"><![CDATA[SmartTube Material]]></string>
     <string translatable="false" name="browse_title"><![CDATA[SmartTube Material]]></string>
+    <string translatable="false" name="material_search">Search</string>
+    <string translatable="false" name="material_search_hint">Press OK to search</string>
+    <string translatable="false" name="material_settings">Settings</string>
+    <string translatable="false" name="material_retry">Retry</string>
+    <string translatable="false" name="material_loading">Loading…</string>
+    <string translatable="false" name="material_empty">Nothing here yet</string>
 </resources>

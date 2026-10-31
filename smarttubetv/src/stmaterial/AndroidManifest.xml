@@ -10,5 +10,11 @@
         <!-- MATERIAL: no external zip import -->
         <activity android:name="com.liskovsoft.smartyoutubetv2.common.misc.BackupReceiverActivity"
             tools:node="remove" />
+
+        <activity
+            android:name="io.github.ivanosh.stmaterial.browse.MaterialBrowseActivity"
+            android:launchMode="singleInstance"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified" />
     </application>
 </manifest>
