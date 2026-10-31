@@ -4,7 +4,6 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        jcenter()
     }
 
     dependencies {
@@ -23,6 +22,8 @@ buildscript {
 }
 
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
@@ -41,6 +42,7 @@ if (new File("${projectDir}/google-services.json").exists() && (getGradle().getS
 }
 
 android {
+    namespace 'com.liskovsoft.smartyoutubetv2.tv'
     // FIX: Default interface methods are only supported starting with Android N (--min-api 24)
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -137,6 +139,10 @@ android {
         }
     }
 
+    buildFeatures {
+        compose true
+    }
+
     packagingOptions {
         // openvpn module fix: More than one file was found with OS independent path 'META-INF/com.android.tools/proguard/coroutines.pro'
         //exclude 'META-INF/com.android.tools/proguard/coroutines.pro'
@@ -167,6 +173,13 @@ android {
             applicationId "org.smarttube.stable"
             targetSdkVersion project.properties.compileSdkVersion
         }
+        stmaterial {
+            applicationId "io.github.ivanosh.smarttubematerial"
+            matchingFallbacks = ["stfdroid"]
+            minSdkVersion 29
+            targetSdkVersion 34
+            signingConfig signingConfigs.debug
+        }
         stfdroid {
             applicationId "app.smarttube.fdroid"
             minSdkVersion 21
@@ -180,8 +193,26 @@ android {
     }
 }
 
+// The ABI splits are shared by all flavors, stmaterial supports only the two ARM ones.
+androidComponents {
+    onVariants(selector().withFlavor(new kotlin.Pair('default', 'stmaterial'))) { variant ->
+        variant.outputs.each { output ->
+            if (output.filters.any { it.identifier == 'x86' }) {
+                output.enabled.set(false)
+            }
+        }
+    }
+}
+
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+
+    stmaterialImplementation platform('androidx.compose:compose-bom:2026.06.01')
+    stmaterialImplementation 'androidx.compose.ui:ui'
+    stmaterialImplementation 'androidx.compose.foundation:foundation'
+    stmaterialImplementation 'androidx.activity:activity-compose:1.11.0'
+    stmaterialImplementation 'androidx.tv:tv-material:1.1.0'
+    testStmaterialImplementation 'junit:junit:4.13.2'
 
     implementation 'androidx.leanback:leanback:' + leanbackXVersion
     implementation 'androidx.leanback:leanback-preference:' + leanbackXVersion

@@ -19,8 +19,9 @@ buildscript {
         //jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.4.2'
+        classpath 'com.android.tools.build:gradle:8.13.2'
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:' + kotlinVersion
+        classpath 'org.jetbrains.kotlin:compose-compiler-gradle-plugin:' + kotlinVersion
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -45,13 +46,17 @@ allprojects {
         // Force Android 4 compatible okHttp version
         resolutionStrategy.force 'com.squareup.okhttp3:okhttp:' + okhttpVersion
         // Downgrade kotlin version for WorkManager
-        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:' + kotlinVersion
-        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:' + kotlinVersion
-        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:' + kotlinVersion
-        resolutionStrategy.force 'org.jetbrains.kotlinx:kotlinx-coroutines-android:' + kotlinxVersion
-        resolutionStrategy.force 'androidx.core:core-ktx:' + kotlinCoreXVersion
-        resolutionStrategy.force 'androidx.core:core:' + coreXVersion
-        resolutionStrategy.force 'androidx.annotation:annotation:' + annotationXVersion
+        // Root value: the submodules apply the upstream constants themselves and shadow kotlinVersion.
+        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:' + rootProject.kotlinVersion
+        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:' + rootProject.kotlinVersion
+        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:' + rootProject.kotlinVersion
+        // Compose in the stmaterial flavor needs newer versions of these.
+        if (!name.toLowerCase().contains('stmaterial')) {
+            resolutionStrategy.force 'org.jetbrains.kotlinx:kotlinx-coroutines-android:' + kotlinxVersion
+            resolutionStrategy.force 'androidx.core:core-ktx:' + kotlinCoreXVersion
+            resolutionStrategy.force 'androidx.core:core:' + coreXVersion
+            resolutionStrategy.force 'androidx.annotation:annotation:' + annotationXVersion
+        }
         // Downgrade Cronet version for cronet-okhttp
         resolutionStrategy.force 'org.chromium.net:cronet-api:' + cronetApiVersion
         resolutionStrategy.force 'androidx.multidex:multidex:' + multiDexVersion
@@ -66,5 +71,21 @@ allprojects {
         //     // substitute remote dependency with local module
         //     substitute module('androidx.leanback:leanback') using project(':leanback-1.0.0')
         // }
+    }
+}
+
+subprojects { module ->
+    // The submodules must stay untouched and apply the upstream constants themselves, so fix them up from here.
+    plugins.withId('com.android.library') {
+        module.androidComponents.finalizeDsl { android ->
+            android.compileSdk = rootProject.compileSdkVersion
+            android.buildToolsVersion = rootProject.buildToolsVersion
+            // AGP 8 requires a namespace.
+            android.namespace = new groovy.xml.XmlSlurper().parse(module.file('src/main/AndroidManifest.xml')).'@package'.text()
+        }
+    }
+    // Kotlin 2.x targets JVM 17 by default; the modules compile Java for 1.8.
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
     }
 }

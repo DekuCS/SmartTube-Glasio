@@ -1,0 +1,8 @@
+// Upstream constants with the versions this fork builds with. The SharedModules submodule stays untouched.
+apply from: gradle.ext.upstreamConstants
+
+project.ext {
+    kotlinVersion = '2.4.21'
+    compileSdkVersion = 36
+    buildToolsVersion = '36.0.0'
+}

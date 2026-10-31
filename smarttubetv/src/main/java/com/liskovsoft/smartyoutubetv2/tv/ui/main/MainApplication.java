@@ -84,7 +84,7 @@ public class MainApplication extends MultiDexApplication implements Configuratio
         }
 
         setupGlobalExceptionHandler();
-        setupViewManager();
+        registerViews();
     }
 
     /**
@@ -98,7 +98,7 @@ public class MainApplication extends MultiDexApplication implements Configuratio
         return new Configuration.Builder().build();
     }
 
-    private void setupViewManager() {
+    protected void registerViews() {
         ViewManager viewManager = ViewManager.instance(this);
 
         Class<? extends AppDialogActivity> dialogClass = getDialogClass();
