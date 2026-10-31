@@ -81,6 +81,9 @@ public class BackupTokenProtectionTest {
 
     @Test
     public void doWorkSkipsBackupWhenFrequencyIsNone() throws Exception {
+        // Without storage permission backupData() would bail out by itself and the test would prove nothing
+        org.robolectric.Shadows.shadowOf((android.app.Application) mContext).grantPermissions(
+                android.Manifest.permission.READ_EXTERNAL_STORAGE, android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
         GeneralData.instance(mContext).setLocalDriveBackupFreqDays(-1);
         File marker = new File(mContext.getFilesDir(), "global_prefs/media_service_data");
         write(marker);
@@ -88,14 +91,26 @@ public class BackupTokenProtectionTest {
         OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(LocalDriveBackupWorker.class).build();
         WorkManager.getInstance(mContext).enqueue(request).getResult().get();
 
-        WorkInfo info = WorkManager.getInstance(mContext).getWorkInfoById(request.getId()).get();
-        assertEquals(State.SUCCEEDED, info.getState());
+        assertEquals(State.SUCCEEDED, settled(() -> WorkManager.getInstance(mContext).getWorkInfoById(request.getId()).get()));
         assertFalse(new File(new BackupAndRestoreManager(mContext).getRestoreRootPath(),
                 mContext.getPackageName() + "/Backup").exists());
     }
 
     private State uniqueWorkState() throws Exception {
-        List<WorkInfo> infos = WorkManager.getInstance(mContext).getWorkInfosForUniqueWork("LocalDriveBackupWorker").get();
-        return infos.get(0).getState();
+        return settled(() -> WorkManager.getInstance(mContext).getWorkInfosForUniqueWork("LocalDriveBackupWorker").get().get(0));
+    }
+
+    private interface InfoSource {
+        WorkInfo get() throws Exception;
+    }
+
+    // The test scheduler runs the worker on a background thread; wait until it leaves RUNNING
+    private static State settled(InfoSource source) throws Exception {
+        State state = source.get().getState();
+        for (int i = 0; i < 100 && state == State.RUNNING; i++) {
+            Thread.sleep(50);
+            state = source.get().getState();
+        }
+        return state;
     }
 }
