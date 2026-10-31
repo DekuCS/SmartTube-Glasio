@@ -647,12 +647,14 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 option -> GlobalPreferences.instance(getContext()).setChannelsServiceEnabled(!option.isSelected()),
                 !GlobalPreferences.instance(getContext()).isChannelsServiceEnabled()));
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.hide_settings_section),
-                option -> {
-                    mSidebarService.enableSettingsSection(!option.isSelected());
-                    mRestartApp = true;
-                },
-                !mSidebarService.isSettingsSectionEnabled()));
+        if (!mSidebarService.isSettingsSectionLocked()) { // MATERIAL:
+            options.add(UiOptionItem.from(getContext().getString(R.string.hide_settings_section),
+                    option -> {
+                        mSidebarService.enableSettingsSection(!option.isSelected());
+                        mRestartApp = true;
+                    },
+                    !mSidebarService.isSettingsSectionEnabled()));
+        }
 
         options.add(UiOptionItem.from(getContext().getString(R.string.fix_empty_subs_and_channels),
                 option -> mMediaServiceData.setLegacyUIEnabled(option.isSelected()),

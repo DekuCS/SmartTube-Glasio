@@ -228,6 +228,7 @@ private fun FeedCard(state: BrowseState, actions: FeedActions, row: VideoRow, vi
 
     VideoCard(
         video = video,
+        revision = row.revision,
         focused = focused,
         onClick = { actions.onVideoClicked(video) },
         onLongClick = { actions.onVideoLongClicked(video) },

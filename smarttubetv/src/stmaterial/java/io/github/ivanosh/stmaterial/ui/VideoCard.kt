@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,14 +41,19 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
 import com.bumptech.glide.Glide
+import com.bumptech.glide.RequestManager
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
 import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.target.Target
 import com.bumptech.glide.request.transition.Transition
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 
 // Sizes of the canvas, in pixels of the bitmap.
@@ -72,7 +77,7 @@ private const val FOCUS_ANIMATION_MS = 120
 private data class CardFace(val url: String?, val title: String, val meta: String, val badge: String?, val progress: Float)
 
 private fun faceOf(video: Video) = CardFace(
-    url = video.cardImageUrl,
+    url = video.getCardImageUrl(),
     title = video.getTitle().orEmpty(),
     meta = video.getSecondTitle()?.toString().orEmpty(),
     badge = video.badge?.takeIf { it.isNotBlank() },
@@ -84,7 +89,8 @@ private fun faceOf(video: Video) = CardFace(
  * of text and a badge) missed the jank threshold of the brief, see docs/perf.md. The screen only draws
  * finished images, and focus changes nothing but the scale and the outline around them.
  *
- * Focus belongs to the caller: only the card that changed recomposes when focus moves.
+ * Focus belongs to the caller: only the card that changed recomposes when focus moves. [revision] is
+ * how the caller says the video changed in place.
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -95,9 +101,10 @@ fun VideoCard(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     tone: Color = Palette.Tones[0],
+    revision: Int = 0,
 ) {
     val scale = animateFloatAsState(if (focused) 1.04f else 1f, tween(FOCUS_ANIMATION_MS), label = "cardScale")
-    val image = rememberCardImage(faceOf(video), tone)
+    val image = rememberCardImage(remember(video, revision) { faceOf(video) }, tone)
     Surface(
         onClick = onClick,
         onLongClick = onLongClick,
@@ -138,44 +145,86 @@ fun VideoCard(
 
 /** Loads through the app's Glide for as long as the card is composed. The state is read only while drawing. */
 @Composable
-private fun rememberCardImage(face: CardFace, tone: Color): MutableState<ImageBitmap?> {
+private fun rememberCardImage(face: CardFace, tone: Color): State<ImageBitmap?> {
     val glide = Glide.with(LocalContext.current.applicationContext)
     val scope = rememberCoroutineScope()
-    val image = remember(face) { mutableStateOf<ImageBitmap?>(null) }
+    val loader = remember { CardImageLoader(glide) }
+    DisposableEffect(loader) { onDispose { loader.clear() } }
     DisposableEffect(face) {
-        // No picture still leaves a title to show, on the tone of the placeholder.
-        val bakeWithoutThumbnail = {
-            scope.launch(Dispatchers.Default) {
-                val bitmap = Bitmap.createBitmap(THUMB_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888)
-                bakeCard(bitmap, null, face, tone.toArgb())
-                image.value = bitmap.asImageBitmap()
-            }
+        loader.load(face, tone, scope)
+        onDispose { }
+    }
+    return loader.image
+}
+
+/**
+ * Keeps showing the old bitmap until the new one is ready, so a changed card does not blink. Glide may
+ * reuse a bitmap once its target is cleared, so the old target lives exactly as long as it is on screen.
+ */
+private class CardImageLoader(private val glide: RequestManager) {
+    val image = mutableStateOf<ImageBitmap?>(null)
+    private var shown: Target<Bitmap>? = null
+    private var pending: Target<Bitmap>? = null
+    private var baking: Job? = null
+
+    fun load(face: CardFace, tone: Color, scope: CoroutineScope) {
+        cancelPending()
+        if (face.url == null) {
+            bakeWithoutThumbnail(face, tone, scope)
+            return
         }
         val target = object : CustomTarget<Bitmap>(THUMB_WIDTH, THUMB_HEIGHT) {
             override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                image.value = resource.asImageBitmap()
+                pending = null
+                show(resource, this)
             }
 
+            // No picture still leaves a title to show, on the tone of the placeholder.
             override fun onLoadFailed(errorDrawable: Drawable?) {
-                bakeWithoutThumbnail()
+                bakeWithoutThumbnail(face, tone, scope)
             }
 
             override fun onLoadCleared(placeholder: Drawable?) {
-                image.value = null
+                if (shown === this) image.value = null
             }
         }
-        if (face.url != null) {
-            glide.asBitmap()
-                .load(face.url)
-                .transform(CardBake(face))
-                .diskCacheStrategy(DiskCacheStrategy.NONE)
-                .into(target)
-        } else {
-            bakeWithoutThumbnail()
-        }
-        onDispose { glide.clear(target) }
+        pending = target
+        glide.asBitmap()
+            .load(face.url)
+            .transform(CardBake(face))
+            .diskCacheStrategy(DiskCacheStrategy.DATA)
+            .into(target)
     }
-    return image
+
+    fun clear() {
+        cancelPending()
+        shown?.let(glide::clear)
+        shown = null
+        image.value = null
+    }
+
+    private fun cancelPending() {
+        baking?.cancel()
+        pending?.let(glide::clear)
+        pending = null
+    }
+
+    private fun bakeWithoutThumbnail(face: CardFace, tone: Color, scope: CoroutineScope) {
+        baking = scope.launch {
+            val bitmap = withContext(Dispatchers.Default) {
+                Bitmap.createBitmap(THUMB_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888)
+                    .also { bakeCard(it, null, face, tone.toArgb()) }
+            }
+            show(bitmap, null)
+        }
+    }
+
+    private fun show(bitmap: Bitmap, target: Target<Bitmap>?) {
+        val previous = shown
+        shown = target
+        image.value = bitmap.asImageBitmap()
+        previous?.let(glide::clear)
+    }
 }
 
 /** Runs on a Glide thread, with the decoded thumbnail. */

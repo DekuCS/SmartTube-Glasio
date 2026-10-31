@@ -25,6 +25,7 @@ public class SidebarService implements ProfileChangeListener {
     private final Map<Integer, Integer> mDefaultSections = new LinkedHashMap<>();
     private final AppPrefs mPrefs;
     private boolean mIsSettingsSectionEnabled;
+    private boolean mIsSettingsSectionLocked; // MATERIAL:
     private int mBootSectionId;
     private final static int RESERVED_ID = 100;
 
@@ -218,13 +219,27 @@ public class SidebarService implements ProfileChangeListener {
     }
 
     public void enableSettingsSection(boolean enabled) {
+        if (mIsSettingsSectionLocked) { // MATERIAL:
+            return;
+        }
+
         mIsSettingsSectionEnabled = enabled;
 
         persistState();
     }
 
     public boolean isSettingsSectionEnabled() {
-        return mIsSettingsSectionEnabled;
+        return mIsSettingsSectionLocked || mIsSettingsSectionEnabled; // MATERIAL: survives a profile change
+    }
+
+    // MATERIAL: the Settings gear is the only way in, so the section can't be hidden
+    public void lockSettingsSection() {
+        mIsSettingsSectionLocked = true;
+    }
+
+    // MATERIAL:
+    public boolean isSettingsSectionLocked() {
+        return mIsSettingsSectionLocked;
     }
 
     private int getSectionId(Video item) {

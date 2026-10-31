@@ -31,6 +31,10 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
     /** A video refers to its group weakly, and needs it for the next page. Nothing else holds it here. */
     var group: VideoGroup? = null
         internal set
+
+    /** Grows when a video of this row changed in place. */
+    var revision by mutableIntStateOf(0)
+        private set
     private val keys = HashSet<String>()
     internal var requestedMoreAt = -1
 
@@ -41,18 +45,24 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
         if (atStart) videos.addAll(0, fresh) else videos.addAll(fresh)
     }
 
+    /** Also takes the videos out of their groups, or the next cumulative page would bring them back. */
     internal fun removeWhere(predicate: (Video) -> Boolean) {
+        videos.filter(predicate).forEach { it.getGroup()?.remove(it) }
         videos.removeAll(predicate)
         keys.clear()
         videos.forEach { keys.add(videoKey(it)) }
     }
 
+    /**
+     * Video.equals compares ids, so a list holding an equal clone would not see a change. The shown
+     * instance takes the new values, and [revision] tells its card to look again.
+     */
     internal fun sync(items: List<Video>) {
-        items.forEach { fresh ->
+        val changed = items.mapNotNull { fresh ->
             val key = videoKey(fresh)
-            val index = videos.indexOfFirst { videoKey(it) == key }
-            if (index >= 0) videos[index] = fresh
+            videos.firstOrNull { videoKey(it) == key }?.also { it.sync(fresh) }
         }
+        if (changed.isNotEmpty()) revision++
     }
 
     companion object {
@@ -61,7 +71,7 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
 }
 
 /** What the presenter has told the screen, plus where focus is. */
-class BrowseState {
+class BrowseState(private val authorOf: (Video) -> String? = { it.getAuthor() }) {
     /** All sections of the presenter, in its order: its selectSection() passes indexes into this list. */
     val sections = mutableStateListOf<BrowseSection>()
     var shown by mutableStateOf<List<Int>>(emptyList())
@@ -127,12 +137,12 @@ class BrowseState {
                 return
             }
             VideoGroup.ACTION_REMOVE_AUTHOR -> {
-                val channels = videos.mapNotNullTo(HashSet()) { it.channelId }
-                removeFromRows { it.channelId in channels }
+                val authors = videos.mapNotNullTo(HashSet(), authorOf)
+                removeFromRows { authorOf(it) in authors }
                 return
             }
             VideoGroup.ACTION_SYNC -> {
-                rows.firstOrNull { it.id == rowId }?.sync(videos)
+                rows.forEach { it.sync(videos) }
                 return
             }
             VideoGroup.ACTION_REPLACE ->

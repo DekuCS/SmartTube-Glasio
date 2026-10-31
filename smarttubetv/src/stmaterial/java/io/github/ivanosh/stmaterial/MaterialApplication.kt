@@ -1,5 +1,6 @@
 package io.github.ivanosh.stmaterial
 
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.service.SidebarService
 import com.liskovsoft.smartyoutubetv2.common.app.views.AddDeviceView
 import com.liskovsoft.smartyoutubetv2.common.app.views.AppDialogView
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView
@@ -17,6 +18,8 @@ class MaterialApplication : MainApplication() {
     /** The single place where the Material screens replace the upstream ones. */
     override fun registerViews() {
         super.registerViews()
+        // Before any presenter: BrowsePresenter maps the Settings section only once, when it is created.
+        SidebarService.instance(this).lockSettingsSection()
         val viewManager = ViewManager.instance(this)
         val browse = MaterialBrowseActivity::class.java
         viewManager.setRoot(browse)

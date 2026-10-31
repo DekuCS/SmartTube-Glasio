@@ -7,6 +7,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import io.github.ivanosh.stmaterial.logic.Sections
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -25,7 +26,8 @@ class BrowseStateTest {
             setAction(action)
         }
 
-    private fun stateOnHome() = BrowseState().apply {
+    /** Video.getAuthor() needs TextUtils, which is not on the JVM test path. */
+    private fun stateOnHome() = BrowseState { it.author }.apply {
         sections.addAll(listOf(subs, home, settingsSection))
         selectTab(home.id)
     }
@@ -94,12 +96,93 @@ class BrowseStateTest {
     }
 
     @Test
-    fun removedVideoCanComeBack() {
+    fun cumulativePageDoesNotRestoreARemovedVideo() {
         val state = stateOnHome()
-        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a", "b"))
+        val page = group(home, 1, VideoGroup.ACTION_APPEND, "a", "b")
+        state.updateSection(page)
         state.updateSection(group(home, 1, VideoGroup.ACTION_REMOVE, "a"))
+        state.updateSection(page)
+        assertEquals(listOf("b"), state.ids())
+    }
+
+    @Test
+    fun removeAuthorRemovesTheAuthorsVideosFromEveryRow() {
+        val state = stateOnHome()
+        val mine = group(home, 1, VideoGroup.ACTION_APPEND, "a", "b").apply { videos[0].author = "Ann"; videos[1].author = "Bob" }
+        val other = group(home, 2, VideoGroup.ACTION_APPEND, "c", "d").apply {
+            setPosition(1)
+            videos[0].author = "Ann"
+            videos[1].author = "Bob"
+        }
+        state.updateSection(mine)
+        state.updateSection(other)
+        val gone = group(null, 1, VideoGroup.ACTION_REMOVE_AUTHOR, "x").apply { videos[0].author = "Ann" }
+        state.updateSection(gone)
+        assertEquals(listOf("b"), state.ids(0))
+        assertEquals(listOf("d"), state.ids(1))
+    }
+
+    @Test
+    fun removeAuthorKeepsItsVideosOutOfACumulativePage() {
+        val state = stateOnHome()
+        val page = group(home, 1, VideoGroup.ACTION_APPEND, "a", "b").apply { videos[0].author = "Ann"; videos[1].author = "Bob" }
+        state.updateSection(page)
+        state.updateSection(group(null, 1, VideoGroup.ACTION_REMOVE_AUTHOR, "x").apply { videos[0].author = "Ann" })
+        state.updateSection(page)
+        assertEquals(listOf("b"), state.ids())
+    }
+
+    @Test
+    fun prependPutsVideosFirst() {
+        val state = stateOnHome()
         state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.updateSection(group(home, 1, VideoGroup.ACTION_PREPEND, "b"))
         assertEquals(listOf("b", "a"), state.ids())
+    }
+
+    @Test
+    fun syncUpdatesTheShownVideoAndTellsTheCard() {
+        val state = stateOnHome()
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        val row = state.rows[0]
+        val shown = row.videos[0]
+        val before = row.revision
+        state.updateSection(group(null, 9, VideoGroup.ACTION_SYNC, "a").apply { videos[0].percentWatched = 40f })
+        assertSame(shown, row.videos[0])
+        assertEquals(40f, shown.percentWatched, 0f)
+        assertNotEquals(before, row.revision)
+    }
+
+    @Test
+    fun syncReachesEveryRowWithTheVideo() {
+        val state = stateOnHome()
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.updateSection(group(home, 2, VideoGroup.ACTION_APPEND, "a").apply { setPosition(1) })
+        state.updateSection(group(null, 1, VideoGroup.ACTION_SYNC, "a").apply { videos[0].percentWatched = 40f })
+        assertEquals(40f, state.rows[1].videos[0].percentWatched, 0f)
+    }
+
+    @Test
+    fun syncOfAVideoChangedInPlaceStillTellsTheCard() {
+        val state = stateOnHome()
+        val page = group(home, 1, VideoGroup.ACTION_APPEND, "a")
+        state.updateSection(page)
+        val row = state.rows[0]
+        val before = row.revision
+        val sync = VideoGroup.from(listOf(row.videos[0])).apply { setAction(VideoGroup.ACTION_SYNC) }
+        row.videos[0].deArrowTitle = "Better title"
+        state.updateSection(sync)
+        assertNotEquals(before, row.revision)
+    }
+
+    @Test
+    fun syncOfAnotherVideoLeavesTheRowAlone() {
+        val state = stateOnHome()
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        val row = state.rows[0]
+        val before = row.revision
+        state.updateSection(group(null, 1, VideoGroup.ACTION_SYNC, "z"))
+        assertEquals(before, row.revision)
     }
 
     @Test
