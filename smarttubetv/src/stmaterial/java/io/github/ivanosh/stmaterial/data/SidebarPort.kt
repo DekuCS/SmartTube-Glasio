@@ -9,6 +9,7 @@ interface SidebarPort {
     fun moveUp(id: Int)
     fun enable(id: Int, on: Boolean)
     fun setBoot(id: Int)
+    fun boot(): Int
 }
 
 class SidebarServicePort(private val sidebar: SidebarService) : SidebarPort {
@@ -17,4 +18,5 @@ class SidebarServicePort(private val sidebar: SidebarService) : SidebarPort {
     override fun moveUp(id: Int) = sidebar.moveSectionUp(id)
     override fun enable(id: Int, on: Boolean) = sidebar.enableSection(id, on)
     override fun setBoot(id: Int) = sidebar.setBootSectionId(id)
+    override fun boot() = sidebar.getBootSectionId()
 }

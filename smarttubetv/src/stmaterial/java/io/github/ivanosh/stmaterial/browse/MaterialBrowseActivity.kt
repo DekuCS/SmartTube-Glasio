@@ -19,7 +19,6 @@ import io.github.ivanosh.stmaterial.data.SectionStore
 import io.github.ivanosh.stmaterial.logic.EditorState
 import io.github.ivanosh.stmaterial.logic.Sections
 import io.github.ivanosh.stmaterial.logic.resolveStart
-import java.util.concurrent.Executors
 import com.liskovsoft.smartyoutubetv2.tv.R
 
 /**
@@ -34,7 +33,6 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     private val loadSelected = Runnable { load() }
     private lateinit var presenter: BrowsePresenter
     private lateinit var store: SectionStore
-    private val saver = Executors.newSingleThreadExecutor()
     private var initializing = false
 
     private val actions = object : BrowseActions {
@@ -113,6 +111,9 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
             ?: state.tabs().firstOrNull()
         target?.let { select(it, immediately = true) }
 
+        // A save cut short leaves the sidebar half done while the prefs, which the tabs follow, are new.
+        store.repairAsync { changed -> if (changed && !isDestroyed) runOnUiThread { presenter.updateSections() } }
+
         setContentView(ComposeView(this).apply { setContent { BrowseScreen(state, actions) } })
         // The screen is opaque, a window background would only be one more fill per frame.
         window.setBackgroundDrawable(null)
@@ -134,12 +135,12 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     }
 
     /**
-     * Storing mirrors the list to SidebarService, which writes its whole state on every change, so it
-     * runs off the main thread. Nothing here reads the sidebar until the editor or the next start.
+     * Prefs are written at once; mirroring to SidebarService writes its whole state on every change, so it
+     * runs on the store's save thread, after every earlier save.
      */
     private fun saveAsync(shown: List<Int>, start: Int) {
         val edited = EditorState(shown, emptyList(), emptySet(), Sections.LIMIT)
-        saver.execute { store.save(edited, start) }
+        store.saveAsync(edited, start)
     }
 
     private fun titleOf(id: Int): String =
@@ -154,7 +155,6 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(loadSelected)
-        saver.shutdown()
         presenter.onViewDestroyed()
     }
 

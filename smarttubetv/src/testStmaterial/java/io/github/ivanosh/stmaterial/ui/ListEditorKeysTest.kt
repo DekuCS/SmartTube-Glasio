@@ -162,4 +162,41 @@ class ListEditorKeysTest {
     fun otherKeysDoNotFinish() {
         assertTrue(!ui().press(EditorKey.Down, EditorKey.Ok).done)
     }
+
+    @Test
+    fun upDownMoveCursorInsideHiddenList() {
+        val r = ui(side = Side.Hidden, index = 0).press(EditorKey.Down)
+        assertEquals(EditorCursor(Side.Hidden, 1), r.ui.cursor)
+        assertEquals(EditorCursor(Side.Hidden, 0), r.ui.press(EditorKey.Up).ui.cursor)
+        assertEquals(0, r.ui.press(EditorKey.Up, EditorKey.Up).ui.cursor.index)
+    }
+
+    @Test
+    fun okPicksAndReleasesInsideHiddenList() {
+        val r = ui(side = Side.Hidden, index = 1).press(EditorKey.Ok)
+        assertEquals("y", r.ui.state.picked)
+        assertNull(r.ui.press(EditorKey.Ok).ui.state.picked)
+    }
+
+    @Test
+    fun pickedHiddenItemDoesNotReorderOnUpDown() {
+        // The hidden order is not kept, so Up and Down leave a picked hidden item, and the lists, alone.
+        val picked = ui(side = Side.Hidden, index = 1).press(EditorKey.Ok)
+        val r = picked.ui.press(EditorKey.Up, EditorKey.Down, EditorKey.Down)
+        assertEquals(listOf("x", "y"), r.ui.state.hidden)
+        assertEquals(listOf("a", "b", "c"), r.ui.state.shown)
+        assertEquals("y", r.ui.state.picked)
+        assertEquals(EditorCursor(Side.Hidden, 1), r.ui.cursor)
+    }
+
+    @Test
+    fun emptyHiddenListWithCursorOnItIsHarmless() {
+        val empty = ui(hidden = emptyList(), side = Side.Hidden, index = 0)
+        for (key in listOf(EditorKey.Up, EditorKey.Down, EditorKey.Ok, EditorKey.Right)) {
+            val r = empty.press(key)
+            assertEquals(key.name, empty.state, r.ui.state)
+            assertEquals(key.name, EditorCursor(Side.Hidden, 0), r.ui.cursor)
+        }
+        assertEquals(Side.Shown, empty.press(EditorKey.Left).ui.cursor.side)
+    }
 }

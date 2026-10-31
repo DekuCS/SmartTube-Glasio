@@ -48,10 +48,7 @@ class MaterialSectionsEditorActivity : ComponentActivity() {
 
     /** The browse screen reads the result when it resumes, so the editor closes only once it is stored. */
     private fun save(state: EditorState<Int>) {
-        Thread {
-            store.save(state)
-            runOnUiThread { finish() }
-        }.start()
+        store.saveAsync(state) { runOnUiThread { finish() } }
     }
 }
 

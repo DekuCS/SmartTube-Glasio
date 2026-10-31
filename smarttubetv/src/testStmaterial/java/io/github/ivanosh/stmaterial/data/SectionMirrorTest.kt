@@ -10,19 +10,26 @@ import org.junit.Test
 private class FakeSidebar(var items: MutableList<Int>) : SidebarPort {
     var booted = -1
     var moves = 0
+    var writes = 0
     override fun index(id: Int) = items.indexOf(id)
     override fun canMoveUp(id: Int) = index(id) > 0
     override fun moveUp(id: Int) {
         // Bounded: a non-terminating reorder fails instead of hanging.
+        writes++
         check(++moves < 10_000) { "reorder did not converge: $items" }
         val i = index(id)
         items.removeAt(i)
         items.add(i - 1, id)
     }
     override fun enable(id: Int, on: Boolean) {
+        writes++
         if (on) { if (id !in items) items.add(id) } else items.remove(id)
     }
-    override fun setBoot(id: Int) { booted = id }
+    override fun setBoot(id: Int) {
+        writes++
+        booted = id
+    }
+    override fun boot() = booted
 }
 
 class SectionMirrorTest {
@@ -84,5 +91,45 @@ class SectionMirrorTest {
         assertTrue(MediaGroup.TYPE_HOME in fake.items)
         assertFalse(MediaGroup.TYPE_MUSIC in fake.items)
         assertFalse(Sections.SEARCH_SECTION_ID in fake.items)
+    }
+
+    @Test
+    fun halfAppliedSidebarConvergesToThePrefs() {
+        val target = listOf(MediaGroup.TYPE_HISTORY, MediaGroup.TYPE_HOME, MediaGroup.TYPE_MUSIC)
+        // A save cut after enabling Music and Shorts but before ordering and booting.
+        val fake = FakeSidebar(
+            mutableListOf(MediaGroup.TYPE_HOME, MediaGroup.TYPE_SETTINGS, MediaGroup.TYPE_NEWS, MediaGroup.TYPE_MUSIC, MediaGroup.TYPE_SHORTS)
+        )
+        fake.booted = MediaGroup.TYPE_NEWS
+        val changed = SectionMirror(fake).mirror(target, MediaGroup.TYPE_HISTORY)
+        assertTrue(changed)
+        assertEquals(target, fake.items.filter { it in target })
+        assertFalse(MediaGroup.TYPE_NEWS in fake.items)
+        assertFalse(MediaGroup.TYPE_SHORTS in fake.items)
+        assertTrue(MediaGroup.TYPE_SETTINGS in fake.items)
+        assertEquals(MediaGroup.TYPE_HISTORY, fake.booted)
+    }
+
+    @Test
+    fun alreadyCorrectSidebarCausesNoMovesOrWrites() {
+        val target = listOf(MediaGroup.TYPE_HISTORY, Sections.SEARCH_SECTION_ID, MediaGroup.TYPE_HOME)
+        val fake = FakeSidebar(mutableListOf(MediaGroup.TYPE_SETTINGS, 5001))
+        SectionMirror(fake).mirror(target, MediaGroup.TYPE_HOME)
+        fake.moves = 0
+        fake.writes = 0
+        assertFalse(SectionMirror(fake).mirror(target, MediaGroup.TYPE_HOME))
+        assertEquals(0, fake.writes)
+        assertEquals(0, fake.moves)
+    }
+
+    @Test
+    fun searchOnlyListIsStableOnRepeat() {
+        val fake = FakeSidebar(mutableListOf())
+        val shown = listOf(Sections.SEARCH_SECTION_ID)
+        SectionMirror(fake).mirror(shown, Sections.SEARCH_SECTION_ID)
+        fake.writes = 0
+        assertFalse(SectionMirror(fake).mirror(shown, Sections.SEARCH_SECTION_ID))
+        assertEquals(0, fake.writes)
+        assertEquals(MediaGroup.TYPE_HOME, fake.booted)
     }
 }

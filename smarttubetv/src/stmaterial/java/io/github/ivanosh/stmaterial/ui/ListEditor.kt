@@ -173,6 +173,8 @@ fun <T> ListEditor(
     var ui by remember { mutableStateOf(EditorUi(state, defaults, EditorCursor(Side.Shown, 0))) }
     var notice by remember { mutableStateOf<Notice?>(null) }
     var backPressed by remember { mutableStateOf(false) }
+    // Back has handed the state over: the editor takes no more keys while it is stored and closed.
+    var finished by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -199,11 +201,15 @@ fun <T> ListEditor(
             }
             null -> null
         }
-        if (result.done) onDone(result.ui.state)
+        if (result.done) {
+            finished = true
+            onDone(result.ui.state)
+        }
     }
 
     val picked = ui.state.picked
     val key = Modifier.onPreviewKeyEvent { event ->
+        if (finished) return@onPreviewKeyEvent true
         val code = event.nativeKeyEvent.keyCode
         if (event.key == Key.Back) {
             when (event.type) {
