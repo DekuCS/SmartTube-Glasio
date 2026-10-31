@@ -1,7 +1,6 @@
 package io.github.ivanosh.stmaterial.data
 
 import android.content.Context
-import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.service.SidebarService
 import io.github.ivanosh.stmaterial.logic.EditorState
 import io.github.ivanosh.stmaterial.logic.Sections
@@ -15,7 +14,7 @@ import io.github.ivanosh.stmaterial.logic.resolveTabs
 class SectionStore(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val sidebar: SidebarService = SidebarService.instance(context)
+    private val mirror = SectionMirror(SidebarServicePort(SidebarService.instance(context)))
 
     init {
         if (!prefs.contains(KEY_ORDER)) {
@@ -48,32 +47,8 @@ class SectionStore(context: Context) {
             Sections.DEFAULT_SHOWN, Sections.HIDDEN_ADDABLE, emptySet(), Sections.LIMIT
         )
 
-    private fun mirror(shown: List<Int>) {
-        val real = shown.filter { it != Sections.SEARCH_SECTION_ID }
-        for (id in Sections.KNOWN) {
-            if (id != Sections.SEARCH_SECTION_ID) sidebar.enableSection(id, id in real)
-        }
-        sidebar.enableSection(MediaGroup.TYPE_SHORTS, false)
-        order(real)
-        // The presenter cannot open Search, so a Search start boots the first real section.
-        val start = resolveStart(prefs.getInt(KEY_START, Sections.START_DEFAULT), shown)
-        val boot = if (start == Sections.SEARCH_SECTION_ID) real.firstOrNull() else start
-        if (boot != null) sidebar.setBootSectionId(boot)
-    }
-
-    /** SidebarService has no bulk ordering: bubble each section above its predecessor until sorted. */
-    private fun order(ids: List<Int>) {
-        var moved = true
-        while (moved) {
-            moved = false
-            for (i in 1 until ids.size) {
-                if (sidebar.getSectionIndex(ids[i]) < sidebar.getSectionIndex(ids[i - 1])) {
-                    sidebar.moveSectionUp(ids[i - 1])
-                    moved = true
-                }
-            }
-        }
-    }
+    private fun mirror(shown: List<Int>) =
+        mirror.mirror(shown, prefs.getInt(KEY_START, Sections.START_DEFAULT))
 
     private fun parseIds(raw: String?): List<Int> =
         raw?.split(',')?.mapNotNull { it.trim().toIntOrNull() } ?: emptyList()
