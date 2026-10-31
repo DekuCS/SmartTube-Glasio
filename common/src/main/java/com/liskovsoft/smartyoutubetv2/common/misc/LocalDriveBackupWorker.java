@@ -57,7 +57,8 @@ public class LocalDriveBackupWorker extends Worker {
     }
 
     public static void cancel(Context context) {
-        if (VERSION.SDK_INT >= 23 && GeneralData.instance(context).getLocalDriveBackupFreqDays() > 0) {
+        // MATERIAL: no frequency check; the setting is already -1 when "None" is chosen, so the old guard skipped the cancel
+        if (VERSION.SDK_INT >= 23) {
             Log.d(TAG, "Unregistering worker job...");
 
             SafeWorkManager workManager = SafeWorkManager.getInstance(context);
@@ -68,6 +69,12 @@ public class LocalDriveBackupWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
+        // MATERIAL: a job left from an earlier setting must not back up when auto backup is off
+        if (!BackupExclusions.isAutoBackupEnabled(GeneralData.instance(getApplicationContext()).getLocalDriveBackupFreqDays())) {
+            cancel(getApplicationContext());
+            return Result.success();
+        }
+
         if (BackupSettingsPresenter.hasInstance()) {
             return Result.retry();
         }

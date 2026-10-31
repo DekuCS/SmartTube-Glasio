@@ -4,5 +4,11 @@
 
     <application
         android:name="io.github.ivanosh.stmaterial.MaterialApplication"
-        tools:replace="android:name" />
+        android:allowBackup="false"
+        tools:replace="android:name,android:allowBackup">
+
+        <!-- MATERIAL: no external zip import -->
+        <activity android:name="com.liskovsoft.smartyoutubetv2.common.misc.BackupReceiverActivity"
+            tools:node="remove" />
+    </application>
 </manifest>
