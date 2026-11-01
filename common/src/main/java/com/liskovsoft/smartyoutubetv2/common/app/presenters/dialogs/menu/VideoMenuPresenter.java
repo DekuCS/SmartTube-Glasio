@@ -350,21 +350,24 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
         RxHelper.disposeActions(mNotInterestedAction);
 
         mDialogPresenter.appendSingleButton(
-                UiOptionItem.from(getContext().getString(R.string.not_interested), optionItem -> {
-                    if (mVideo.mediaItem.getFeedbackEndpoint() == null) {
-                        markAsNotInterested(mVideo.mediaItem.getFeedbackToken());
-                    } else {
-                        mNotInterestedAction = mMediaItemService.getFeedbackTokensObserve(mVideo.mediaItem.getFeedbackEndpoint())
-                                .subscribe(
-                                        tokens -> {
-                                            if (tokens.size() == 2) {
-                                                markAsNotInterested(tokens.get(0));
-                                            }
-                                        },
-                                        error -> Log.e(TAG, "Mark as 'not interested' error: %s", error.getMessage())
-                                );
-                    }
-                }));
+                UiOptionItem.from(getContext().getString(R.string.not_interested), optionItem -> startNotInterested()));
+    }
+
+    // MATERIAL: the body of the 'not interested' button, so that the card menu of the Material UI runs the same calls.
+    private void startNotInterested() {
+        if (mVideo.mediaItem.getFeedbackEndpoint() == null) {
+            markAsNotInterested(mVideo.mediaItem.getFeedbackToken());
+        } else {
+            mNotInterestedAction = mMediaItemService.getFeedbackTokensObserve(mVideo.mediaItem.getFeedbackEndpoint())
+                    .subscribe(
+                            tokens -> {
+                                if (tokens.size() == 2) {
+                                    markAsNotInterested(tokens.get(0));
+                                }
+                            },
+                            error -> Log.e(TAG, "Mark as 'not interested' error: %s", error.getMessage())
+                    );
+        }
     }
 
     private void markAsNotInterested(String feedbackToken) {
@@ -466,20 +469,25 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
 
         mDialogPresenter.appendSingleButton(
                 UiOptionItem.from(buttonText, optionItem -> {
-                    if (isBlocked) {
-                        blockedChannelData.removeChannel(channelId, channelName);
-                        MessageHelpers.showMessage(getContext(), R.string.channel_unblocked);
-                    } else {
-                        blockedChannelData.addChannel(channelId, channelName);
-                        MessageHelpers.showMessage(getContext(), R.string.channel_blocked);
-                    }
-
-                    if (mCallback != null) {
-                        mCallback.onItemAction(mVideo, VideoMenuCallback.ACTION_REMOVE);
-                    }
+                    MessageHelpers.showMessage(getContext(), isBlocked ? R.string.channel_unblocked : R.string.channel_blocked);
+                    setChannelBlocked(!isBlocked);
                     mDialogPresenter.closeDialog();
-                    showHideBlockedChannelsSection(blockedChannelData);
                 }));
+    }
+
+    // MATERIAL: the body of the block/unblock button, so that the card menu of the Material UI runs the same calls.
+    private void setChannelBlocked(boolean blocked) {
+        BlockedChannelData blockedChannelData = BlockedChannelData.instance(getContext());
+        if (blocked) {
+            blockedChannelData.addChannel(mVideo.channelId, mVideo.getAuthor());
+        } else {
+            blockedChannelData.removeChannel(mVideo.channelId, mVideo.getAuthor());
+        }
+
+        if (mCallback != null) {
+            mCallback.onItemAction(mVideo, VideoMenuCallback.ACTION_REMOVE);
+        }
+        showHideBlockedChannelsSection(blockedChannelData);
     }
 
     private void showHideBlockedChannelsSection(BlockedChannelData blockedChannelData) {
@@ -499,18 +507,23 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
 
         mDialogPresenter.appendSingleButton(
                 UiOptionItem.from(getContext().getString(R.string.remove_from_history), optionItem -> {
-                    if (mVideo.mediaItem == null || mVideo.mediaItem.getFeedbackToken() == null) {
-                        onRemoveFromHistoryDone();
-                    } else {
-                        mNotInterestedAction = mMediaItemService.markAsNotInterestedObserve(mVideo.mediaItem.getFeedbackToken())
-                                .subscribe(
-                                        var -> {},
-                                        error -> Log.e(TAG, "Remove from history error: %s", error.getMessage()),
-                                        this::onRemoveFromHistoryDone
-                                );
-                    }
+                    startRemoveFromHistory();
                     mDialogPresenter.closeDialog();
                 }));
+    }
+
+    // MATERIAL: the body of the 'remove from history' button, so that the card menu of the Material UI runs the same calls.
+    private void startRemoveFromHistory() {
+        if (mVideo.mediaItem == null || mVideo.mediaItem.getFeedbackToken() == null) {
+            onRemoveFromHistoryDone();
+        } else {
+            mNotInterestedAction = mMediaItemService.markAsNotInterestedObserve(mVideo.mediaItem.getFeedbackToken())
+                    .subscribe(
+                            var -> {},
+                            error -> Log.e(TAG, "Remove from history error: %s", error.getMessage()),
+                            this::onRemoveFromHistoryDone
+                    );
+        }
     }
 
     private void onRemoveFromHistoryDone() {
@@ -763,11 +776,7 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
                 UiOptionItem.from(
                         getContext().getString(R.string.add_to_playback_queue),
                         optionItem -> {
-                            mVideo.fromQueue = true;
-                            playlist.add(mVideo);
-                            if (mCallback != null) {
-                                mCallback.onItemAction(mVideo, VideoMenuCallback.ACTION_ADD_TO_QUEUE);
-                            }
+                            addToQueue();
 
                             closeDialog();
                             MessageHelpers.showMessage(getContext(), String.format("%s: %s",
@@ -775,6 +784,45 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
                                     getContext().getString(R.string.added_to_playback_queue))
                             );
                         }));
+    }
+
+    // MATERIAL: the body of the 'add to queue' button, so that the card menu of the Material UI runs the same calls.
+    private void addToQueue() {
+        mVideo.fromQueue = true;
+        Playlist.instance().add(mVideo);
+        if (mCallback != null) {
+            mCallback.onItemAction(mVideo, VideoMenuCallback.ACTION_ADD_TO_QUEUE);
+        }
+    }
+
+    // MATERIAL: entry points of the card menu of the Material UI. Each runs what the button of the same name runs.
+    // The callers show their own confirmation and close nothing: there is no dialog to close.
+
+    public void addToQueue(Video video, VideoMenuCallback callback) {
+        bind(video, callback);
+        addToQueue();
+    }
+
+    public void notInterested(Video video, VideoMenuCallback callback) {
+        bind(video, callback);
+        startNotInterested();
+    }
+
+    /** Only blocks: a channel that is blocked already stays so, and the callback still reports the removal. */
+    public void blockChannel(Video video, VideoMenuCallback callback) {
+        bind(video, callback);
+        setChannelBlocked(true);
+    }
+
+    public void removeFromHistory(Video video, VideoMenuCallback callback) {
+        bind(video, callback);
+        startRemoveFromHistory();
+    }
+
+    private void bind(Video video, VideoMenuCallback callback) {
+        mVideo = video;
+        mCallback = callback;
+        sVideoHolder = new WeakReference<>(video);
     }
 
     private void appendRemoveFromPlaybackQueueButton() {

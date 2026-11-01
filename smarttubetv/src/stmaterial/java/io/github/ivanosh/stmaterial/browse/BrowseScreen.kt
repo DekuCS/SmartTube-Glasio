@@ -40,6 +40,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.logic.Sections
 import io.github.ivanosh.stmaterial.ui.CenteredMessage
@@ -59,6 +60,9 @@ interface BrowseActions : FeedActions {
     fun onHide(id: Int)
     fun onCustomize()
     fun onErrorAction(error: ErrorData)
+
+    /** What the long press on a card offers. Empty when nothing can be done with it. */
+    fun videoMenuItems(video: Video): List<MenuItem>
 }
 
 private const val TABS_ANIMATION_MS = 200
@@ -88,6 +92,22 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
         var backPressed by remember { mutableStateOf(false) }
         // The tab whose menu is open, and the tab that gets focus back when it closes.
         var menuFor by remember { mutableStateOf<Int?>(null) }
+        // The menu of a card. Focus comes back to the card through the state, as it does after any loss of focus.
+        var cardMenu by remember { mutableStateOf<List<MenuItem>?>(null) }
+        // The card that had focus when the menu opened. Focus falls to the tabs when the menu goes, and
+        // that forgets the card, so the menu keeps it.
+        var cardMenuOrigin by remember { mutableStateOf<FocusKey?>(null) }
+        val feedActions = remember(actions) {
+            object : BrowseActions by actions {
+                override fun onVideoLongClicked(video: Video) {
+                    val items = actions.videoMenuItems(video)
+                    if (items.isNotEmpty()) {
+                        cardMenuOrigin = state.focused
+                        cardMenu = items
+                    }
+                }
+            }
+        }
 
         fun focusTabs() {
             val ids = state.tabs()
@@ -97,7 +117,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
 
         // Nothing holds focus: the first frame, or what had it is gone (error replaced, card removed,
         // section cleared). A card takes it back if there is one, otherwise the selected tab.
-        val orphaned = !barFocused && !contentFocused && menuFor == null
+        val orphaned = !barFocused && !contentFocused && menuFor == null && cardMenu == null
         val hasTabs = state.tabs().isNotEmpty()
         LaunchedEffect(orphaned, hasTabs) {
             if (!orphaned || !hasTabs) return@LaunchedEffect
@@ -113,6 +133,15 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                 menuClosedOn = null
                 withFrameNanos { }
                 if (origin == MediaGroup.TYPE_SETTINGS || origin in state.tabs()) requesterFor(origin).requestFocus() else focusTabs()
+            }
+        }
+        LaunchedEffect(cardMenu) {
+            val origin = cardMenuOrigin
+            if (cardMenu == null && origin != null) {
+                cardMenuOrigin = null
+                withFrameNanos { }
+                val card = state.restoreFocus(origin)
+                if (card != null) state.pendingFocus = card else focusTabs()
             }
         }
         LaunchedEffect(state.message) {
@@ -165,7 +194,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                     }
             ) {
                 key(state.selected) {
-                    Content(state, actions)
+                    Content(state, feedActions)
                 }
             }
             Tabs(
@@ -185,6 +214,9 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                     .graphicsLayer { translationY = -TabsTravel.toPx() * tabsAway.value },
             )
             state.message?.let { Message(it, Modifier.align(Alignment.BottomCenter)) }
+            cardMenu?.let { items ->
+                ContextMenu(items = items, onDismiss = { cardMenu = null })
+            }
             menuFor?.let { id ->
                 val openFirst = stringResource(R.string.material_menu_open_first)
                 val hide = stringResource(R.string.material_menu_hide)

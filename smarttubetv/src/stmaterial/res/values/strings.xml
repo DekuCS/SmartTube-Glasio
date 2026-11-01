@@ -11,6 +11,16 @@
     <string translatable="false" name="material_menu_open_first">Open first</string>
     <string translatable="false" name="material_menu_hide">Hide</string>
     <string translatable="false" name="material_menu_customize">Customize sections</string>
+    <string translatable="false" name="material_video_queue">Add to queue</string>
+    <string translatable="false" name="material_video_playlist">Save to playlist</string>
+    <string translatable="false" name="material_video_channel">Go to channel</string>
+    <string translatable="false" name="material_video_not_interested">Not interested</string>
+    <string translatable="false" name="material_video_block_channel">Block channel</string>
+    <string translatable="false" name="material_video_remove_history">Remove from history</string>
+    <string translatable="false" name="material_video_queued">Added to queue</string>
+    <string translatable="false" name="material_video_hidden">Got it, we will show less like this</string>
+    <string translatable="false" name="material_video_blocked">Channel blocked</string>
+    <string translatable="false" name="material_video_removed_history">Removed from history</string>
     <string translatable="false" name="material_start_moved">%1$s opens first now</string>
     <string translatable="false" name="material_editor_subtitle">Settings always stays in the menu.</string>
     <string translatable="false" name="material_editor_in_menu">In menu</string>

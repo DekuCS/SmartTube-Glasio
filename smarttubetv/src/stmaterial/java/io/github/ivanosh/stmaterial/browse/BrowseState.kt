@@ -249,8 +249,7 @@ class BrowseState(
     }
 
     /** The saved card if it still exists, otherwise the first one. Null when there are no cards. */
-    fun restoreFocus(): FocusKey? {
-        val saved = focused
+    fun restoreFocus(saved: FocusKey? = focused): FocusKey? {
         if (saved != null) {
             val row = rows.firstOrNull { it.id == saved.rowId }
             if (row != null && row.videos.any { videoKey(it) == saved.videoId }) return saved
