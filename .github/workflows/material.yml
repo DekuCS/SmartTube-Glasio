@@ -76,7 +76,7 @@ jobs:
       - name: Assemble the release variant
         run: ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
 
-  # Tags only. The key stays in material-release.yml.
+  # Tags only. Builds with no secret and signs in a separate job, see material-release.yml.
   release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/material-v')
     needs: test

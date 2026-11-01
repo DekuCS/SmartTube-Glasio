@@ -46,6 +46,11 @@ if (envKeystore) {
                            keyAlias: props['keyAlias'], keyPassword: props['keyPassword']]
     }
 }
+// CI builds the release with no key and signs the APKs in a later job that never runs this build.
+def materialUnsignedRelease = System.getenv('MATERIAL_UNSIGNED_RELEASE') == 'true'
+if (materialUnsignedRelease) {
+    materialSigning = null
+}
 if (materialSigning != null && materialSigning.values().any { !it }) {
     throw new GradleException('stmaterial release signing is configured but incomplete: need store file, store password, key alias and key password.')
 }
@@ -53,7 +58,7 @@ if (materialSigning == null && System.getenv('MATERIAL_REQUIRE_RELEASE_SIGNING')
     throw new GradleException('MATERIAL_REQUIRE_RELEASE_SIGNING is set but no release signing key was found. Refusing to build.')
 }
 def materialReleaseRequested = getGradle().getStartParameter().getTaskRequests().toString().contains('StmaterialRelease')
-if (materialSigning == null && materialReleaseRequested) {
+if (materialSigning == null && materialReleaseRequested && !materialUnsignedRelease) {
     logger.warn('WARNING: no stmaterial release key (MATERIAL_KEYSTORE_FILE env or ~/.config/smarttube-material/release.properties). ' +
             'stmaterialRelease will be signed with the DEBUG key. Do not distribute this APK.')
 }
@@ -236,7 +241,9 @@ android {
             minSdkVersion 29
             targetSdkVersion 34
             // The release variant is switched to signingConfigs.stmaterialRelease in androidComponents below.
-            signingConfig signingConfigs.debug
+            if (!materialUnsignedRelease) {
+                signingConfig signingConfigs.debug
+            }
         }
         stfdroid {
             applicationId "app.smarttube.fdroid"

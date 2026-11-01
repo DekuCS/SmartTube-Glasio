@@ -1,7 +1,10 @@
 name: SmartTube Material release
 
-# The only workflow that sees the signing key. Two callers: material.yml for a pushed tag, material-sync.yml for the
-# commit it has just verified and pushed. A tag pushed with GITHUB_TOKEN starts no workflow, so the sync calls this.
+# Two callers: material.yml for a pushed tag, material-sync.yml for the commit it has just verified and pushed. A tag
+# pushed with GITHUB_TOKEN starts no workflow, so the sync calls this.
+#
+# The build runs the repository's Gradle code and upstream's, so it gets no secret. The key lives only in `sign`,
+# which never checks out or runs anything from the repository: its input is the APKs and its tools are the SDK's.
 on:
   workflow_call:
     inputs:
@@ -25,14 +28,15 @@ on:
 
 permissions: {}
 
+env:
+  BUILD_TOOLS_VERSION: 36.0.0
+
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write      # create the GitHub Release
-      id-token: write      # sign the provenance attestation
-      attestations: write  # store the attestation
+      contents: read
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,7 +54,7 @@ jobs:
       - name: Tag must match versionName
         env:
           TAG: ${{ inputs.tag }}
-        run: python3 scripts/sync/sync.py check-tag --tag "$TAG"
+        run: python3 -B scripts/sync/sync.py check-tag --tag "$TAG"
 
       - name: Install the SDK parts the build pins
         shell: bash
@@ -58,8 +62,31 @@ jobs:
           set -euo pipefail
           SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "ndk;21.0.6113669" "build-tools;36.0.0" "platforms;android-36"
+          "$SDKMANAGER" "ndk;21.0.6113669" "build-tools;$BUILD_TOOLS_VERSION" "platforms;android-36"
 
+      - name: Build the unsigned release APKs
+        env:
+          MATERIAL_UNSIGNED_RELEASE: 'true'
+        run: ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
+
+      - name: Hand the APKs to the signing job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned-apks
+          path: smarttubetv/build/outputs/apk/stmaterial/release/*.apk
+          retention-days: 1
+          if-no-files-found: error
+
+  # The only job that sees the signing key. Add no checkout here and run nothing that came from the artifact.
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write      # create the GitHub Release
+      id-token: write      # sign the provenance attestation
+      attestations: write  # store the attestation
+    steps:
       - name: Require the signing secrets
         env:
           KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
@@ -74,30 +101,85 @@ jobs:
             fi
           done
 
-      - name: Build the signed release APKs
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install the pinned build-tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "build-tools;$BUILD_TOOLS_VERSION"
+
+      - name: Take the unsigned APKs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unsigned-apks
+          path: ${{ runner.temp }}/unsigned
+
+      - name: The APKs must be the expected files of this release
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          VERSION=${TAG#material-v}
+          EXPECTED="SmartTube_material_${VERSION}_arm64-v8a.apk SmartTube_material_${VERSION}_armeabi-v7a.apk SmartTube_material_${VERSION}_universal.apk"
+          ACTUAL=$(cd "$RUNNER_TEMP/unsigned" && ls -A | sort | tr '\n' ' ')
+          if [ "$ACTUAL" != "$EXPECTED " ]; then
+            echo "::error::Unexpected artifact contents."
+            exit 1
+          fi
+          AAPT2="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/aapt2"
+          for apk in "$RUNNER_TEMP"/unsigned/*.apk; do
+            HEADER=$("$AAPT2" dump badging "$apk" | sed -n 1p)
+            case "$HEADER" in
+              "package: name='io.github.ivanosh.smarttubematerial' versionCode='"*"' versionName='$VERSION' "*) ;;
+              *)
+                echo "::error::$(basename "$apk") is not this release: $HEADER"
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Align and sign
+        shell: bash
         env:
           KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
-          MATERIAL_KEYSTORE_PASSWORD: ${{ secrets.MATERIAL_KEYSTORE_PASSWORD }}
-          MATERIAL_KEY_ALIAS: ${{ secrets.MATERIAL_KEY_ALIAS }}
-          MATERIAL_KEY_PASSWORD: ${{ secrets.MATERIAL_KEY_PASSWORD }}
-          MATERIAL_REQUIRE_RELEASE_SIGNING: 'true'
+          KEYSTORE_PASSWORD: ${{ secrets.MATERIAL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MATERIAL_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MATERIAL_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           umask 077
-          export MATERIAL_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
-          printf '%s' "$KEYSTORE_B64" | base64 -d > "$MATERIAL_KEYSTORE_FILE"
-          ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
+          TOOLS="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          mkdir -p "$RUNNER_TEMP/signed"
+          for apk in "$RUNNER_TEMP"/unsigned/*.apk; do
+            "$TOOLS/zipalign" -f -P 16 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+            # env: keeps the passwords out of the process list.
+            "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-pass env:KEYSTORE_PASSWORD \
+              --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --v2-signing-enabled true \
+              --v3-signing-enabled true --v4-signing-enabled false \
+              --out "$RUNNER_TEMP/signed/$(basename "$apk")" "$RUNNER_TEMP/aligned.apk"
+          done
+          rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/aligned.apk"
 
       - name: Verify the signature
         shell: bash
         run: |
           set -euo pipefail
           EXPECTED=8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
-          for apk in smarttubetv/build/outputs/apk/stmaterial/release/*.apk; do
+          APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner"
+          for apk in "$RUNNER_TEMP"/signed/*.apk; do
             ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
-            echo "$apk $ACTUAL"
+            echo "$(basename "$apk") $ACTUAL"
             if [ "$ACTUAL" != "$EXPECTED" ]; then
-              echo "::error::$apk is not signed with the expected certificate"
+              echo "::error::$(basename "$apk") is not signed with the expected certificate"
               exit 1
             fi
           done
@@ -105,7 +187,7 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: smarttubetv/build/outputs/apk/stmaterial/release/*.apk
+          subject-path: ${{ runner.temp }}/signed/*.apk
 
       - name: Publish the GitHub Release
         env:
@@ -113,10 +195,10 @@ jobs:
           TAG: ${{ inputs.tag }}
           SHA: ${{ inputs.sha }}
         run: |
-          gh release create "$TAG" smarttubetv/build/outputs/apk/stmaterial/release/*.apk \
+          gh release create "$TAG" "$RUNNER_TEMP"/signed/*.apk \
             --repo "$GITHUB_REPOSITORY" --title "$TAG" --prerelease --target "$SHA" --generate-notes \
             --notes "Version ${TAG#material-v}. Signing certificate SHA-256 8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c."
 
       - name: Remove the signing material
         if: always()
-        run: rm -f "$RUNNER_TEMP/release.jks"
+        run: rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/aligned.apk"
