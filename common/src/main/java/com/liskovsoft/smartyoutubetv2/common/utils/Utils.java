@@ -508,7 +508,14 @@ public class Utils {
         }
     }
 
+    // MATERIAL: the Material UI never sends a link to the third party QR service; set once at start
+    public static boolean sQrServiceDisabled;
+
     public static String toQrCodeLink(String data) {
+        if (sQrServiceDisabled) { // MATERIAL:
+            return data;
+        }
+
         return String.format(QR_CODE_URL_TEMPLATE, data);
     }
 

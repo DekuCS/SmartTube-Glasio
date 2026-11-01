@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.BrowseSection
-import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import io.github.ivanosh.stmaterial.logic.Sections
@@ -102,7 +101,6 @@ class BrowseState(
     /** A short line over the screen, or null. */
     var message by mutableStateOf<String?>(null)
     val rows = mutableStateListOf<VideoRow>()
-    val settings = mutableStateListOf<SettingsItem>()
     var focused by mutableStateOf<FocusKey?>(null)
         private set
     var error by mutableStateOf<ErrorData?>(null)
@@ -119,7 +117,7 @@ class BrowseState(
     /** True when the screen is at its top, so the feed must not stay scrolled away under the tabs. */
     val focusOnTabs: Boolean get() = focusedRow == NO_ROW
 
-    val isEmpty: Boolean get() = rows.all { it.videos.isEmpty() } && settings.isEmpty()
+    val isEmpty: Boolean get() = rows.all { it.videos.isEmpty() }
 
     val selectedSection: BrowseSection? get() = sections.firstOrNull { it.id == selected }
 
@@ -160,7 +158,6 @@ class BrowseState(
     fun clearContent() {
         subscriptions.restart()
         rows.clear()
-        settings.clear()
         error = null
         focused = null
     }
@@ -219,12 +216,6 @@ class BrowseState(
             group.action == VideoGroup.ACTION_PREPEND -> row.add(videos, atStart = true)
             else -> row.add(videos)
         }
-    }
-
-    fun updateSettings(section: BrowseSection?, items: List<SettingsItem>) {
-        if (section?.id != selected) return
-        settings.clear()
-        settings.addAll(items)
     }
 
     /** Errors have no section. The Search tab loads nothing, so one arriving there is a late one. */

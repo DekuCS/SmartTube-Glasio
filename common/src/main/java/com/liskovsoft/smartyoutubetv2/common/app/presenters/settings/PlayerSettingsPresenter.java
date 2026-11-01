@@ -58,7 +58,9 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
 
         appendPlaybackModeCategory(settingsPresenter);
         appendVideoPresetsCategory(settingsPresenter);
-        appendPlayerButtonsCategory(settingsPresenter);
+        if (!mSidebarService.isSettingsSectionLocked()) { // MATERIAL: the panel buttons come from the Material editor
+            appendPlayerButtonsCategory(settingsPresenter);
+        }
         appendNetworkEngineCategory(settingsPresenter);
         appendVideoBufferCategory(settingsPresenter);
         appendVideoZoomCategory(settingsPresenter);
@@ -66,10 +68,12 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         appendAudioLanguageCategory(settingsPresenter);
         appendAudioDelayCategory(settingsPresenter);
         appendMasterVolumeCategory(settingsPresenter);
-        appendOKButtonCategory(settingsPresenter);
-        appendUIAutoHideCategory(settingsPresenter);
-        appendSeekTypeCategory(settingsPresenter);
-        appendSeekingPreviewCategory(settingsPresenter);
+        if (!mSidebarService.isSettingsSectionLocked()) { // MATERIAL: the Material player has a fixed key table, panel and seek preview
+            appendOKButtonCategory(settingsPresenter);
+            appendUIAutoHideCategory(settingsPresenter);
+            appendSeekTypeCategory(settingsPresenter);
+            appendSeekingPreviewCategory(settingsPresenter);
+        }
         AppDialogUtil.appendSeekIntervalDialogItems(getContext(), settingsPresenter, mPlayerData, false);
         //appendRememberSpeedCategory(settingsPresenter);
         //appendScreenOffTimeoutCategory(settingsPresenter);
@@ -78,7 +82,9 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         //appendPlayerExitCategory(settingsPresenter);
         appendSleepTimerCategory(settingsPresenter);
         appendMiscCategory(settingsPresenter);
-        appendDeveloperCategory(settingsPresenter);
+        if (!mSidebarService.isSettingsSectionLocked()) { // MATERIAL: no Developer options page in this app
+            appendDeveloperCategory(settingsPresenter);
+        }
 
         settingsPresenter.showDialog(getContext().getString(R.string.settings_player), mOnFinish);
     }

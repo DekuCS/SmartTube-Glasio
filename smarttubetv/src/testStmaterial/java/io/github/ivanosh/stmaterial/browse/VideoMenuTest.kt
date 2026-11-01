@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class VideoMenuTest {
-    private val all = VideoFacts(signedIn = true, hasVideo = true, hasChannel = true, hasFeedback = true)
+    private val all = VideoFacts(signedIn = true, hasVideo = true, hasChannel = true, hasAuthor = true, hasFeedback = true)
 
     @Test
     fun `history adds remove from history last`() {
@@ -42,10 +42,19 @@ class VideoMenuTest {
     }
 
     @Test
-    fun `no channel id hides channel and block`() {
+    fun `a card that cannot open a channel hides go to channel only`() {
         assertEquals(
-            listOf(QUEUE, PLAYLIST, NOT_INTERESTED, REMOVE_FROM_HISTORY),
+            listOf(QUEUE, PLAYLIST, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY),
             availableVideoActions(MediaGroup.TYPE_HISTORY, all.copy(hasChannel = false))
+        )
+    }
+
+    /** A search result has no channel id, but an author: the channel can be opened and blocked by name. */
+    @Test
+    fun `no author hides block channel only`() {
+        assertEquals(
+            listOf(QUEUE, PLAYLIST, CHANNEL, NOT_INTERESTED, REMOVE_FROM_HISTORY),
+            availableVideoActions(MediaGroup.TYPE_HISTORY, all.copy(hasAuthor = false))
         )
     }
 

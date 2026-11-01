@@ -52,5 +52,35 @@
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
             android:screenOrientation="unspecified"
             android:theme="@style/Material.Theme.Dialog" />
+
+        <!-- Like the upstream ones: one instance each, so that a presenter can start the view that is already open. -->
+        <activity
+            android:name="io.github.ivanosh.stmaterial.search.MaterialSearchActivity"
+            android:launchMode="singleInstance"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified" />
+
+        <activity
+            android:name="io.github.ivanosh.stmaterial.channel.MaterialChannelActivity"
+            android:launchMode="singleInstance"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified" />
+
+        <activity
+            android:name="io.github.ivanosh.stmaterial.channel.MaterialUploadsActivity"
+            android:launchMode="singleInstance"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified" />
+
+        <activity
+            android:name="io.github.ivanosh.stmaterial.signin.MaterialSignInActivity"
+            android:launchMode="singleInstance"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified" />
+
+        <activity
+            android:name="io.github.ivanosh.stmaterial.settings.MaterialSettingsActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified" />
     </application>
 </manifest>

@@ -1,5 +1,6 @@
 package io.github.ivanosh.stmaterial.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -75,4 +77,18 @@ fun CenteredMessage(message: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(message, style = MessageStyle.copy(color = Palette.OnBackgroundVariant))
     }
+}
+
+/** A short line over the bottom of the screen: the confirmation of something that was done. */
+@Composable
+fun MessageLine(text: String, modifier: Modifier) {
+    Text(
+        text,
+        style = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Medium, color = Palette.OnBackground),
+        modifier = modifier
+            .padding(bottom = 48.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Palette.Tile)
+            .padding(horizontal = 32.dp, vertical = 14.dp),
+    )
 }

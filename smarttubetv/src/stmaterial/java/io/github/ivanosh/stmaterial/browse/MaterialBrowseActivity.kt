@@ -6,10 +6,6 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.ui.platform.ComposeView
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
-import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter
-import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter.VideoMenuCallback
-import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager
-import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil
 import io.github.ivanosh.stmaterial.ui.MenuItem
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.BrowseSection
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsGroup
@@ -26,6 +22,7 @@ import io.github.ivanosh.stmaterial.data.SectionStore
 import io.github.ivanosh.stmaterial.logic.EditorState
 import io.github.ivanosh.stmaterial.logic.Sections
 import io.github.ivanosh.stmaterial.logic.resolveStart
+import io.github.ivanosh.stmaterial.settings.MaterialSettingsActivity
 import com.liskovsoft.smartyoutubetv2.tv.R
 
 /**
@@ -43,6 +40,8 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     private lateinit var store: SectionStore
     private var initializing = false
 
+    private val cardMenu = CardMenu(this, onGone = { state.updateSection(it) }, onMessage = { state.message = it })
+
     private val actions = object : BrowseActions {
         override fun onTabFocused(id: Int) {
             if (id != MediaGroup.TYPE_SETTINGS && id != state.selected) select(id, immediately = false)
@@ -51,7 +50,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
         override fun onTabClicked(id: Int) {
             when (id) {
                 Sections.SEARCH_SECTION_ID -> SearchPresenter.instance(this@MaterialBrowseActivity).startSearch(null)
-                MediaGroup.TYPE_SETTINGS -> if (id != state.selected) select(id, immediately = true)
+                MediaGroup.TYPE_SETTINGS -> startActivity(Intent(this@MaterialBrowseActivity, MaterialSettingsActivity::class.java))
             }
         }
 
@@ -93,7 +92,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
         override fun onVideoClicked(video: Video) = presenter.onVideoItemClicked(video)
         // The menu is the screen's own: BrowsePresenter.onVideoItemLongClicked opens the old dialog.
         override fun onVideoLongClicked(video: Video) = Unit
-        override fun videoMenuItems(video: Video): List<MenuItem> = buildVideoMenu(video)
+        override fun videoMenuItems(video: Video): List<MenuItem> = cardMenu.items(video, state.selected ?: MediaGroup.TYPE_UNDEFINED)
         override fun onNeedMore(row: VideoRow) {
             state.takeMoreRequest(row)?.let(presenter::onScrollEnd)
         }
@@ -205,55 +204,6 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
         history.load { state.updateHistory(VideoGroup.from(it), epoch) }
     }
 
-    /**
-     * Each action goes to what the button of the same name in [VideoMenuPresenter] runs. Removing a card
-     * and the confirmation line are ours: the presenter reports the removal through the callback.
-     */
-    private fun buildVideoMenu(video: Video): List<MenuItem> {
-        val token = video.mediaItem
-        val facts = VideoFacts(
-            signedIn = YouTubeServiceManager.instance().signInService.isSigned,
-            hasVideo = video.hasVideo(),
-            hasChannel = video.channelId != null,
-            hasFeedback = token != null && (token.feedbackToken != null || token.feedbackEndpoint != null),
-        )
-        val menu = VideoMenuPresenter.instance(this)
-        return availableVideoActions(state.selected ?: MediaGroup.TYPE_UNDEFINED, facts).map { action ->
-            when (action) {
-                VideoAction.QUEUE -> MenuItem(getString(R.string.material_video_queue)) {
-                    menu.addToQueue(video, null)
-                    state.message = getString(R.string.material_video_queued)
-                }
-                VideoAction.PLAYLIST -> MenuItem(getString(R.string.material_video_playlist)) {
-                    AppDialogUtil.showAddToPlaylistDialog(this, video, removalCallback(null, false))
-                }
-                VideoAction.CHANNEL -> MenuItem(getString(R.string.material_video_channel)) {
-                    MediaServiceManager.chooseChannelPresenter(this, video)
-                }
-                VideoAction.NOT_INTERESTED -> MenuItem(getString(R.string.material_video_not_interested)) {
-                    menu.notInterested(video, removalCallback(R.string.material_video_hidden, false))
-                }
-                VideoAction.BLOCK_CHANNEL -> MenuItem(getString(R.string.material_video_block_channel)) {
-                    menu.blockChannel(video, removalCallback(R.string.material_video_blocked, true))
-                }
-                VideoAction.REMOVE_FROM_HISTORY -> MenuItem(getString(R.string.material_video_remove_history)) {
-                    menu.removeFromHistory(video, removalCallback(R.string.material_video_removed_history, false))
-                }
-            }
-        }
-    }
-
-    /** The presenter says a card is gone, maybe from another thread; blocking a channel takes its other cards too. */
-    private fun removalCallback(message: Int?, wholeChannel: Boolean) = VideoMenuCallback { video, action ->
-        if (action != VideoMenuCallback.ACTION_REMOVE && action != VideoMenuCallback.ACTION_REMOVE_FROM_PLAYLIST) return@VideoMenuCallback
-        runOnUiThread {
-            val gone = VideoGroup.from(listOf(video))
-            gone.action = if (wholeChannel) VideoGroup.ACTION_REMOVE_AUTHOR else VideoGroup.ACTION_REMOVE
-            state.updateSection(gone)
-            message?.let { state.message = getString(it) }
-        }
-    }
-
     private val isLoadPending: Boolean get() = handler.hasCallbacks(loadSelected)
 
     // BrowseView
@@ -286,7 +236,8 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
 
     override fun updateSection(group: VideoGroup) = state.updateSection(group)
 
-    override fun updateSection(group: SettingsGroup) = state.updateSettings(group.category, group.items.orEmpty())
+    /** The presenter's Settings grid is replaced by the settings screen. */
+    override fun updateSection(group: SettingsGroup) = Unit
 
     override fun clearSection(section: BrowseSection) {
         if (section.id == state.selected) state.clearContent()

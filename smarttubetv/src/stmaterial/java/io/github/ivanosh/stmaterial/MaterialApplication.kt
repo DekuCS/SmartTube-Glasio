@@ -11,7 +11,12 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.SearchView
 import com.liskovsoft.smartyoutubetv2.common.app.views.SignInView
 import com.liskovsoft.smartyoutubetv2.common.app.views.ViewManager
 import com.liskovsoft.smartyoutubetv2.common.app.views.WebBrowserView
+import com.liskovsoft.smartyoutubetv2.common.utils.Utils
 import com.liskovsoft.smartyoutubetv2.tv.ui.main.MainApplication
+import io.github.ivanosh.stmaterial.channel.MaterialChannelActivity
+import io.github.ivanosh.stmaterial.channel.MaterialUploadsActivity
+import io.github.ivanosh.stmaterial.search.MaterialSearchActivity
+import io.github.ivanosh.stmaterial.signin.MaterialSignInActivity
 import io.github.ivanosh.stmaterial.browse.MaterialBrowseActivity
 import io.github.ivanosh.stmaterial.dialog.MaterialDialogActivity
 import io.github.ivanosh.stmaterial.player.MaterialPlaybackActivity
@@ -31,13 +36,16 @@ class MaterialApplication : MainApplication() {
         // Back from the other screens has to land on the new home.
         listOf(
             PlaybackView::class.java,
-            SearchView::class.java,
-            SignInView::class.java,
             AddDeviceView::class.java,
-            ChannelView::class.java,
-            ChannelUploadsView::class.java,
             WebBrowserView::class.java,
         ).forEach { view -> viewManager.register(view, viewManager.getActivity(view), browse) }
+        viewManager.register(SearchView::class.java, MaterialSearchActivity::class.java, browse)
+        viewManager.register(ChannelView::class.java, MaterialChannelActivity::class.java, browse)
+        viewManager.register(ChannelUploadsView::class.java, MaterialUploadsActivity::class.java, browse)
+        // Not in the view stack: closing the sign-in code returns to the screen that opened it, settings or home.
+        viewManager.register(SignInView::class.java, MaterialSignInActivity::class.java)
+        // MATERIAL: links are never sent to the QR service of api.qrserver.com
+        Utils.sQrServiceDisabled = true
         // After the list: the parent lookup goes by isInstance, so PlaybackActivity needs the new home too.
         viewManager.register(PlaybackView::class.java, MaterialPlaybackActivity::class.java, browse)
     }

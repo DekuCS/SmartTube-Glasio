@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,14 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -30,7 +27,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -42,11 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Surface
-import androidx.tv.material3.Text
-import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import io.github.ivanosh.stmaterial.browse.BrowseState
 import io.github.ivanosh.stmaterial.browse.FocusKey
@@ -279,59 +270,4 @@ private fun FeedCard(state: BrowseState, actions: FeedActions, row: VideoRow, vi
                 }
             },
     )
-}
-
-/** The tiles of the old Settings section. Each opens its old dialog; Task 12 replaces this. */
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-fun SettingsGrid(state: BrowseState) {
-    val items = state.settings.toList()
-    val lines = items.chunked(GRID_COLUMNS)
-    FeedColumn(
-        state, GridCardTop, rememberLazyListState(),
-        PaddingValues(bottom = 400.dp),
-        spacing = 32.dp - CardBleed * 2,
-    ) {
-        itemsIndexed(lines, key = { line, _ -> line }) { line, tiles ->
-            Row(
-                Modifier.padding(start = SidePadding, top = CardBleed, bottom = CardBleed),
-                horizontalArrangement = Arrangement.spacedBy(CardGap),
-            ) {
-                tiles.forEach { item -> SettingsTile(item) { state.onContentFocused(line) } }
-            }
-        }
-    }
-}
-
-private val TileShape = RoundedCornerShape(16.dp)
-private val TileStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.Medium)
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun SettingsTile(item: SettingsItem, onFocused: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Surface(
-        onClick = { item.onClick?.run() },
-        modifier = Modifier
-            .size(400.dp, 120.dp)
-            .focusRing(focused, corner = 16.dp, gap = 4.dp)
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocused()
-            },
-        shape = ClickableSurfaceDefaults.shape(TileShape),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = Palette.Tile,
-            contentColor = Palette.OnBackground,
-            focusedContainerColor = Palette.Tile,
-            focusedContentColor = Palette.OnBackground,
-            pressedContainerColor = Palette.Tile,
-            pressedContentColor = Palette.OnBackground
-        ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f, pressedScale = 1f),
-    ) {
-        Box(Modifier.fillMaxSize().padding(horizontal = 24.dp), contentAlignment = Alignment.CenterStart) {
-            Text(item.title.orEmpty(), style = TileStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-    }
 }

@@ -46,23 +46,20 @@ import io.github.ivanosh.stmaterial.logic.Sections
 import io.github.ivanosh.stmaterial.ui.CenteredMessage
 import io.github.ivanosh.stmaterial.ui.ErrorState
 import io.github.ivanosh.stmaterial.ui.Feed
-import io.github.ivanosh.stmaterial.ui.FeedActions
+import io.github.ivanosh.stmaterial.ui.FeedPageActions
+import io.github.ivanosh.stmaterial.ui.MessageLine
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
 import io.github.ivanosh.stmaterial.ui.Palette
-import io.github.ivanosh.stmaterial.ui.SettingsGrid
 import io.github.ivanosh.stmaterial.ui.TabItem
 import io.github.ivanosh.stmaterial.ui.Tabs
 
-interface BrowseActions : FeedActions {
+interface BrowseActions : FeedPageActions {
     fun onTabFocused(id: Int)
     fun onTabClicked(id: Int)
     fun onOpenFirst(id: Int)
     fun onHide(id: Int)
     fun onCustomize()
     fun onErrorAction(error: ErrorData)
-
-    /** What the long press on a card offers. Empty when nothing can be done with it. */
-    fun videoMenuItems(video: Video): List<MenuItem>
 }
 
 private const val TABS_ANIMATION_MS = 200
@@ -213,7 +210,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                     .onFocusChanged { barFocused = it.hasFocus }
                     .graphicsLayer { translationY = -TabsTravel.toPx() * tabsAway.value },
             )
-            state.message?.let { Message(it, Modifier.align(Alignment.BottomCenter)) }
+            state.message?.let { MessageLine(it, Modifier.align(Alignment.BottomCenter)) }
             cardMenu?.let { items ->
                 ContextMenu(items = items, onDismiss = { cardMenu = null })
             }
@@ -243,24 +240,10 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
 }
 
 @Composable
-private fun Message(text: String, modifier: Modifier) {
-    Text(
-        text,
-        style = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Medium, color = Palette.OnBackground),
-        modifier = modifier
-            .padding(bottom = 48.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(Palette.Tile)
-            .padding(horizontal = 32.dp, vertical = 14.dp),
-    )
-}
-
-@Composable
 private fun Content(state: BrowseState, actions: BrowseActions) {
     val error = state.error
     when {
         state.selected == Sections.SEARCH_SECTION_ID -> CenteredMessage(stringResource(R.string.material_search_hint))
-        state.settings.isNotEmpty() -> SettingsGrid(state)
         !state.isEmpty -> Feed(state, actions)
         error != null -> ErrorState(
             message = error.message,

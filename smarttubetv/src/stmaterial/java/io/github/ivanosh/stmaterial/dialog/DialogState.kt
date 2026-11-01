@@ -70,6 +70,11 @@ class DialogState {
         levels = kept + Level(page.withId(nextId++))
     }
 
+    /** Takes the top page's place with [page], for a page whose lines changed under it (an account gone, a channel unblocked). */
+    fun replace(page: DialogPage) {
+        levels = levels.dropLast(1) + Level(page.withId(nextId++))
+    }
+
     fun open(entry: EntryRow) = push(entry.open(), openedFrom = entry.key)
 
     /** False when there is no page below. */

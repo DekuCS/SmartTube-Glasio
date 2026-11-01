@@ -188,7 +188,9 @@ public class AccountSettingsPresenter extends BasePresenter<Void> {
         return account.getName() != null ? account.getName() : account.getEmail();
     }
 
-    private void removeAccount(Account account) {
+    // MATERIAL: public, the settings screen of the Material UI signs out through the same call. It only forgets
+    // the account on this device; no token is revoked at Google.
+    public void removeAccount(Account account) {
         getSignInService().removeAccount(account);
         BrowsePresenter.instance(getContext()).refresh(false);
     }

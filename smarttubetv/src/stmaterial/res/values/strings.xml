@@ -96,4 +96,38 @@
     <string translatable="false" name="material_buttons_keep_one">At least one button must stay on the panel</string>
     <string translatable="false" name="material_buttons_was_reset">Buttons reset</string>
     <string translatable="false" name="material_buttons_displaced">%1$s moved to More: the panel holds %2$d</string>
+    <string translatable="false" name="material_set_account">Account</string>
+    <string translatable="false" name="material_set_sections">Customize sections</string>
+    <string translatable="false" name="material_set_buttons">Customize buttons</string>
+    <string translatable="false" name="material_set_sponsor">Ad and sponsor skipping</string>
+    <string translatable="false" name="material_set_quality">Default video quality</string>
+    <string translatable="false" name="material_set_language">Language</string>
+    <string translatable="false" name="material_set_blocked">Blocked channels</string>
+    <string translatable="false" name="material_set_advanced">Advanced</string>
+    <string translatable="false" name="material_set_about">About</string>
+    <string translatable="false" name="material_adv_player">Player</string>
+    <string translatable="false" name="material_adv_subtitles">Subtitles</string>
+    <string translatable="false" name="material_adv_dearrow">DeArrow</string>
+    <string translatable="false" name="material_adv_afr">Auto frame rate</string>
+    <string translatable="false" name="material_account_signed_in">Signed in as %1$s</string>
+    <string translatable="false" name="material_account_none">You are not signed in</string>
+    <string translatable="false" name="material_account_signed_out">Signed out</string>
+    <string translatable="false" name="material_account_sign_in">Sign in</string>
+    <string translatable="false" name="material_account_sign_out">Sign out</string>
+    <string translatable="false" name="material_account_sign_out_ask">Sign out?</string>
+    <string translatable="false" name="material_account_revoke">To fully revoke access, remove this device in your Google account\'s security settings.</string>
+    <string translatable="false" name="material_account_token_stays">Neither signing out nor uninstalling the app revokes the access token.</string>
+    <string translatable="false" name="material_blocked_none">No blocked channels</string>
+    <string translatable="false" name="material_blocked_hint">Choose a channel to unblock it</string>
+    <string translatable="false" name="material_blocked_unblocked">Unblocked %1$s</string>
+    <string translatable="false" name="material_about_version">Version %1$s</string>
+    <string translatable="false" name="material_about_based_on">Based on SmartTube by yuliskov, used under the MIT License:</string>
+    <string translatable="false" name="material_search_title">Search</string>
+    <string translatable="false" name="material_search_placeholder">Type to search</string>
+    <string translatable="false" name="material_key_space">Space</string>
+    <string translatable="false" name="material_key_delete">Delete</string>
+    <string translatable="false" name="material_key_search">Search</string>
+    <string translatable="false" name="material_signin_getting">Getting a code…</string>
+    <string translatable="false" name="material_signin_instruction">Open this address on a phone or computer and enter the code. Back cancels.</string>
+    <string translatable="false" name="material_signin_failed_hint">Press Back to close.</string>
 </resources>

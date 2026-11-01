@@ -154,7 +154,7 @@ public class AppDialogUtil {
      * Adds QR code item to existing dialog.
      */
     public static void appendShareQRLinkDialogItem(Context context, AppDialogPresenter dialogPresenter, Video video, int positionSec) {
-        if (video == null) {
+        if (video == null || Utils.sQrServiceDisabled) { // MATERIAL: the QR page is an external service
             return;
         }
 

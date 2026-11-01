@@ -127,4 +127,27 @@ class DialogStateTest {
         state.push(DialogPage.of("B", radio(true)))
         assertTrue(state.page!!.id != first)
     }
+
+    @Test
+    fun `replace swaps the top page and keeps the one below with its focus`() {
+        val state = DialogState()
+        val entry = EntryRow(7, "Account", 1) { DialogPage.of("Account", listOf(ButtonRow(1, "Sign in", null))) }
+        state.push(DialogPage.of("Settings", listOf(entry)))
+        state.open(entry)
+        val before = state.page!!.id
+        state.replace(DialogPage.of("Account", listOf(ButtonRow(2, "Sign out", null))))
+        assertEquals(listOf(2), state.page!!.rows.map { it.key })
+        assertEquals(2, state.depth)
+        assertTrue(state.page!!.id != before)
+        assertTrue(state.pop())
+        assertEquals(7, state.initialFocus())
+    }
+
+    @Test
+    fun `replace on an empty dialog just shows the page`() {
+        val state = DialogState()
+        state.replace(DialogPage.of("Blocked", listOf(TextRow(1, "none"))))
+        assertEquals(1, state.depth)
+        assertEquals("Blocked", state.page!!.title)
+    }
 }
