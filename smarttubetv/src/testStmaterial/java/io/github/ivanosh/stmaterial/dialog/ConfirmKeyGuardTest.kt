@@ -28,4 +28,13 @@ class ConfirmKeyGuardTest {
         assertFalse(guard.shouldDrop(isDown = true, repeatCount = 1))
         assertFalse(guard.shouldDrop(isDown = false, repeatCount = 0))
     }
+
+    @Test
+    fun eachScreenKeepsItsOwnGuardSoAPressStartedElsewhereDoesNotCount() {
+        val first = ConfirmKeyGuard()
+        val second = ConfirmKeyGuard()
+        assertFalse(first.shouldDrop(isDown = true, repeatCount = 0))
+        assertTrue(second.shouldDrop(isDown = true, repeatCount = 5))
+        assertTrue(second.shouldDrop(isDown = false, repeatCount = 0))
+    }
 }

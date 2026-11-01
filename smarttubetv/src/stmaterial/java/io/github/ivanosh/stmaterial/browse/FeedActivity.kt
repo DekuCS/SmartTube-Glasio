@@ -1,17 +1,20 @@
 package io.github.ivanosh.stmaterial.browse
 
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
+import com.liskovsoft.sharedutils.helpers.KeyHelpers
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.interfaces.VideoGroupPresenter
 import com.liskovsoft.smartyoutubetv2.tv.ui.common.LeanbackActivity
+import io.github.ivanosh.stmaterial.dialog.ConfirmKeyGuard
 import io.github.ivanosh.stmaterial.ui.FeedPage
 import io.github.ivanosh.stmaterial.ui.FeedPageActions
 import io.github.ivanosh.stmaterial.ui.MenuItem
@@ -39,6 +42,16 @@ abstract class FeedActivity<P> : LeanbackActivity() where P : BasePresenter<*>, 
 
     /** Gives the presenter this view. */
     protected abstract fun connect()
+
+    private val confirmKeyGuard = ConfirmKeyGuard()
+
+    /**
+     * The player opens the channel and search on a held OK, so the rest of that press (repeats and the up)
+     * would land on the first card. Confirm keys count only from a press that starts on this screen.
+     */
+    override fun interceptKeyEvent(event: KeyEvent): Boolean =
+        KeyHelpers.isConfirmKey(event.keyCode) &&
+            confirmKeyGuard.shouldDrop(event.action == KeyEvent.ACTION_DOWN, event.repeatCount)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
