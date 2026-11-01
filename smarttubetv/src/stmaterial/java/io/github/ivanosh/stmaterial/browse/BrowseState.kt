@@ -11,6 +11,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import io.github.ivanosh.stmaterial.logic.Sections
+import io.github.ivanosh.stmaterial.logic.SubscriptionRowIds
 
 // Group parsing follows BrowseState in margantcovka/SmartTube-New (MIT).
 
@@ -40,6 +41,9 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
 
     /** False for a row that has no next page. */
     internal var pageable = true
+
+    /** Asks for the next page when any card of the row gets focus, not only one near its end. */
+    internal var eager = false
 
     /** YouTube often repeats shown videos in a continuation. A page of repeats allows the next request. */
     internal fun add(items: List<Video>, atStart: Boolean = false) {
@@ -82,6 +86,8 @@ class VideoRow(val id: String, title: String?, val isGrid: Boolean) {
 
 /** What the presenter has told the screen, plus where focus is. */
 class BrowseState(
+    /** The feed of Subscriptions starts loading: the screen asks for the history, with this [epoch]. */
+    private val onSubscriptionsLoad: (epoch: Int) -> Unit = {},
     private val rowTitle: (Int) -> String = { "" },
     private val authorOf: (Video) -> String? = { it.getAuthor() }) {
     /** All sections of the presenter, in its order: its selectSection() passes indexes into this list. */
@@ -186,7 +192,10 @@ class BrowseState(
                 return
             }
             VideoGroup.ACTION_REPLACE -> {
-                if (feedRows) subscriptions.restart()
+                if (feedRows) {
+                    subscriptions.restart()
+                    onSubscriptionsLoad(epoch)
+                }
                 if (grid || group.position == -1) rows.clear() else rows.removeAll { it.id == rowId }
             }
         }
@@ -253,8 +262,11 @@ class BrowseState(
     /** The video to continue from, at most once per size of the row. */
     fun takeMoreRequest(row: VideoRow): Video? {
         if (!row.pageable || row.requestedMoreAt == row.videos.size) return null
+        // The history row asks only when no row of the feed is left, and then goes by the feed's group.
+        val video = (if (isSubscriptionGrid && row.id == SubscriptionRowIds.CONTINUE) subscriptions.nextPageVideo()
+        else row.videos.lastOrNull()) ?: return null
         row.requestedMoreAt = row.videos.size
-        return row.videos.lastOrNull()
+        return video
     }
 
     private fun acceptsContent(section: BrowseSection?): Boolean =
@@ -264,6 +276,7 @@ class BrowseState(
         subscriptions.forget(predicate)
         rows.forEach { it.removeWhere(predicate) }
         rows.removeAll { it.videos.isEmpty() }
+        if (isSubscriptionGrid) subscriptions.onRowsChanged()
     }
 
     private companion object {

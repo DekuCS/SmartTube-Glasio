@@ -23,6 +23,7 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
 
     /** The presenter sends one group again and again, with the next page added. Videos find their next page through it. */
     private var group: VideoGroup? = null
+    private var historyGroup: VideoGroup? = null
 
     /** A new load of the feed. The history stays: it is fetched once per visit of the tab. */
     fun restart() {
@@ -33,14 +34,24 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
     fun reset() {
         restart()
         history = emptyList()
+        historyGroup = null
         removed.clear()
     }
 
-    fun onHistory(videos: List<Video>, historyGroup: VideoGroup?) {
+    fun onHistory(videos: List<Video>, group: VideoGroup?) {
         history = visible(videos)
+        historyGroup = group
         arrange()
-        rows.firstOrNull { it.id == SubscriptionRowIds.CONTINUE }?.group = historyGroup
     }
+
+    /** Called after videos left [rows]: the row that may ask for a page can have changed. */
+    fun onRowsChanged() = finish()
+
+    /**
+     * The video to continue the feed from when no row of it is left to ask: the last of its group, which
+     * knows the next page. Null before the feed has arrived.
+     */
+    fun nextPageVideo(): Video? = group?.videos?.lastOrNull()
 
     fun onFeed(feedGroup: VideoGroup, videos: List<Video>, atStart: Boolean) {
         group = feedGroup
@@ -61,12 +72,13 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
 
     private fun arrange() {
         val feed = firstPage.orEmpty()
-        val byId = HashMap<String, Video>()
-        history.forEach { byId.putIfAbsent(videoKey(it), it) }
-        feed.forEach { byId.putIfAbsent(videoKey(it), it) }
         val models = buildRows(feed.map(::item), history.map(::item))
 
-        val ordered = models.map { model -> rowFor(model, byId) }.toMutableList()
+        // Each row shows its own list's videos: a feed video that is also in the history belongs to the
+        // feed group, which is the one that has the next page.
+        val ordered = models.map { model ->
+            rowFor(model, if (model.id == SubscriptionRowIds.CONTINUE) history else feed)
+        }.toMutableList()
         val claimed = ordered.flatMapTo(HashSet()) { row -> row.videos.map(::videoKey) }
         rows.firstOrNull { it.id == SubscriptionRowIds.EARLIER }?.let { earlier ->
             earlier.drop(claimed)
@@ -77,7 +89,8 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
         finish()
     }
 
-    private fun rowFor(model: RowModel, byId: Map<String, Video>): VideoRow {
+    private fun rowFor(model: RowModel, source: List<Video>): VideoRow {
+        val byId = source.associateBy(::videoKey)
         val existing = rows.firstOrNull { it.id == model.id }
         if (existing != null && existing.videos.map(::videoKey) == model.ids) return existing
         return VideoRow(model.id, title(model.titleRes), isGrid = false).also { row ->
@@ -97,16 +110,23 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
                 VideoRow(SubscriptionRowIds.EARLIER, title(R.string.material_row_earlier), isGrid = true).also { it.add(fresh) }
             )
             // A page of repeats: the last row may ask for the next one.
-            else -> rows.lastOrNull { it.id != SubscriptionRowIds.CONTINUE }?.add(emptyList())
+            else -> rows.lastOrNull()?.add(emptyList())
         }
         finish()
     }
 
-    /** Only the last row of the feed has a next page, and the history row never has one. */
+    /**
+     * The last row of the feed asks for the next page, and does it as soon as a card of it is focused: a
+     * row has no cards below it to scroll to. The history row asks only when it is all there is, and then
+     * the page is found through [nextPageVideo].
+     */
     private fun finish() {
+        val lastFeed = rows.lastOrNull { it.id != SubscriptionRowIds.CONTINUE }
         rows.forEach { row ->
-            row.pageable = row.id != SubscriptionRowIds.CONTINUE && row === rows.last()
-            if (row.id != SubscriptionRowIds.CONTINUE) row.group = group
+            val asks = if (row.id == SubscriptionRowIds.CONTINUE) lastFeed == null else row === lastFeed
+            row.pageable = asks
+            row.eager = asks && !row.isGrid
+            row.group = if (row.id == SubscriptionRowIds.CONTINUE) historyGroup else group
         }
     }
 

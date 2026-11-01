@@ -52,6 +52,10 @@ import io.github.ivanosh.stmaterial.browse.BrowseState
 import io.github.ivanosh.stmaterial.browse.FocusKey
 import io.github.ivanosh.stmaterial.browse.VideoRow
 import io.github.ivanosh.stmaterial.browse.videoKey
+import io.github.ivanosh.stmaterial.logic.RowShape
+import io.github.ivanosh.stmaterial.logic.lineCount
+import io.github.ivanosh.stmaterial.logic.itemCount
+import io.github.ivanosh.stmaterial.logic.outerIndex
 
 interface FeedActions {
     fun onVideoFocused(video: Video)
@@ -119,16 +123,7 @@ private fun FeedColumn(
     }
 }
 
-/** Items a row takes in the vertical list: one for a row, a heading (if titled) and the lines for a grid. */
-private fun itemCount(row: VideoRow): Int =
-    if (row.isGrid) (if (row.title != null) 1 else 0) + (row.videos.size + GRID_COLUMNS - 1) / GRID_COLUMNS else 1
-
-/** Index in the vertical list of the item that holds the card, which is also what a card reports as its row. */
-private fun outerIndex(rows: List<VideoRow>, rowIndex: Int, cardIndex: Int): Int {
-    val before = (0 until rowIndex).sumOf { itemCount(rows[it]) }
-    val row = rows[rowIndex]
-    return if (row.isGrid) before + (if (row.title != null) 1 else 0) + cardIndex / GRID_COLUMNS else before
-}
+private fun List<VideoRow>.shapes() = map { RowShape(it.isGrid, it.videos.size) }
 
 /**
  * Rows of cards and grids, one below the other. The usual section is one or the other; Subscriptions
@@ -141,6 +136,12 @@ fun Feed(state: BrowseState, actions: FeedActions) {
     val listState = rememberLazyListState()
     val rowStates = remember { HashMap<String, LazyListState>() }
     val gridOnly = rows.firstOrNull()?.isGrid == true
+
+    // A row that arrives above the first one (the history, late) must not leave the start screen scrolled past it.
+    val firstId = rows.firstOrNull()?.id
+    LaunchedEffect(firstId) {
+        if (state.focusOnTabs) listState.scrollToItem(0)
+    }
 
     val pending = state.pendingFocus
     LaunchedEffect(pending) {
@@ -159,9 +160,9 @@ fun Feed(state: BrowseState, actions: FeedActions) {
         var first = 0
         rows.forEachIndexed { rowIndex, row ->
             val start = first
-            first += itemCount(row)
+            first += itemCount(RowShape(row.isGrid, row.videos.size), GRID_COLUMNS)
             if (row.isGrid) {
-                gridItems(state, actions, row, start)
+                gridItems(state, actions, row, start, compact = !gridOnly)
             } else {
                 item(key = row.id, contentType = "row") {
                     Column {
@@ -197,29 +198,28 @@ private fun RowHeading(title: String?) {
     )
 }
 
-/** A grid cut into lines of [GRID_COLUMNS], under a heading if it has a title. [first] is the index of its first item. */
-private fun LazyListScope.gridItems(state: BrowseState, actions: FeedActions, row: VideoRow, first: Int) {
-    val headed = row.title != null
-    if (headed) {
-        item(key = "${row.id}:heading", contentType = "heading") {
-            Column {
+/**
+ * A grid cut into lines of [GRID_COLUMNS]; a title is a heading in the item of the first line. [first] is the
+ * index of its first item. [compact]: under rows, where the list's spacing already is the gap between lines.
+ */
+private fun LazyListScope.gridItems(state: BrowseState, actions: FeedActions, row: VideoRow, first: Int, compact: Boolean) {
+    val lines = lineCount(row.videos.size, GRID_COLUMNS)
+    items(lines, key = { "${row.id}:line$it" }, contentType = { if (it == 0 && row.title != null) "headed" else "line" }) { line ->
+        Column {
+            if (line == 0 && row.title != null) {
                 RowHeading(row.title)
                 Spacer(Modifier.height(18.dp - CardBleed))
             }
-        }
-    }
-    val lines = (row.videos.size + GRID_COLUMNS - 1) / GRID_COLUMNS
-    val firstLine = first + (if (headed) 1 else 0)
-    items(lines, key = { "${row.id}:line$it" }, contentType = { "line" }) { line ->
-        Row(
-            Modifier.padding(start = SidePadding, top = CardBleed, bottom = CardBleed),
-            horizontalArrangement = Arrangement.spacedBy(CardGap),
-        ) {
-            val end = minOf((line + 1) * GRID_COLUMNS, row.videos.size)
-            for (index in line * GRID_COLUMNS until end) {
-                val video = row.videos[index]
-                key(videoKey(video)) {
-                    FeedCard(state, actions, row, video, index, firstLine + line)
+            Row(
+                Modifier.padding(start = SidePadding, top = CardBleed, bottom = if (compact) 0.dp else CardBleed),
+                horizontalArrangement = Arrangement.spacedBy(CardGap),
+            ) {
+                val end = minOf((line + 1) * GRID_COLUMNS, row.videos.size)
+                for (index in line * GRID_COLUMNS until end) {
+                    val video = row.videos[index]
+                    key(videoKey(video)) {
+                        FeedCard(state, actions, row, video, index, first + line)
+                    }
                 }
             }
         }
@@ -238,7 +238,7 @@ private suspend fun scrollTo(
     val row = state.rows[rowIndex]
     val cardIndex = row.videos.indexOfFirst { videoKey(it) == key.videoId }
     if (cardIndex < 0) return false
-    val outer = outerIndex(state.rows, rowIndex, cardIndex)
+    val outer = outerIndex(state.rows.shapes(), rowIndex, cardIndex, GRID_COLUMNS)
     if (listState.layoutInfo.visibleItemsInfo.none { it.index == outer }) listState.scrollToItem(outer)
     val rowState = rowStates[row.id] ?: return true
     if (rowState.layoutInfo.visibleItemsInfo.none { it.index == cardIndex }) rowState.scrollToItem(cardIndex)
@@ -275,7 +275,7 @@ private fun FeedCard(state: BrowseState, actions: FeedActions, row: VideoRow, vi
                     state.onCardFocused(key, rowIndex)
                     actions.onVideoFocused(video)
                     val margin = if (row.isGrid) GRID_COLUMNS * 2 else MORE_MARGIN
-                    if (index >= row.videos.size - margin) actions.onNeedMore(row)
+                    if (row.eager || index >= row.videos.size - margin) actions.onNeedMore(row)
                 }
             },
     )

@@ -30,7 +30,7 @@ import com.liskovsoft.smartyoutubetv2.tv.R
  * The presenter lifecycle follows NovaBrowseActivity in margantcovka/SmartTube-New (MIT).
  */
 class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
-    private val state = BrowseState(rowTitle = { getString(it) })
+    private val state = BrowseState(onSubscriptionsLoad = ::loadHistory, rowTitle = { getString(it) })
     private val history = HistorySource { YouTubeServiceManager.instance().contentService.historyObserve }
     private val handler = Handler(Looper.getMainLooper())
     private val loadSelected = Runnable { load() }
@@ -185,18 +185,16 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
             (section.data as? ErrorFragmentData)?.let(::showError)
         }
         presenter.onSectionFocused(section.id)
-        loadHistory(section)
     }
 
     /**
-     * "Continue watching" on Subscriptions: one request for the first page of the history. Signed out, there
-     * is nothing to ask for, and the presenter shows its sign-in prompt. A failure only leaves the row out.
+     * "Continue watching" on Subscriptions: one request for the first page of the history per load of the
+     * feed, which the state reports, so a retry or a refresh asks again. Signed out, there is nothing to
+     * ask for, and the presenter shows its sign-in prompt. A failure only leaves the row out.
      */
-    private fun loadHistory(section: BrowseSection) {
+    private fun loadHistory(epoch: Int) {
         history.dispose()
-        if (section.id != MediaGroup.TYPE_SUBSCRIPTIONS || section.type == BrowseSection.TYPE_ROW) return
         if (!YouTubeServiceManager.instance().signInService.isSigned) return
-        val epoch = state.epoch
         history.load { state.updateHistory(VideoGroup.from(it), epoch) }
     }
 

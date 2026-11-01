@@ -1,7 +1,6 @@
 package io.github.ivanosh.stmaterial.data
 
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
-import com.liskovsoft.sharedutils.rx.OnError
 import com.liskovsoft.sharedutils.rx.OnResult
 import com.liskovsoft.sharedutils.rx.RxHelper
 import io.reactivex.Observable
@@ -9,7 +8,7 @@ import io.reactivex.disposables.Disposable
 
 /**
  * One request for the first page of the watch history, for "Continue watching". [observe] is the
- * ContentService observable the History tab uses. An empty or failed answer is silence, not an error.
+ * ContentService observable the History tab uses. An empty or failed answer is silence, not an error; the failure is logged by RxHelper.
  */
 class HistorySource(private val observe: () -> Observable<MediaGroup>) {
     private var action: Disposable? = null
@@ -20,7 +19,8 @@ class HistorySource(private val observe: () -> Observable<MediaGroup>) {
         action = RxHelper.execute(
             observe().take(1),
             OnResult<MediaGroup> { group -> if (!group.mediaItems.isNullOrEmpty()) onGroup(group) },
-            OnError { },
+            null,
+            null,
         )
     }
 

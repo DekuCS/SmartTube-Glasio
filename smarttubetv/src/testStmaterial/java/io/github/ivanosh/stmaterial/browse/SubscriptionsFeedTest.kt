@@ -27,7 +27,9 @@ class SubscriptionsFeedTest {
     private fun historyGroup(vararg entries: Pair<String, Float>): VideoGroup =
         VideoGroup.from(entries.map { video(it.first, it.second) }, null, 0)
 
-    private fun stateOnSubs() = BrowseState(rowTitle = { "t$it" }, authorOf = { it.author }).apply {
+    private val loads = mutableListOf<Int>()
+
+    private fun stateOnSubs() = BrowseState(onSubscriptionsLoad = { loads.add(it) }, rowTitle = { "t$it" }, authorOf = { it.author }).apply {
         sections.addAll(listOf(subs, home, historySection))
         selectTab(subs.id)
     }
@@ -244,5 +246,86 @@ class SubscriptionsFeedTest {
         val group = subsGroup(VideoGroup.ACTION_APPEND, "s1")
         state.updateSection(group)
         assertSame(group, state.rows[0].group)
+    }
+
+    @Test
+    fun aFeedVideoAlsoInTheHistoryStaysOnTheFeedsGroup() {
+        val state = stateOnSubs()
+        state.updateHistory(historyGroup("x" to 100f), state.epoch)
+        val feed = subsGroup(VideoGroup.ACTION_APPEND, "s1", "x")
+        state.updateSection(feed)
+        val last = state.takeMoreRequest(state.rows.first { it.id == "new" })
+        assertEquals("x", last?.videoId)
+        assertSame(feed, last?.group)
+    }
+
+    @Test
+    fun theLastFeedRowAsksAsSoonAsACardIsFocused() {
+        val state = stateOnSubs()
+        state.updateHistory(historyGroup("h1" to 50f), state.epoch)
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "s2"))
+        assertFalse(state.rows[0].eager)
+        assertTrue(state.rows[1].eager)
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "s2", "s3"))
+        assertFalse(state.rows[1].eager)
+        assertFalse(state.rows[2].eager)
+        assertTrue(state.rows[2].pageable)
+    }
+
+    @Test
+    fun everyLoadOfTheFeedAsksForTheHistoryOnce() {
+        val state = stateOnSubs()
+        val first = state.epoch
+        state.updateSection(subsGroup(VideoGroup.ACTION_REPLACE))
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1"))
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "s2"))
+        assertEquals(listOf(first), loads)
+        state.updateSection(subsGroup(VideoGroup.ACTION_REPLACE))
+        assertEquals(listOf(first, first), loads)
+    }
+
+    @Test
+    fun otherTabsNeverAskForTheHistory() {
+        val state = stateOnSubs()
+        state.selectTab(home.id)
+        state.updateSection(VideoGroup.from(home).apply { setAction(VideoGroup.ACTION_REPLACE) })
+        assertTrue(loads.isEmpty())
+    }
+
+    @Test
+    fun emptyingEarlierLetsNewAskAgain() {
+        val state = stateOnSubs()
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1"))
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "s2"))
+        state.updateSection(VideoGroup.from(listOf(video("s2"))).apply { setAction(VideoGroup.ACTION_REMOVE) })
+        assertEquals(listOf("new"), state.layout())
+        assertTrue(state.rows[0].pageable)
+        assertTrue(state.rows[0].eager)
+    }
+
+    @Test
+    fun whenContinueIsAllThereIsItPagesTheFeedByItsGroup() {
+        val state = stateOnSubs()
+        state.updateHistory(historyGroup("h1" to 50f), state.epoch)
+        assertNull(state.takeMoreRequest(state.rows[0]))
+        assertEquals(1, loads.size + 1)
+        val feed = subsGroup(VideoGroup.ACTION_APPEND, "h1", "s9")
+        state.updateSection(feed)
+        state.updateSection(VideoGroup.from(listOf(video("s9"))).apply { setAction(VideoGroup.ACTION_REMOVE) })
+        assertEquals(listOf("continue"), state.layout())
+        assertTrue(state.rows[0].eager)
+        val next = state.takeMoreRequest(state.rows[0])
+        assertSame(feed, next?.group)
+        assertNull(state.takeMoreRequest(state.rows[0]))
+    }
+
+    @Test
+    fun continueKeepsItsGroupAfterTheFeedRestarts() {
+        val state = stateOnSubs()
+        val history = historyGroup("h1" to 50f)
+        state.updateHistory(history, state.epoch)
+        state.updateSection(subsGroup(VideoGroup.ACTION_REPLACE))
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1"))
+        assertSame(history, state.rows[0].group)
     }
 }
