@@ -101,7 +101,7 @@
     <string translatable="false" name="material_state_on">On</string>
     <string translatable="false" name="material_state_off">Off</string>
     <string translatable="false" name="material_player_customize">Customize buttons</string>
-    <string translatable="false" name="material_buttons_subtitle">Five buttons on the panel, the rest in More.</string>
+    <string translatable="false" name="material_buttons_subtitle">Up to eight buttons on the panel, the rest in More.</string>
     <string translatable="false" name="material_buttons_on_panel">On the panel</string>
     <string translatable="false" name="material_buttons_in_more">In More</string>
     <string translatable="false" name="material_buttons_keep_one">At least one button must stay on the panel</string>

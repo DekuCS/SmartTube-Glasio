@@ -10,8 +10,10 @@ import org.junit.Test
 class PlayerButtonsTest {
     @Test
     fun theDefaultIsTheOneInGlobalConstraints() {
-        assertEquals(listOf(PlayPause, Next, Quality, Subtitles, Speed), DEFAULT_BUTTONS)
-        assertEquals(5, PANEL_LIMIT)
+        assertEquals(listOf(PlayPause, Next, Quality, Subtitles, Speed, Like, Dislike, Subscribe), DEFAULT_BUTTONS)
+        assertEquals(8, PANEL_LIMIT)
+        assertEquals(PANEL_LIMIT, DEFAULT_BUTTONS.size)
+        assertEquals(listOf(PlayPause, Next, Quality, Subtitles, Speed), LEGACY_DEFAULT_BUTTONS)
     }
 
     @Test
@@ -52,12 +54,12 @@ class PlayerButtonsTest {
 
     @Test
     fun aButtonPushedOffTheFullPanelShowsUpInMore() {
-        val editor = buttonsEditorState(DEFAULT_BUTTONS).pick(Like)
+        val editor = buttonsEditorState(DEFAULT_BUTTONS).pick(Queue)
         val result = editor.toggleList()
-        assertEquals(Speed, result.displaced)
+        assertEquals(Subscribe, result.displaced)
         assertEquals(PANEL_LIMIT, result.state.shown.size)
-        assertTrue(Speed in moreGroups(result.state.shown).flatMap { it.buttons })
-        assertFalse(Like in moreGroups(result.state.shown).flatMap { it.buttons })
+        assertTrue(Subscribe in moreGroups(result.state.shown).flatMap { it.buttons })
+        assertFalse(Queue in moreGroups(result.state.shown).flatMap { it.buttons })
     }
 
     @Test
@@ -89,8 +91,55 @@ class PlayerButtonsTest {
 
     @Test
     fun nothingValidFallsBackToTheDefault() {
-        assertEquals(DEFAULT_BUTTONS, resolveButtons(emptyList()))
+        assertEquals(DEFAULT_BUTTONS, resolveButtons(null))
         assertEquals(DEFAULT_BUTTONS, resolveButtons(listOf("Chat", "Pip")))
+    }
+
+    @Test
+    fun aSavedEmptyListStaysEmpty() {
+        assertEquals(emptyList<PlayerButton>(), resolveButtons(emptyList()))
+    }
+
+    @Test
+    fun theOldDefaultSavedAsItWasBecomesTheNewDefault() {
+        assertEquals(DEFAULT_BUTTONS, resolveButtons(listOf("PlayPause", "Next", "Quality", "Subtitles", "Speed")))
+    }
+
+    @Test
+    fun anyOtherSavedListIsKeptAsItIs() {
+        // Another order, one more, one less, and the new default itself.
+        val reordered = listOf("Next", "PlayPause", "Quality", "Subtitles", "Speed")
+        assertEquals(reordered.map { PlayerButton.valueOf(it) }, resolveButtons(reordered))
+        assertEquals(listOf(PlayPause, Next, Quality, Subtitles, Speed, Like), resolveButtons(listOf("PlayPause", "Next", "Quality", "Subtitles", "Speed", "Like")))
+        assertEquals(listOf(PlayPause, Next, Quality, Subtitles), resolveButtons(listOf("PlayPause", "Next", "Quality", "Subtitles")))
+        assertEquals(DEFAULT_BUTTONS, resolveButtons(DEFAULT_BUTTONS.map { it.name }))
+    }
+
+    @Test
+    fun theButtonsEditorLetsEveryButtonGoDownToNone() {
+        var state = buttonsEditorState(listOf(PlayPause, Next))
+        assertEquals(0, state.minShown)
+        for (button in listOf(Next, PlayPause)) {
+            val result = state.pick(button).toggleList()
+            assertEquals(null, result.displaced)
+            state = result.state
+        }
+        assertEquals(emptyList<PlayerButton>(), state.shown)
+        assertTrue(PlayPause in state.hidden && Next in state.hidden)
+    }
+
+    @Test
+    fun aSmallPanelTakesAnotherButtonWithoutDisplacingAnything() {
+        val result = buttonsEditorState(listOf(PlayPause, Next, Quality)).pick(Like).toggleList()
+        assertEquals(null, result.displaced)
+        assertEquals(listOf(PlayPause, Next, Quality, Like), result.state.shown)
+    }
+
+    @Test
+    fun theSectionsEditorStillKeepsOne() {
+        val state = EditorState(listOf("a"), listOf("b"), emptySet(), 3).pick("a")
+        assertEquals(1, state.minShown)
+        assertEquals(state, state.toggleList().state)
     }
 
     @Test

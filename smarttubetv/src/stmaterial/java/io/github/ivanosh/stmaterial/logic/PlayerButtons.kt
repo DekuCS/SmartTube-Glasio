@@ -10,10 +10,19 @@ enum class ButtonGroupKind { Playback, PictureAndSound, VideoAndChannel }
 
 data class ButtonGroup(val kind: ButtonGroupKind, val buttons: List<PlayerButton>)
 
-/** The panel holds this many buttons and More, which is always there and is not a [PlayerButton]. */
-const val PANEL_LIMIT = 5
+/**
+ * The panel holds up to this many buttons and More, which is always there and is not a [PlayerButton].
+ * The owner raised the limit from five to eight on 2026-11-01; any button can be switched off, down to none.
+ */
+const val PANEL_LIMIT = 8
 
-val DEFAULT_BUTTONS = listOf(PlayerButton.PlayPause, PlayerButton.Next, PlayerButton.Quality, PlayerButton.Subtitles, PlayerButton.Speed)
+/** The first version's default. A saved list equal to it was never chosen by the owner, so it becomes [DEFAULT_BUTTONS]. */
+val LEGACY_DEFAULT_BUTTONS = listOf(PlayerButton.PlayPause, PlayerButton.Next, PlayerButton.Quality, PlayerButton.Subtitles, PlayerButton.Speed)
+
+val DEFAULT_BUTTONS = listOf(
+    PlayerButton.PlayPause, PlayerButton.Next, PlayerButton.Quality, PlayerButton.Subtitles, PlayerButton.Speed,
+    PlayerButton.Like, PlayerButton.Dislike, PlayerButton.Subscribe
+)
 
 fun groupOf(button: PlayerButton): ButtonGroupKind = when (button) {
     PlayerButton.PlayPause, PlayerButton.Previous, PlayerButton.Next, PlayerButton.Speed, PlayerButton.Repeat,
@@ -30,14 +39,25 @@ fun moreGroups(shown: List<PlayerButton>): List<ButtonGroup> =
         ButtonGroup(kind, PlayerButton.values().filter { groupOf(it) == kind && it !in shown })
     }.filter { it.buttons.isNotEmpty() }
 
-/** Saved names to buttons: unknown names and repeats are skipped, the limit holds, and nothing valid gives the default. */
-fun resolveButtons(names: List<String>): List<PlayerButton> {
+/**
+ * Saved names to buttons: unknown names and repeats are skipped and the limit holds.
+ * [names] null means nothing was ever saved, which gives the default; a saved empty list stays empty, since
+ * the owner may switch every button off. A list with names but none of them known is damaged and gives the default.
+ * The first version's default is migrated to the new one.
+ */
+fun resolveButtons(names: List<String>?): List<PlayerButton> {
+    if (names == null) return DEFAULT_BUTTONS
+    if (names.isEmpty()) return emptyList()
     val buttons = names.mapNotNull { name -> PlayerButton.values().firstOrNull { it.name == name } }.distinct().take(PANEL_LIMIT)
-    return buttons.ifEmpty { DEFAULT_BUTTONS }
+    return when {
+        buttons.isEmpty() -> DEFAULT_BUTTONS
+        buttons == LEGACY_DEFAULT_BUTTONS -> DEFAULT_BUTTONS
+        else -> buttons
+    }
 }
 
 fun buttonsEditorState(shown: List<PlayerButton>): EditorState<PlayerButton> =
-    EditorState(shown, PlayerButton.values().filter { it !in shown }, emptySet(), PANEL_LIMIT)
+    EditorState(shown, PlayerButton.values().filter { it !in shown }, emptySet(), PANEL_LIMIT, minShown = 0)
 
 sealed interface SheetCommand {
     object Close : SheetCommand

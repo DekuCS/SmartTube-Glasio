@@ -6,7 +6,9 @@ data class EditorState<T>(
     val hidden: List<T>,
     val locked: Set<T>,
     val limit: Int,
-    val picked: T? = null
+    val picked: T? = null,
+    /** The editor will not take the last items out of the shown list below this many. */
+    val minShown: Int = 1
 )
 
 data class EditResult<T>(val state: EditorState<T>, val displaced: T? = null)
@@ -38,7 +40,7 @@ fun <T> EditorState<T>.moveBy(delta: Int): EditorState<T> {
 fun <T> EditorState<T>.toggleList(): EditResult<T> {
     val item = picked ?: return EditResult(this)
     if (item in shown) {
-        if (item in locked || shown.size <= 1) return EditResult(this)
+        if (item in locked || shown.size <= minShown) return EditResult(this)
         return EditResult(copy(shown = shown - item, hidden = hidden + item))
     }
     if (item !in hidden) return EditResult(this)
