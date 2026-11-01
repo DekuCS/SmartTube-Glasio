@@ -85,9 +85,9 @@ private fun faceOf(video: Video) = CardFace(
 )
 
 /**
- * One card is one bitmap, made off the main thread: the plain Compose card (a rounded image, three lines
- * of text and a badge) missed the jank threshold of the brief, see docs/perf.md. The screen only draws
- * finished images, and focus changes nothing but the scale and the outline around them.
+ * One card is one bitmap, made off the main thread: a card with Compose text scrolls worse on real
+ * devices, see docs/perf.md. The screen only draws finished images, and focus changes nothing but the
+ * scale and the outline around them.
  *
  * Focus belongs to the caller: only the card that changed recomposes when focus moves. [revision] is
  * how the caller says the video changed in place.
