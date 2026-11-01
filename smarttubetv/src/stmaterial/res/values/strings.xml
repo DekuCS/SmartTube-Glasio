@@ -67,6 +67,15 @@
     <string translatable="false" name="material_player_speed">Speed</string>
     <string translatable="false" name="material_player_more">More</string>
     <string translatable="false" name="material_player_marks">Marked by SponsorBlock</string>
+    <string translatable="false" name="material_sb_sponsor">Sponsor</string>
+    <string translatable="false" name="material_sb_intro">Intro</string>
+    <string translatable="false" name="material_sb_outro">Outro</string>
+    <string translatable="false" name="material_sb_interaction">Subscribe reminder</string>
+    <string translatable="false" name="material_sb_selfpromo">Self-promo</string>
+    <string translatable="false" name="material_sb_music_offtopic">Non-music</string>
+    <string translatable="false" name="material_sb_preview">Recap</string>
+    <string translatable="false" name="material_sb_poi_highlight">Highlight</string>
+    <string translatable="false" name="material_sb_filler">Filler</string>
     <string translatable="false" name="material_group_playback">Playback</string>
     <string translatable="false" name="material_group_picture">Picture and sound</string>
     <string translatable="false" name="material_group_video">Video and channel</string>

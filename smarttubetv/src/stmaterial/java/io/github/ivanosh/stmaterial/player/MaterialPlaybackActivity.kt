@@ -10,10 +10,12 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
+import androidx.core.content.ContextCompat
 import com.liskovsoft.sharedutils.helpers.KeyHelpers
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData
+import com.liskovsoft.smartyoutubetv2.common.prefs.SponsorBlockData
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity
 import io.github.ivanosh.stmaterial.browse.KeyRepeatGuard
 import io.github.ivanosh.stmaterial.data.ButtonStore
@@ -205,6 +207,18 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     /** As on the upstream bar, chapters and SponsorBlock add up, and null clears them. */
     fun setMarks(segments: List<SeekBarSegment>?) {
         panel.marks = if (segments == null) emptyList() else (panel.marks + segments.mapNotNull(::markOf)).distinct()
+        // Once per change of the marks, not per frame: the legend and whether it needs a line of its own.
+        val legend = legendEntries(panel.marks, ::categoryName)
+        panel.legend = legend
+    }
+
+    /** The name of the SponsorBlock category that draws in this colour, in English whatever the device language. */
+    private fun categoryName(argb: Int): String? {
+        val data = SponsorBlockData.instance(this)
+        val category = data.allCategories.firstOrNull { c ->
+            data.getColorRes(c)?.let { ContextCompat.getColor(this, it) } == argb
+        } ?: return null
+        return SPONSOR_CATEGORY_NAMES[category]?.let(::getString)
     }
 
     fun setChapter(title: String?) {
@@ -313,7 +327,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
 
     private fun markOf(segment: SeekBarSegment): ProgressMark? {
         if (segment.startProgress < 0 || segment.endProgress < 0 || segment.startProgress >= 1) return null
-        return ProgressMark(segment.startProgress, segment.endProgress.coerceAtMost(1f), segment.color == Color.BLACK)
+        val chapter = segment.color == Color.BLACK
+        return ProgressMark(segment.startProgress, segment.endProgress.coerceAtMost(1f), chapter, if (chapter) 0 else segment.color)
     }
 
     private fun playerKeyOf(keyCode: Int): PlayerKey? = when {

@@ -30,6 +30,8 @@ class PlayerOverlayState {
     var durationMs by mutableLongStateOf(0)
     var playing by mutableStateOf(true)
     var marks by mutableStateOf(emptyList<ProgressMark>())
+    /** One entry per SponsorBlock category on the bar, set with [marks]. */
+    var legend by mutableStateOf(emptyList<LegendEntry>())
     /** The buttons on the panel, before More, which is always the last. */
     var buttons by mutableStateOf<List<PlayerButton>>(DEFAULT_BUTTONS)
     /** The state the presenter set for each button, by the id the Leanback button had. */

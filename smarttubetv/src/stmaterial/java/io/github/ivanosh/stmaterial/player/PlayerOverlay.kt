@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -185,15 +187,33 @@ private fun markColor(mark: ProgressMark): Color = if (mark.argb == 0) MarkColor
 
 @Composable
 private fun TimeRow(state: PlayerOverlayState) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(formatPlayerTime(state.positionMs), style = timeStyle)
-        if (state.marks.any { !it.isChapter }) {
+    // The legend sits between the times, or, when it does not fit there, on a line of its own that is
+    // reserved for this video; both were decided when the marks arrived.
+    val legend = state.legend
+    // The width of the window in the density Compose draws with: Configuration's can differ on a wrapped context.
+    val widthDp = LocalWindowInfo.current.containerSize.width / LocalDensity.current.density
+    // Decided when the legend changes, with room for both times; not measured while playing.
+    val wraps = remember(legend, widthDp) { !legendFits(legend, widthDp - 2 * 58f - 2 * 110f) }
+    Column {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatPlayerTime(state.positionMs), style = timeStyle)
+            if (legend.isNotEmpty() && !wraps) Legend(legend)
+            Text(if (state.durationMs > 0) formatPlayerTime(state.durationMs) else "", style = timeStyle)
+        }
+        if (legend.isNotEmpty() && wraps) Box(Modifier.padding(top = 8.dp)) { Legend(legend) }
+    }
+}
+
+/** A swatch and a name for each category on the bar. */
+@Composable
+private fun Legend(entries: List<LegendEntry>) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        entries.forEach { entry ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(28.dp, 8.dp).background(MarkColor, RoundedCornerShape(4.dp)))
-                Text(stringResource(R.string.material_player_marks), style = timeStyle)
+                Box(Modifier.size(28.dp, 8.dp).background(Color(entry.argb), RoundedCornerShape(4.dp)))
+                Text(entry.name, style = timeStyle, maxLines = 1)
             }
         }
-        Text(if (state.durationMs > 0) formatPlayerTime(state.durationMs) else "", style = timeStyle)
     }
 }
 
