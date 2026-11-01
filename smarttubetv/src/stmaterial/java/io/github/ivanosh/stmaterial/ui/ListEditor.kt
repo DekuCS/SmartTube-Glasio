@@ -135,8 +135,19 @@ private fun <T> cursorOn(state: EditorState<T>, item: T, old: EditorCursor): Edi
     return if (hidden >= 0) EditorCursor(Side.Hidden, hidden) else old
 }
 
-/** The words around the lists, which differ between editors. */
-class ListEditorTexts(val title: String, val subtitle: String, val shownHeader: String, val hiddenHeader: String)
+/**
+ * The words around the lists, which differ between editors. The notices default to the section editor's;
+ * [displaced] takes the pushed item's label and the limit.
+ */
+class ListEditorTexts(
+    val title: String,
+    val subtitle: String,
+    val shownHeader: String,
+    val hiddenHeader: String,
+    val keepOne: String? = null,
+    val wasReset: String? = null,
+    val displaced: ((label: String, limit: Int) -> String)? = null,
+)
 
 private const val ROWS = 8
 private const val NOTICE_MS = 2500L
@@ -194,10 +205,11 @@ fun <T> ListEditor(
         ui = result.ui
         if (result.ui.state != before) onChange(result.ui.state)
         notice = when (result.notice) {
-            EditorNotice.KeepOne -> Notice(context.getString(R.string.material_editor_keep_one))
-            EditorNotice.Reset -> Notice(context.getString(R.string.material_editor_was_reset))
+            EditorNotice.KeepOne -> Notice(texts.keepOne ?: context.getString(R.string.material_editor_keep_one))
+            EditorNotice.Reset -> Notice(texts.wasReset ?: context.getString(R.string.material_editor_was_reset))
             EditorNotice.Displaced -> result.displaced?.let {
-                Notice(context.getString(R.string.material_editor_displaced, label(it), result.ui.state.limit))
+                val limit = result.ui.state.limit
+                Notice(texts.displaced?.invoke(label(it), limit) ?: context.getString(R.string.material_editor_displaced, label(it), limit))
             }
             null -> null
         }

@@ -26,12 +26,19 @@
         <activity
             android:name="io.github.ivanosh.stmaterial.player.MaterialPlaybackActivity"
             android:launchMode="singleInstance"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection|keyboard|keyboardHidden|navigation"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
             android:screenOrientation="unspecified"
             android:showWhenLocked="true"
             android:theme="@style/App.Theme.Leanback.Player" />
+
+        <!-- Translucent like the dialogs: the player under it is paused, not stopped, and plays on. -->
+        <activity
+            android:name="io.github.ivanosh.stmaterial.player.MaterialButtonsEditorActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Material.Theme.Dialog" />
 
         <!-- noHistory and singleInstance as in the upstream dialog; the translucent theme keeps the player visible behind. -->
         <activity

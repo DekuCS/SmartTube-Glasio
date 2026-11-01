@@ -33,11 +33,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.logic.PanelFocus
+import io.github.ivanosh.stmaterial.logic.PlayerButton
+import io.github.ivanosh.stmaterial.logic.buttonIsOn
 import io.github.ivanosh.stmaterial.logic.formatPlayerTime
 import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.focusRing
@@ -46,7 +49,7 @@ private val MarkColor = Color(0xFFF2B84B)
 private val titleStyle = TextStyle(fontSize = 44.sp, lineHeight = 54.sp, fontWeight = FontWeight.Medium, color = Palette.OnBackground)
 private val subtitleStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp, color = Palette.OnBackgroundVariant)
 private val timeStyle = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, color = Palette.OnBackgroundVariant)
-private val buttonLabelStyle = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, color = Palette.OnBackground)
+internal val buttonLabelStyle = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, color = Palette.OnBackground)
 
 /**
  * Draws only: the view holds no focus, and [MaterialPlaybackActivity] handles every key.
@@ -74,6 +77,7 @@ fun PlayerOverlay(state: PlayerOverlayState) {
             }
             Box(Modifier.onlyWhenOpen(state).padding(top = 24.dp)) { Buttons(state) }
         }
+        MoreSheet(state)
     }
 }
 
@@ -143,20 +147,31 @@ private fun TimeRow(state: PlayerOverlayState) {
 @Composable
 private fun Buttons(state: PlayerOverlayState) {
     Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
-        PANEL_BUTTONS.forEachIndexed { index, action ->
-            val focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == index
-            val paused = action == PanelAction.PlayPause && !state.playing
+        state.buttons.forEachIndexed { index, button ->
+            val paused = button == PlayerButton.PlayPause && !state.playing
             PanelButton(
-                label = if (paused) stringResource(R.string.material_player_play) else stringResource(action.label),
-                iconPath = if (paused) PLAY_ICON_PATH else action.iconPath,
-                focused = focused,
+                label = when {
+                    button != PlayerButton.PlayPause -> stringResource(buttonLabel(button))
+                    paused -> stringResource(R.string.material_player_play)
+                    else -> stringResource(R.string.material_player_pause)
+                },
+                iconPath = if (paused) PLAY_ICON_PATH else buttonIcon(button),
+                focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == index,
+                on = button in STATEFUL_BUTTONS && buttonIsOn(button, viewId(button)?.let { state.buttonStates[it] }),
             )
         }
+        PanelButton(
+            label = stringResource(R.string.material_player_more),
+            iconPath = MORE_ICON_PATH,
+            focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == state.buttons.size,
+            on = false,
+        )
     }
 }
 
+/** A button of the panel: [on] marks a switched-on state with the accent colour. */
 @Composable
-private fun PanelButton(label: String, iconPath: String, focused: Boolean) {
+internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: Boolean, size: Dp = 84.dp, labelStyle: TextStyle = buttonLabelStyle) {
     Column(
         Modifier.width(150.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -164,14 +179,14 @@ private fun PanelButton(label: String, iconPath: String, focused: Boolean) {
     ) {
         Box(
             Modifier
-                .size(84.dp)
-                .focusRing(focused, corner = 42.dp, gap = 3.dp)
-                .background(if (focused) Color.White else Palette.TabSelected, CircleShape),
+                .size(size)
+                .focusRing(focused, corner = size / 2, gap = 3.dp)
+                .background(if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            PanelIcon(iconPath, if (focused) Palette.Background else Palette.OnBackground)
+            PanelIcon(iconPath, if (focused || on) Palette.Background else Palette.OnBackground)
         }
-        Text(label, style = buttonLabelStyle, maxLines = 1)
+        Text(label, style = labelStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

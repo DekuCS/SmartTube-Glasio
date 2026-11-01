@@ -1,5 +1,6 @@
 package io.github.ivanosh.stmaterial.player
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -15,12 +16,17 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity
 import io.github.ivanosh.stmaterial.browse.KeyRepeatGuard
+import io.github.ivanosh.stmaterial.data.ButtonStore
 import io.github.ivanosh.stmaterial.logic.PanelFocus
+import io.github.ivanosh.stmaterial.logic.PlayerButton
 import io.github.ivanosh.stmaterial.logic.PlayerCommand
 import io.github.ivanosh.stmaterial.logic.PlayerKey
 import io.github.ivanosh.stmaterial.logic.PlayerUi
 import io.github.ivanosh.stmaterial.logic.SEEK_DEBOUNCE_MS
 import io.github.ivanosh.stmaterial.logic.SeekDebounce
+import io.github.ivanosh.stmaterial.logic.SheetCommand
+import io.github.ivanosh.stmaterial.logic.moreGroups
+import io.github.ivanosh.stmaterial.logic.moreSheetKey
 import io.github.ivanosh.stmaterial.logic.playerKey
 import io.github.ivanosh.stmaterial.logic.presenterOpenFocus
 import io.github.ivanosh.stmaterial.logic.shouldAutoHide
@@ -39,7 +45,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private val player get() = playbackView as? MaterialPlaybackFragment
     private val presenter get() = PlaybackPresenter.instance(this)
     private val commands by lazy { PlayerCommands(presenter) { player } }
-    private var ui = PlayerUi(PanelFocus.HIDDEN, 0, PANEL_BUTTONS.size)
+    private val store by lazy { ButtonStore(this) }
+    private var ui = PlayerUi(PanelFocus.HIDDEN, 0, panel.buttons.size + 1)
     private var seek = SeekDebounce()
     private var lastKeyMs = 0L
     private var seekPreviewUntilMs = 0L
@@ -49,6 +56,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private var lastSeekKeyMs: Long? = null
 
     val isPanelOpen get() = ui.focus != PanelFocus.HIDDEN
+    private val isSheetOpen get() = panel.sheetGroups != null
 
     private val applySeek = Runnable {
         val (rest, due) = seek.takeDue(SystemClock.uptimeMillis())
@@ -64,7 +72,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             // A dialog over the panel holds the timer; it starts again when the dialog closes.
             if (!hasWindowFocus()) lastKeyMs = now
             val view = player
-            if (view != null && shouldAutoHide(ui, view.playWhenReady, now - lastKeyMs)) {
+            if (view != null && !isSheetOpen && shouldAutoHide(ui, view.playWhenReady, now - lastKeyMs)) {
                 setUi(ui.copy(focus = PanelFocus.HIDDEN))
             }
             if (now >= seekPreviewUntilMs) panel.seekPreview = false
@@ -75,6 +83,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyButtons(store.buttons())
         addContentView(
             ComposeView(this).apply {
                 setContent { MaterialTvTheme { PlayerOverlay(panel) } }
@@ -92,6 +101,12 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         // Before the fragment starts: that is when the presenter may ask for the panel.
         started = true
         super.onStart()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The editor may have changed them.
+        applyButtons(store.buttons())
     }
 
     override fun onStop() {
@@ -129,14 +144,19 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             }
             return true
         }
-        val moves = key == PlayerKey.Left || key == PlayerKey.Right
+        val sheet = isSheetOpen
+        val moves = if (sheet) key == PlayerKey.Up || key == PlayerKey.Down else key == PlayerKey.Left || key == PlayerKey.Right
         if (event.repeatCount > 0) {
-            // Only a held left or right repeats, and what waited in the queue is dropped, so nothing moves after release.
+            // Only a held seek key (or, in More, up or down) repeats, and what waited in the queue is dropped, so nothing moves after release.
             if (!moves || repeatGuard.shouldDrop(event.repeatCount, event.eventTime, SystemClock.uptimeMillis())) return true
         } else {
             presenter.onKeyDown(NO_KEY) // what a touch does: the sleep timer and the like start over
         }
         lastKeyMs = SystemClock.uptimeMillis()
+        if (sheet) {
+            sheetKey(key)
+            return true
+        }
         val (next, keyCommands) = playerKey(ui, key, PlayerData.instance(this).seekIncrementMs.toLong())
         setUi(next)
         var passBackOn = false
@@ -144,8 +164,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             when (command) {
                 PlayerCommand.TogglePlay -> commands.togglePlay()
                 is PlayerCommand.Seek -> seekBy(command.deltaMs)
-                is PlayerCommand.Press -> commands.press(command.index)
-                PlayerCommand.OpenMore -> commands.openMore()
+                is PlayerCommand.Press -> panel.buttons.getOrNull(command.index)?.let(commands::run)
+                PlayerCommand.OpenMore -> openSheet()
                 PlayerCommand.Exit -> {
                     sendSeekNow()
                     passBackOn = true
@@ -159,6 +179,11 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     }
 
     // Calls from MaterialPlaybackFragment, which answers for the presenter.
+
+    /** What the presenter set for a button, which the panel and More show. */
+    fun onButtonState(buttonId: Int, state: Int) {
+        panel.buttonStates[buttonId] = state
+    }
 
     fun showPanel(show: Boolean) {
         if (!show) {
@@ -187,8 +212,49 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         seek = SeekDebounce()
     }
 
+    /** The panel's buttons from the store. The count of keys moves with them, and an open More follows. */
+    private fun applyButtons(buttons: List<PlayerButton>) {
+        if (buttons == panel.buttons && ui.buttonCount == buttons.size + 1) return
+        panel.buttons = buttons
+        writeUi(ui.copy(buttonCount = buttons.size + 1, buttonIndex = ui.buttonIndex.coerceAtMost(buttons.size)))
+        if (isSheetOpen) {
+            panel.sheetGroups = moreGroups(buttons)
+            panel.sheetCursor = panel.sheetCursor.coerceAtMost(sheetEntries().size)
+        }
+    }
+
+    /** The buttons More lists, in the order of its lines. Customize buttons comes after them. */
+    private fun sheetEntries(): List<PlayerButton> = panel.sheetGroups.orEmpty().flatMap { it.buttons }
+
+    private fun openSheet() {
+        panel.sheetCursor = 0
+        panel.sheetGroups = moreGroups(panel.buttons)
+    }
+
+    private fun sheetKey(key: PlayerKey) {
+        val entries = sheetEntries()
+        val (cursor, command) = moreSheetKey(panel.sheetCursor, entries.size + 1, key)
+        panel.sheetCursor = cursor
+        when (command) {
+            SheetCommand.Close -> panel.sheetGroups = null
+            is SheetCommand.Activate -> {
+                val button = entries.getOrNull(command.index)
+                if (button == null) {
+                    panel.sheetGroups = null
+                    startActivity(Intent(this, MaterialButtonsEditorActivity::class.java))
+                } else {
+                    commands.run(button)
+                    // A switch shows its new state in place; the rest opens something over the player.
+                    if (button !in STATEFUL_BUTTONS || button == PlayerButton.Subtitles) panel.sheetGroups = null
+                }
+            }
+            null -> Unit
+        }
+    }
+
     private fun writeUi(next: PlayerUi) {
         ui = next
+        if (next.focus == PanelFocus.HIDDEN) panel.sheetGroups = null
         panel.focus = next.focus
         panel.buttonIndex = next.buttonIndex
     }

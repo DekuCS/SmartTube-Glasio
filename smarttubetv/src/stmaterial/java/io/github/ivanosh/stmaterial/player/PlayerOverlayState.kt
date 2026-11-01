@@ -3,9 +3,13 @@ package io.github.ivanosh.stmaterial.player
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.github.ivanosh.stmaterial.logic.ButtonGroup
+import io.github.ivanosh.stmaterial.logic.DEFAULT_BUTTONS
 import io.github.ivanosh.stmaterial.logic.PanelFocus
+import io.github.ivanosh.stmaterial.logic.PlayerButton
 
 /** A stretch of the progress bar, in fractions of the video. A chapter start is drawn as a gap. */
 data class ProgressMark(val start: Float, val end: Float, val isChapter: Boolean)
@@ -23,4 +27,11 @@ class PlayerOverlayState {
     var durationMs by mutableLongStateOf(0)
     var playing by mutableStateOf(true)
     var marks by mutableStateOf(emptyList<ProgressMark>())
+    /** The buttons on the panel, before More, which is always the last. */
+    var buttons by mutableStateOf<List<PlayerButton>>(DEFAULT_BUTTONS)
+    /** The state the presenter set for each button, by the id the Leanback button had. */
+    val buttonStates = mutableStateMapOf<Int, Int>()
+    /** What More lists while its sheet is open, else null. */
+    var sheetGroups by mutableStateOf<List<ButtonGroup>?>(null)
+    var sheetCursor by mutableIntStateOf(0)
 }

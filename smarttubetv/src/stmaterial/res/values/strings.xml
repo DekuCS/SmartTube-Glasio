@@ -65,4 +65,35 @@
     <string translatable="false" name="material_player_speed">Speed</string>
     <string translatable="false" name="material_player_more">More</string>
     <string translatable="false" name="material_player_marks">Marked by SponsorBlock</string>
+    <string translatable="false" name="material_group_playback">Playback</string>
+    <string translatable="false" name="material_group_picture">Picture and sound</string>
+    <string translatable="false" name="material_group_video">Video and channel</string>
+    <string translatable="false" name="material_btn_play_pause">Play/Pause</string>
+    <string translatable="false" name="material_btn_previous">Previous</string>
+    <string translatable="false" name="material_btn_like">Like</string>
+    <string translatable="false" name="material_btn_dislike">Dislike</string>
+    <string translatable="false" name="material_btn_subscribe">Subscribe</string>
+    <string translatable="false" name="material_btn_channel">Open channel</string>
+    <string translatable="false" name="material_btn_playlist">Add to playlist</string>
+    <string translatable="false" name="material_btn_queue">Queue</string>
+    <string translatable="false" name="material_btn_repeat">Repeat</string>
+    <string translatable="false" name="material_btn_search">Search</string>
+    <string translatable="false" name="material_btn_info">Video info</string>
+    <string translatable="false" name="material_btn_share">Share</string>
+    <string translatable="false" name="material_btn_zoom">Zoom</string>
+    <string translatable="false" name="material_btn_stats">Stats</string>
+    <string translatable="false" name="material_btn_seek_interval">Seek interval</string>
+    <string translatable="false" name="material_btn_sponsorblock">SponsorBlock</string>
+    <string translatable="false" name="material_btn_dimming">Screen dimming</string>
+    <string translatable="false" name="material_btn_mute">Mute</string>
+    <string translatable="false" name="material_btn_afr">Frame rate (AFR)</string>
+    <string translatable="false" name="material_state_on">On</string>
+    <string translatable="false" name="material_state_off">Off</string>
+    <string translatable="false" name="material_player_customize">Customize buttons</string>
+    <string translatable="false" name="material_buttons_subtitle">Five buttons on the panel, the rest in More.</string>
+    <string translatable="false" name="material_buttons_on_panel">On the panel</string>
+    <string translatable="false" name="material_buttons_in_more">In More</string>
+    <string translatable="false" name="material_buttons_keep_one">At least one button must stay on the panel</string>
+    <string translatable="false" name="material_buttons_was_reset">Buttons reset</string>
+    <string translatable="false" name="material_buttons_displaced">%1$s moved to More: the panel holds %2$d</string>
 </resources>

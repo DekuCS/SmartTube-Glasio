@@ -79,6 +79,20 @@ class MaterialPlaybackFragment : PlaybackFragment() {
         video?.titleFull?.ifBlank { null }?.let { lastTitle = it }
     }
 
+    /**
+     * What the presenter sets for a button goes to the panel and to More, which show it. The hidden
+     * Leanback actions get it too, since the presenter reads it back with [getButtonState].
+     */
+    val buttonStates = HashMap<Int, Int>()
+
+    override fun setButtonState(buttonId: Int, buttonState: Int) {
+        super.setButtonState(buttonId, buttonState)
+        buttonStates[buttonId] = buttonState
+        host?.onButtonState(buttonId, buttonState)
+    }
+
+    override fun getButtonState(buttonId: Int): Int = buttonStates[buttonId] ?: super.getButtonState(buttonId)
+
     /** Nothing draws the storyboard, and it costs work per load. */
     override fun loadStoryboard() = Unit
 
