@@ -20,7 +20,7 @@ class DialogStateTest {
     @Test
     fun `radio keeps exactly one selected`() {
         val state = DialogState()
-        state.push(DialogPage("Speed", radio(true, false, false)))
+        state.push(DialogPage.of("Speed", radio(true, false, false)))
         state.choose(2)
         assertEquals(listOf(2), state.selected())
         state.choose(2)
@@ -32,7 +32,7 @@ class DialogStateTest {
     @Test
     fun `checkbox toggles one item and leaves the others`() {
         val state = DialogState()
-        state.push(DialogPage("Tweaks", checks(true, false, true)))
+        state.push(DialogPage.of("Tweaks", checks(true, false, true)))
         state.toggle(1)
         assertEquals(listOf(0, 1, 2), state.selected())
         state.toggle(0)
@@ -42,7 +42,7 @@ class DialogStateTest {
     @Test
     fun `a switch toggles`() {
         val state = DialogState()
-        state.push(DialogPage(null, listOf(SwitchRow(7, "Loop", false, null))))
+        state.push(DialogPage.of(null, listOf(SwitchRow(7, "Loop", false, null))))
         state.toggle(7)
         assertTrue((state.page!!.rows.single() as SwitchRow).selected)
     }
@@ -50,8 +50,8 @@ class DialogStateTest {
     @Test
     fun `back returns to the previous page`() {
         val state = DialogState()
-        state.push(DialogPage("Root", radio(false)))
-        state.push(DialogPage("Sub", radio(true)), openedFrom = 0)
+        state.push(DialogPage.of("Root", radio(false)))
+        state.push(DialogPage.of("Sub", radio(true)), openedFrom = 0)
         assertTrue(state.canGoBack)
         assertEquals("Sub", state.page!!.title)
         assertTrue(state.pop())
@@ -64,8 +64,8 @@ class DialogStateTest {
     @Test
     fun `clearing the stack leaves nothing`() {
         val state = DialogState()
-        state.push(DialogPage("A", emptyList()))
-        state.push(DialogPage("B", emptyList()))
+        state.push(DialogPage.of("A", emptyList()))
+        state.push(DialogPage.of("B", emptyList()))
         state.clear()
         assertNull(state.page)
         assertFalse(state.canGoBack)
@@ -73,8 +73,8 @@ class DialogStateTest {
 
     @Test
     fun `an empty category is not shown`() {
-        val full = EntryRow(1, "Full", size = 2, open = { DialogPage("Full", radio(false, false)) })
-        val empty = EntryRow(2, "Empty", size = 0, open = { DialogPage("Empty", emptyList()) })
+        val full = EntryRow(1, "Full", size = 2, open = { DialogPage.of("Full", radio(false, false)) })
+        val empty = EntryRow(2, "Empty", size = 0, open = { DialogPage.of("Empty", emptyList()) })
         val page = DialogPage.of("Settings", listOf(empty, full))
         assertEquals(listOf(1), page.rows.map { it.key })
     }
@@ -82,8 +82,8 @@ class DialogStateTest {
     @Test
     fun `opening an entry pushes its page and back returns focus to the entry`() {
         val state = DialogState()
-        val entry = EntryRow(5, "Quality", size = 1, open = { DialogPage("Quality", radio(true)) })
-        state.push(DialogPage("Root", listOf(SwitchRow(1, "a", false, null), entry)))
+        val entry = EntryRow(5, "Quality", size = 1, open = { DialogPage.of("Quality", radio(true)) })
+        state.push(DialogPage.of("Root", listOf(SwitchRow(1, "a", false, null), entry)))
         state.open(entry)
         assertEquals("Quality", state.page!!.title)
         assertEquals(0, state.initialFocus())
@@ -94,16 +94,16 @@ class DialogStateTest {
     @Test
     fun `focus starts on the selected item or else the first row`() {
         val state = DialogState()
-        state.push(DialogPage("Speed", radio(false, false, true, false)))
+        state.push(DialogPage.of("Speed", radio(false, false, true, false)))
         assertEquals(2, state.initialFocus())
-        state.push(DialogPage("Plain", radio(false, false)))
+        state.push(DialogPage.of("Plain", radio(false, false)))
         assertEquals(0, state.initialFocus())
     }
 
     @Test
     fun `sync rereads the selection of the items`() {
         val state = DialogState()
-        state.push(DialogPage("Tweaks", checks(true, true)))
+        state.push(DialogPage.of("Tweaks", checks(true, true)))
         state.sync { row -> row.key == 1 }
         assertEquals(listOf(1), state.selected())
     }
@@ -111,7 +111,7 @@ class DialogStateTest {
     @Test
     fun `sync leaves a radio list as chosen`() {
         val state = DialogState()
-        state.push(DialogPage("Speed", radio(true, false)))
+        state.push(DialogPage.of("Speed", radio(true, false)))
         state.choose(1)
         state.sync { true }
         assertEquals(listOf(1), state.selected())
@@ -120,11 +120,11 @@ class DialogStateTest {
     @Test
     fun `pages get distinct ids and keep theirs when the selection changes`() {
         val state = DialogState()
-        state.push(DialogPage("A", radio(true, false)))
+        state.push(DialogPage.of("A", radio(true, false)))
         val first = state.page!!.id
         state.choose(1)
         assertEquals(first, state.page!!.id)
-        state.push(DialogPage("B", radio(true)))
+        state.push(DialogPage.of("B", radio(true)))
         assertTrue(state.page!!.id != first)
     }
 }

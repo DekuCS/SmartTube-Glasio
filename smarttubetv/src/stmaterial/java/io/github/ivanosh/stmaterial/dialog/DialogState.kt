@@ -37,10 +37,10 @@ class DialogPage private constructor(val id: Int, val title: String?, val rows: 
 
     companion object {
         /** A page without the entries that open nothing. */
+        /** The only way to make a page. */
         fun of(title: String?, rows: List<DialogRow>) =
             DialogPage(0, title, rows.filterNot { it is EntryRow && it.size == 0 })
 
-        operator fun invoke(title: String?, rows: List<DialogRow>) = DialogPage(0, title, rows)
     }
 }
 

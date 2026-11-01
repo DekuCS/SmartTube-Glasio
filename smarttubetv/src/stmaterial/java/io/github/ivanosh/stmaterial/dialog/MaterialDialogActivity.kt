@@ -68,7 +68,8 @@ class MaterialDialogActivity : MotherActivity(), AppDialogView {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val translated = keyTranslator.translate(event)
+        // null: the translator has run the key's own action
+        val translated = keyTranslator.translate(event) ?: return true
         return handleNavigation(translated) || super.dispatchKeyEvent(translated)
     }
 
@@ -127,8 +128,8 @@ class MaterialDialogActivity : MotherActivity(), AppDialogView {
         state.viewId = id
 
         val single = categories?.singleOrNull()
-        if (isExpandable && single?.options != null) {
-            showOnly(single)
+        if (isExpandable && !single?.options.isNullOrEmpty()) {
+            showOnly(single!!)
         } else {
             state.push(DialogPage.of(title?.toString(), categories.orEmpty().filter { !it.options.isNullOrEmpty() }.mapIndexed(::rowOf)))
         }
@@ -139,7 +140,7 @@ class MaterialDialogActivity : MotherActivity(), AppDialogView {
         when (category.type) {
             // As upstream, a single button runs at once; the dialog is for its callback to continue.
             OptionCategory.TYPE_SINGLE_BUTTON -> category.options.firstOrNull()?.onSelect(true)
-            OptionCategory.TYPE_SINGLE_SWITCH -> state.push(DialogPage(null, listOf(rowOf(0, category))))
+            OptionCategory.TYPE_SINGLE_SWITCH -> state.push(DialogPage.of(null, listOf(rowOf(0, category))))
             else -> state.push(pageOf(category))
         }
     }
@@ -185,7 +186,7 @@ class MaterialDialogActivity : MotherActivity(), AppDialogView {
             OptionCategory.TYPE_CHECKBOX_LIST -> options.mapIndexed { i, item -> choice(i, item, item.isSelected, multi = true) }
             OptionCategory.TYPE_STRING_LIST -> options.mapIndexed { i, item -> ButtonRow(i, item.title.text(), item) }
             // A long text is read paragraph by paragraph, each line being a stop for the remote.
-            OptionCategory.TYPE_LONG_TEXT -> options.first().title.text().lines().filter { it.isNotBlank() }.mapIndexed(::TextRow)
+            OptionCategory.TYPE_LONG_TEXT -> options.firstOrNull()?.title.text().lines().filter { it.isNotBlank() }.mapIndexed(::TextRow)
             // Chat and comments are not part of this app.
             else -> listOf(TextRow(0, category.title.text()))
         }

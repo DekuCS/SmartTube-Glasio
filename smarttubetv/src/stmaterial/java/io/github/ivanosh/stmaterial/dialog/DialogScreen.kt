@@ -59,20 +59,18 @@ private val RowStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp)
 private val DescriptionStyle = TextStyle(fontSize = 22.sp, lineHeight = 30.sp)
 private val PanelShape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
 private val RowShape = RoundedCornerShape(14.dp)
-private const val SCRIM_ALPHA = 0.62f
 private const val ROWS_ABOVE_FOCUS = 2
 
 /**
  * Every dialog of the app: a panel on the right edge listing the lines of the top page.
- * Over the player ([DialogState.isTransparent]) nothing but the panel is drawn, so the video stays visible.
+ * Nothing but the panel is drawn, as in the upstream dialog, which never dimmed the screen behind it:
+ * the video of the player stays as it is.
  */
 @Composable
 fun DialogScreen(state: DialogState, onActivate: (DialogRow) -> Unit) {
     val page = state.page
     Box(
-        Modifier
-            .fillMaxSize()
-            .then(if (state.isTransparent) Modifier else Modifier.background(Palette.Background.copy(alpha = SCRIM_ALPHA))),
+        Modifier.fillMaxSize(),
         contentAlignment = Alignment.CenterEnd,
     ) {
         if (page != null) {
@@ -143,7 +141,7 @@ private fun DialogLine(row: DialogRow, onActivate: (DialogRow) -> Unit, modifier
     ) {
         val contrast = if (focused) Palette.OnBackground else PanelFill
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().heightIn(min = 68.dp).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(18.dp),
         ) {
