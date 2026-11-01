@@ -37,7 +37,7 @@ jobs:
           cache: gradle
 
       - name: Sync logic tests
-        run: python3 -B -m unittest discover -s scripts/sync
+        run: python3 -I -B -m unittest discover -s scripts/sync
 
       - name: Unit tests
         run: ./gradlew --no-daemon :smarttubetv:testStmaterialDebugUnitTest :common:testStfdroidDebugUnitTest

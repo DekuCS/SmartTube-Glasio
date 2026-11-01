@@ -25,6 +25,9 @@ _BUILD_LOGIC_PATH = re.compile(
 _CODE_SOURCE_LINE = re.compile(
     r"(?i)\bapply\b.*\bfrom\b|\b(?:get)?repositories\b|://|\burl\b|\buri\s*\(|\bmaven\b|\bivy\b|\bflatDir\b"
     r"|\bjcenter\b|\bmavenLocal\b")
+# What runs the sync itself, in this repository only. Stopped rather than dropped: code here runs with write access.
+_SYNC_MACHINERY_PATH = re.compile(r"(?i)(?:scripts/sync|\.github)/")
+_RELEASE_TAG = re.compile(r"material-v([0-9]+)\.([0-9]+)-([0-9]+)")
 _REPOSITORIES = re.compile(r"\brepositories\b")
 _UNSAFE_TEXT = re.compile(r"[^A-Za-z0-9._/+-]")
 
@@ -73,6 +76,21 @@ def material_version(upstream_code, upstream_name, patch):
     return MaterialVersion(upstream_code * 100 + patch, name, "material-v" + name, patch)
 
 
+def _release_order(tag):
+    match = _RELEASE_TAG.fullmatch(tag) if isinstance(tag, str) else None
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
+def newest_release(tags):
+    """The highest material-v<upstream>-<patch> among these names, or None."""
+    return max((tag for tag in tags if _release_order(tag)), key=_release_order, default=None)
+
+
+def is_newer_release(tag, existing):
+    newest = newest_release(existing)
+    return newest is None or _release_order(tag) > _release_order(newest)
+
+
 def next_patch(old_upstream_name, new_upstream_name, old_patch):
     return 1 if new_upstream_name != old_upstream_name else old_patch + 1
 
@@ -102,6 +120,10 @@ def tag_matches_version(tag, version_name):
 
 def is_auth_path(path):
     return _AUTH_PATH.search(path) is not None
+
+
+def is_sync_machinery_path(path):
+    return _SYNC_MACHINERY_PATH.match(path) is not None
 
 
 def is_token_line(line):
@@ -166,6 +188,8 @@ def gate_findings(diffs):
         prefix = diff.label + "/" if diff.label else ""
         for path in diff.paths:
             shown = safe_text(prefix + path)
+            if not diff.label and is_sync_machinery_path(path):
+                findings.append("sync or workflow file changed: " + shown)
             if is_auth_path(path):
                 findings.append("sign-in path changed: " + shown)
             if any(is_token_line(line) for line in diff.lines.get(path, [])):
@@ -196,7 +220,7 @@ def find_open_issue(issues, tag):
 
 
 def failed_jobs(results):
-    return [job for job, result in results.items() if result == "failure"]
+    return [job for job, result in results.items() if result in ("failure", "cancelled")]
 
 
 _CLOSING = "Close this issue once it is dealt with: the sync does not retry this tag while it is open."

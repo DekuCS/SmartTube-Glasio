@@ -143,17 +143,19 @@ class Decide(Fixture):
         self.assertEqual(plan["action"], "proceed", plan)
         self.assertEqual(plan["release_tag"], "material-v32.68-2")
 
-    def test_upstream_workflow_changes_are_dropped(self):
+    def test_upstream_workflow_change_stops(self):
         self.bump()
         write(self.upstream, ".github/workflows/CI.yml", "name: CI changed\n")
-        write(self.upstream, ".github/workflows/new.yml", "name: New\n")
         self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
 
+    def test_upstream_file_next_to_the_sync_scripts_stops(self):
+        self.bump()
+        write(self.upstream, "scripts/sync/json.py", "raise SystemExit('planted')\n")
+        self.upstream_commit()
         plan = self.decide()
-
-        self.assertEqual(plan["action"], "proceed", plan)
-        names = run(self.clone, "git", "ls-tree", "-r", "--name-only", plan["merge_sha"], ".github/workflows")
-        self.assertEqual(names.split(), [".github/workflows/material.yml"])
+        self.assertEqual(plan["reason"], "gate")
+        self.assertIn("scripts/sync/json.py", pathlib.Path(self.out, "issue-body.md").read_text())
 
     def test_merge_conflict_stops_and_leaves_a_clean_tree(self):
         self.bump()
@@ -271,6 +273,27 @@ class Decide(Fixture):
         self.upstream_commit()
         self.assertEqual(self.decide()["action"], "proceed")
 
+    def test_gitmodules_url_without_a_value_stops_cleanly(self):
+        self.bump()
+        write(self.upstream, ".gitmodules", SUBMODULES % ("file://" + self.core) + "\turl\n")
+        self.upstream_commit()
+        plan = self.decide()
+        self.assertEqual(plan["reason"], "gate")
+        self.assertIn(".gitmodules", pathlib.Path(self.out, "issue-body.md").read_text())
+
+    def test_version_lower_than_the_newest_tag_stops(self):
+        self.bump()
+        self.upstream_commit()
+        run(self.clone, "git", "tag", "material-v33.1-1")
+        plan = self.decide()
+        self.assertEqual((plan["action"], plan["reason"]), ("stop", "version"))
+
+    def test_bare_tag_of_that_version_stops(self):
+        self.bump()
+        self.upstream_commit()
+        run(self.clone, "git", "tag", "material-v32.75-1")
+        self.assertEqual(self.decide()["reason"], "version")
+
     def test_token_term_in_a_changed_line_stops(self):
         self.bump()
         write(self.upstream, "app/Main.java", "class Main { void f() { store.persistRefreshToken(t); } }\n")
@@ -347,50 +370,121 @@ class Decide(Fixture):
 
 
 class PendingRelease(Fixture):
-    """A merge on material whose release is missing must not turn into a green no-op."""
+    """A merge on material whose release is missing is released once, and only after the same checks as a new one."""
 
-    def merged(self):
+    BOT = ("-c", "user.name=" + "github-actions[bot]", "-c", "user.email=" + sync.BOT_EMAIL)
+
+    def tagged_upstream(self):
         write(self.upstream, "smarttubetv/build.gradle", GRADLE % (2465, "32.75"))
         self.upstream_commit()
+        run(self.upstream, "git", "tag", "32.75s")
+
+    def merged(self):
+        self.tagged_upstream()
         plan = self.decide()
         run(self.clone, "git", "checkout", "-q", "material")
         run(self.clone, "git", "merge", "-q", "--ff-only", plan["merge_sha"])
         return plan
 
-    def releases(self):
-        return [{"tag_name": "32.75s", "draft": False, "prerelease": False}]
+    def hand_merge(self, extra=None, ref=None):
+        """A bot-authored merge made outside the sync, with the sync's subject."""
+        ref = ref or self.fetch_upstream()
+        run(self.clone, "git", "merge", "-q", "--no-ff", "--no-commit", ref)
+        write(self.clone, "material-version.properties", "materialPatch=1\n")
+        if extra:
+            write(self.clone, extra, "planted\n")
+        run(self.clone, "git", "add", "-A")
+        run(self.clone, "git", *self.BOT, "commit", "-q", "-m", "Merge upstream 32.75s")
+        return run(self.clone, "git", "rev-parse", "HEAD")
+
+    def next_run(self, issues=(), published=()):
+        rows = [{"tag_name": "32.75s", "draft": False, "prerelease": False}]
+        return sync.Sync(self.clone, self.out, published=published).plan(rows, list(issues), upstream_url=self.upstream)
 
     def test_unreleased_merge_is_released_on_the_next_run(self):
         merged = self.merged()
-        plan = sync.Sync(self.clone, self.out).plan(self.releases(), [], upstream_url=self.upstream)
+        plan = self.next_run()
         self.assertEqual(plan["action"], "release-only")
         self.assertEqual(plan["merge_sha"], merged["merge_sha"])
         self.assertEqual(plan["release_tag"], "material-v32.75-1")
         self.assertEqual(plan["tag"], "32.75s")
 
-    def test_released_merge_is_a_no_op(self):
+    def test_the_check_leaves_the_checkout_where_it_was(self):
         self.merged()
-        tags = {"material-v32.75-1"}
-        run(self.upstream, "git", "tag", "32.75s")
-        plan = sync.Sync(self.clone, self.out, published=tags).plan(self.releases(), [], upstream_url=self.upstream)
+        head = run(self.clone, "git", "rev-parse", "HEAD")
+        plan = self.next_run()
+        self.assertEqual(plan["base_sha"], head)
+        self.assertEqual(run(self.clone, "git", "rev-parse", "HEAD"), head)
+        self.assertEqual(run(self.clone, "git", "status", "--porcelain"), "")
+
+    def test_published_release_is_a_no_op(self):
+        self.merged()
+        plan = self.next_run(published=["material-v32.75-1"])
+        self.assertEqual((plan["action"], plan["reason"]), ("noop", "already-merged"))
+
+    def test_deleted_release_with_its_tag_left_is_not_published_again(self):
+        self.merged()
+        run(self.clone, "git", "tag", "material-v32.75-1")
+        plan = self.next_run()
+        self.assertEqual((plan["action"], plan["reason"]), ("noop", "already-merged"))
+
+    def test_newer_version_by_hand_keeps_the_older_merge_unpublished(self):
+        self.merged()
+        run(self.clone, "git", "tag", "material-v32.75-2")
+        plan = self.next_run()
         self.assertEqual((plan["action"], plan["reason"]), ("noop", "already-merged"))
 
     def test_open_issue_holds_the_retry(self):
         self.merged()
         issues = [{"number": 9, "title": "[material-sync] upstream 32.75s", "user": {"login": "github-actions[bot]"}}]
-        plan = sync.Sync(self.clone, self.out).plan(self.releases(), issues, upstream_url=self.upstream)
+        plan = self.next_run(issues=issues)
         self.assertEqual((plan["action"], plan["reason"]), ("noop", "open-issue"))
 
     def test_our_own_commits_after_the_merge_do_not_hide_it(self):
         merged = self.merged()
         write(self.clone, "smarttubetv/src/stmaterial/Ui.kt", "class Ui2\n")
         commit(self.clone, "a later commit of ours")
-        plan = sync.Sync(self.clone, self.out).plan(self.releases(), [], upstream_url=self.upstream)
-        self.assertEqual(plan["merge_sha"], merged["merge_sha"])
+        self.assertEqual(self.next_run()["merge_sha"], merged["merge_sha"])
 
-    def test_a_commit_that_only_looks_like_a_merge_does_not_count(self):
-        run(self.clone, "git", "commit", "-q", "--allow-empty", "-m", "Merge upstream 32.75s")
+    def test_a_single_parent_commit_with_the_bot_and_the_subject_does_not_count(self):
+        run(self.clone, "git", *self.BOT, "commit", "-q", "--allow-empty", "-m", "Merge upstream 32.75s")
         self.assertIsNone(sync.Sync(self.clone, self.out).unreleased_merge())
+
+    def test_a_merge_of_something_other_than_the_tag_stops(self):
+        self.tagged_upstream()
+        run(self.clone, "git", "branch", "side", self.base)
+        run(self.clone, "git", "checkout", "-q", "side")
+        write(self.clone, "app/Side.java", "class Side {}\n")
+        write(self.clone, "smarttubetv/build.gradle", GRADLE % (2465, "32.75"))
+        commit(self.clone, "not upstream")
+        run(self.clone, "git", "checkout", "-q", "material")
+        self.hand_merge(ref="side")
+        plan = self.next_run()
+        self.assertEqual((plan["action"], plan["reason"]), ("stop", "release-check"))
+        self.assertNotIn("merge_sha", plan)
+
+    def test_a_merge_with_a_tree_the_sync_would_not_build_stops(self):
+        self.tagged_upstream()
+        self.hand_merge(extra="app/Planted.java")
+        plan = self.next_run()
+        self.assertEqual((plan["action"], plan["reason"]), ("stop", "release-check"))
+
+    def test_a_merge_the_gate_would_stop_stops(self):
+        write(self.upstream, "smarttubetv/build.gradle", GRADLE % (2465, "32.75"))
+        write(self.upstream, "app/SignInPresenter.java", "class S {}\n")
+        self.upstream_commit()
+        run(self.upstream, "git", "tag", "32.75s")
+        self.hand_merge()
+        plan = self.next_run()
+        self.assertEqual((plan["action"], plan["reason"]), ("stop", "gate"))
+        self.assertIn("SignInPresenter", pathlib.Path(self.out, "issue-body.md").read_text())
+
+    def test_a_tag_that_moved_since_the_merge_stops(self):
+        self.merged()
+        write(self.upstream, "app/Main.java", "class Main { int moved; }\n")
+        self.upstream_commit("moved")
+        run(self.upstream, "git", "tag", "-f", "32.75s")
+        self.assertEqual(self.next_run()["reason"], "release-check")
 
 
 class Bundle(Fixture):
@@ -422,7 +516,7 @@ class CommandLine(Fixture):
         output = pathlib.Path(self.tmp.name, "github-output")
         env = dict(os.environ, GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=os.devnull)
         script = pathlib.Path(sync.__file__)
-        result = subprocess.run(("python3", "-B", str(script)) + args, cwd=self.clone, env=env, capture_output=True,
+        result = subprocess.run(("python3", "-I", "-B", str(script)) + args, cwd=self.clone, env=env, capture_output=True,
                                 text=True)
         return result, output.read_text() if output.exists() else ""
 
@@ -509,6 +603,9 @@ class Gitmodules(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(sync.normalized_gitmodules(""), "")
 
+    def test_a_key_without_a_value_counts_as_a_change(self):
+        self.assertFalse(self.same(self.PLAIN + "\turl\n"))
+
     def test_submodules_follow_the_value_git_uses(self):
         text = self.PLAIN + "\tURL = https://other/a\n"
         self.assertEqual(sync.submodules(text), [("a", "https://other/a")])
@@ -589,6 +686,23 @@ class Report(unittest.TestCase):
                     results=["decide=success", "publish=skipped", "release=failure"])
         self.assertIn("abc123", self.bodies[0])
         self.assertNotIn("Nothing was pushed", self.bodies[0])
+
+
+class PlantedFiles(unittest.TestCase):
+    """How the workflows call the script: a file beside it must not replace a standard module."""
+
+    def test_a_module_planted_beside_the_script_does_not_run(self):
+        source = pathlib.Path(sync.__file__).parent
+        with tempfile.TemporaryDirectory() as temp:
+            for name in ("sync.py", "sync_logic.py"):
+                pathlib.Path(temp, name).write_text((source / name).read_text())
+            marker = pathlib.Path(temp, "ran")
+            for name in ("json", "argparse", "collections", "re", "subprocess"):
+                pathlib.Path(temp, name + ".py").write_text("open(%r, 'w').close()\n" % str(marker))
+            result = subprocess.run(("python3", "-I", "-B", str(pathlib.Path(temp, "sync.py")), "--help"),
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(marker.exists())
 
 
 class GhErrors(unittest.TestCase):

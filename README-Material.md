@@ -84,15 +84,17 @@ are dry runs by default: they report what would happen and leave `material`, the
 2. It stops there if that commit is already part of `material`, or if an issue for that tag is open.
 3. The gate compares upstream's tree from the last merged upstream commit, and each submodule from the pin on
    `material`, without running anything from upstream.
-4. It merges the tag with a merge commit, never a rebase or a force-push. Submodules take upstream's pins, changes under
-   `.github/workflows` are dropped, and `materialPatch` goes back to 1 on a new upstream version.
+4. It merges the tag with a merge commit, never a rebase or a force-push. Submodules take upstream's pins, and
+   `materialPatch` goes back to 1 on a new upstream version.
 5. Tests and `assembleStmaterialRelease` run on that commit in a job with no secrets and nothing writable.
 6. That commit is pushed to `material` and released as a prerelease, the same way as a tagged release: see Versions.
 
 A merge of an upstream version we already carry takes the next patch instead of 1, because the tag and the versionCode
 must both be new.
 
-The logic is in `scripts/sync/`; its tests run in CI and with `python3 -B -m unittest discover -s scripts/sync`.
+The logic is in `scripts/sync/`; its tests run in CI and with `python3 -I -B -m unittest discover -s scripts/sync`. The
+jobs that can write run those scripts from a separate checkout of the commit before the merge, holding only that
+directory, and never run anything from the merged tree.
 
 What stops it, with nothing pushed:
 
@@ -101,13 +103,15 @@ What stops it, with nothing pushed:
   they identify the client, not the account, and upstream changes them often.
 - a changed line with a token term in any file: refresh, access or ID token, client ID or secret, `Authorization`,
   `Bearer`, `persistAccounts`, and the manifest's backup settings
+- any change under `scripts/sync/` or `.github/`, including upstream's own workflows
 - a change to `gradle/wrapper/`, `gradlew`, `buildSrc/`, `settings*.gradle*`, `gradle.properties` or a version catalog
 - a changed line in Gradle code with `repositories`, `getRepositories`, `apply from`, `maven`, `url`, `uri(` or `://`,
   here or in a submodule
 - a changed URL or path in `.gitmodules`, as `git config` reads it
 - a pin that cannot be fetched, or a history with no single merge base
 - a merge conflict
-- a tag that disagrees with `versionName`, a `versionCode` that would not grow, or a release that already exists
+- a tag that disagrees with `versionName`, a `versionCode` that would not grow, or a version not newer than the newest
+  `material-v*` tag or release
 - failed tests or a failed build
 
 These rules prefer a false stop, which costs a look, to a false pass. Four of the last nine upstream stable steps would
@@ -118,8 +122,24 @@ tag. Dry runs only report a stop. The issue names the files and links the compar
 tag while the issue is open: deal with it (usually a manual merge), then close the issue. If Issues is off, the run says
 why in its log and tries the tag again every 6 hours.
 
-If a merge reached `material` and its release is missing, the next run makes the release, unless that tag's issue is
-open. Nothing else is synced until then.
+If a merge reached `material` and its version was never published, the next run makes the release, unless that tag's
+issue is open or a newer version exists. Nothing else is synced until then. It first rebuilds that merge from its two
+parents, the second of which must be the upstream tag's commit, with the gate; a different tree or a stop means no
+release.
+
+### Holding the sync and withdrawing a release
+
+Set the repository variable `MATERIAL_SYNC_HOLD` to `true` (Settings, Secrets and variables, Actions, Variables). Every
+job after `decide` is skipped and the run shows a notice. It needs no commit and works with Issues off. Jobs that have
+already started finish, so cancel a run in progress as well. Remove the variable to resume.
+
+A tag only ever comes from a successful release, so an existing tag means that version is done:
+
+- To withdraw a release, delete it on the Releases page and keep the tag. It is not published again.
+- To publish that version again, delete both the release and the tag (`git push origin :refs/tags/material-v32.68-1`).
+  The next run rebuilds it, so set the hold first if you do not want that yet.
+- A version lower than the newest tag is never published by the sync. After raising `materialPatch` and tagging by hand,
+  the older merge stays unpublished.
 
 ### What the schedule needs
 

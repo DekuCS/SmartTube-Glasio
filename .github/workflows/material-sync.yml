@@ -34,19 +34,36 @@ jobs:
       release_tag: ${{ steps.decide.outputs.release_tag }}
       dry_run: ${{ steps.decide.outputs.dry_run }}
     steps:
+      - name: Say that the sync is on hold
+        if: vars.MATERIAL_SYNC_HOLD == 'true'
+        run: |
+          MESSAGE="MATERIAL_SYNC_HOLD is true: this run only reports. Verify, push, release and issue are skipped."
+          echo "::notice::$MESSAGE"
+          echo "$MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check out material
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: material
+          path: repo
           fetch-depth: 0
           persist-credentials: false
 
       - name: Remember the commit this run starts from
         id: base
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(git -C repo rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the sync scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.base.outputs.sha }}
+          path: tools
+          sparse-checkout: /scripts/sync/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       - name: Sync logic tests
-        run: python3 -B -m unittest discover -s scripts/sync
+        run: python3 -I -B -m unittest discover -s tools/scripts/sync
 
       - name: Read the upstream releases and our open issues
         env:
@@ -64,8 +81,9 @@ jobs:
         id: decide
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        working-directory: repo
         run: |
-          python3 -B scripts/sync/sync.py decide --releases "$RUNNER_TEMP/releases.json" \
+          python3 -I -B "$GITHUB_WORKSPACE/tools/scripts/sync/sync.py" decide --releases "$RUNNER_TEMP/releases.json" \
             --issues "$RUNNER_TEMP/issues.json" --own-releases "$RUNNER_TEMP/own-releases.json" \
             --out "$RUNNER_TEMP/sync-out" --dry-run "$DRY_RUN"
 
@@ -82,7 +100,7 @@ jobs:
   # a later job could inherit.
   verify:
     needs: decide
-    if: needs.decide.outputs.action == 'proceed'
+    if: needs.decide.outputs.action == 'proceed' && vars.MATERIAL_SYNC_HOLD != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -105,7 +123,7 @@ jobs:
         env:
           MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
         run: |
-          python3 -B scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA"
+          python3 -I -B scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA"
           git submodule update --init --recursive
 
       - name: Set up JDK 17
@@ -128,10 +146,11 @@ jobs:
       - name: Assemble the release variant
         run: ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
 
-  # Runs only git, from the starting commit's tree. No force: if material moved, the push fails and the issue says so.
+  # Nothing from the merged tree runs here, and the token exists only for the last step, which runs only git. No force:
+  # if material moved, the push fails and the issue says so.
   publish:
     needs: [decide, verify]
-    if: needs.decide.outputs.action == 'proceed' && needs.decide.outputs.dry_run == 'false'
+    if: needs.decide.outputs.action == 'proceed' && needs.decide.outputs.dry_run == 'false' && vars.MATERIAL_SYNC_HOLD != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -141,7 +160,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.decide.outputs.base_sha }}
+          path: repo
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the sync scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decide.outputs.base_sha }}
+          path: tools
+          sparse-checkout: /scripts/sync/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       - name: Take the merge commit
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -149,20 +179,30 @@ jobs:
           name: sync-out
           path: ${{ runner.temp }}/sync-out
 
-      - name: Push exactly that commit to material
+      - name: Unpack it without switching to it
+        working-directory: repo
         env:
           MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
+        run: python3 -I -B "$GITHUB_WORKSPACE/tools/scripts/sync/sync.py" apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA" --no-checkout
+
+      - name: Push exactly that commit to material
+        working-directory: repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
         run: |
-          python3 -B scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA" --no-checkout
-          git push origin "$MERGE_SHA:refs/heads/material"
+          git -c credential.helper= \
+            -c 'credential.helper=!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f' \
+            push "https://github.com/$GITHUB_REPOSITORY" "$MERGE_SHA:refs/heads/material"
 
   # The same commit, built with no secret and signed in a later job, as for a tagged release. Also runs alone when an
-  # earlier sync pushed its merge but no release followed (action release-only).
+  # earlier sync pushed its merge but no release followed (action release-only), after decide has rebuilt that merge
+  # from its parents and compared the trees.
   release:
     needs: [decide, publish]
     if: >-
       ${{ !cancelled() && needs.decide.result == 'success' && needs.decide.outputs.dry_run == 'false' &&
-      (needs.publish.result == 'success' || needs.decide.outputs.action == 'release-only') }}
+      vars.MATERIAL_SYNC_HOLD != 'true' && (needs.publish.result == 'success' || needs.decide.outputs.action == 'release-only') }}
     permissions:
       contents: write      # create the GitHub Release
       id-token: write      # sign the provenance attestation
@@ -181,17 +221,20 @@ jobs:
   # GitHub's failure email is what reaches the owner. While the issue is open, decide skips the tag.
   report:
     needs: [decide, verify, publish, release]
-    if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' && needs.decide.outputs.action != 'noop' }}
+    if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' && needs.decide.outputs.action != 'noop' && vars.MATERIAL_SYNC_HOLD != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
       issues: write
     steps:
-      - name: Check out the starting commit
+      - name: Check out the sync scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.decide.outputs.base_sha || 'material' }}
+          path: tools
+          sparse-checkout: /scripts/sync/
+          sparse-checkout-cone-mode: false
           persist-credentials: false
 
       - name: Take the issue text
@@ -214,6 +257,6 @@ jobs:
           RELEASE: ${{ needs.release.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          python3 -B scripts/sync/sync.py report --repo "$GITHUB_REPOSITORY" --tag "$TAG" --action "$ACTION" \
+          python3 -I -B "$GITHUB_WORKSPACE/tools/scripts/sync/sync.py" report --repo "$GITHUB_REPOSITORY" --tag "$TAG" --action "$ACTION" \
             --body-file "$RUNNER_TEMP/sync-out/issue-body.md" --run-url "$RUN_URL" --merge-sha "$MERGE_SHA" --release-tag "$RELEASE_TAG" \
             --results "decide=$DECIDE" "verify=$VERIFY" "publish=$PUBLISH" "release=$RELEASE"

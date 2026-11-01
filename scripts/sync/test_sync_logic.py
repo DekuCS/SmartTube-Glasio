@@ -81,6 +81,18 @@ class VersionMath(unittest.TestCase):
         with self.assertRaises(ValueError):
             logic.parse_patch("materialPatch=x\n")
 
+    def test_newest_release_orders_numbers_and_skips_other_names(self):
+        tags = ["material-v32.9-1", "material-v32.68-1", "material-v32.68-3", "material-v32.68", "32.99s", None]
+        self.assertEqual(logic.newest_release(tags), "material-v32.68-3")
+        self.assertIsNone(logic.newest_release(["32.68s"]))
+
+    def test_is_newer_release(self):
+        self.assertTrue(logic.is_newer_release("material-v32.68-2", ["material-v32.68-1"]))
+        self.assertTrue(logic.is_newer_release("material-v32.68-1", []))
+        self.assertFalse(logic.is_newer_release("material-v32.68-1", ["material-v32.68-1"]))
+        self.assertFalse(logic.is_newer_release("material-v32.68-1", ["material-v32.68-2"]))
+        self.assertFalse(logic.is_newer_release("material-v32.9-1", ["material-v32.10-1"]))
+
     def test_release_tag_check(self):
         self.assertTrue(logic.tag_matches_version("material-v32.68-1", "32.68-1"))
         self.assertFalse(logic.tag_matches_version("material-v32.68", "32.68-1"))
@@ -275,6 +287,18 @@ class Gate(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertIn("MediaServiceCore/app/Helper.java", findings[0])
 
+    def test_the_sync_and_the_workflows_stop_when_upstream_changes_them(self):
+        for path in ("scripts/sync/json.py", "scripts/sync/sync.py", ".github/workflows/CI.yml", ".github/FUNDING.yml"):
+            self.assertEqual(len(logic.gate_findings([diff(paths=[path])])), 1, path)
+
+    def test_those_names_inside_a_submodule_are_ordinary(self):
+        for path in ("scripts/sync/json.py", ".github/workflows/CI.yml"):
+            self.assertEqual(logic.gate_findings([diff("MediaServiceCore", [path])]), [], path)
+
+    def test_lookalikes_of_the_sync_paths_pass(self):
+        for path in ("app/scripts/sync/x.py", "scripts/syncer.py", "app/.github/x"):
+            self.assertEqual(logic.gate_findings([diff(paths=[path])]), [], path)
+
     def test_build_logic_path_stops(self):
         self.assertEqual(len(logic.gate_findings([diff(paths=["gradle/wrapper/gradle-wrapper.jar"])])), 1)
 
@@ -311,6 +335,9 @@ class Issues(unittest.TestCase):
         results = {"decide": "success", "verify": "failure", "publish": "skipped", "release": "skipped"}
         self.assertEqual(logic.failed_jobs(results), ["verify"])
         self.assertEqual(logic.failed_jobs({"decide": "success", "verify": "skipped"}), [])
+
+    def test_a_cancelled_job_counts_as_failed(self):
+        self.assertEqual(logic.failed_jobs({"verify": "cancelled", "publish": "skipped"}), ["verify"])
 
     def test_stop_body_names_files_and_links_the_compare_view(self):
         body = logic.stop_body("32.75s", ["changed: a/auth/b.java"], ["https://github.com/x/y/compare/a...b"])

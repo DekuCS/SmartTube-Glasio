@@ -54,7 +54,7 @@ jobs:
       - name: Tag must match versionName
         env:
           TAG: ${{ inputs.tag }}
-        run: python3 -B scripts/sync/sync.py check-tag --tag "$TAG"
+        run: python3 -I -B scripts/sync/sync.py check-tag --tag "$TAG"
 
       - name: Install the SDK parts the build pins
         shell: bash
@@ -128,12 +128,19 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=${TAG#material-v}
-          EXPECTED="SmartTube_material_${VERSION}_arm64-v8a.apk SmartTube_material_${VERSION}_armeabi-v7a.apk SmartTube_material_${VERSION}_universal.apk"
-          ACTUAL=$(cd "$RUNNER_TEMP/unsigned" && ls -A | sort | tr '\n' ' ')
-          if [ "$ACTUAL" != "$EXPECTED " ]; then
+          shopt -s dotglob nullglob
+          ENTRIES=("$RUNNER_TEMP"/unsigned/*)
+          if [ "${#ENTRIES[@]}" -ne 3 ]; then
             echo "::error::Unexpected artifact contents."
             exit 1
           fi
+          for ABI in arm64-v8a armeabi-v7a universal; do
+            APK="$RUNNER_TEMP/unsigned/SmartTube_material_${VERSION}_$ABI.apk"
+            if [ ! -f "$APK" ] || [ -L "$APK" ]; then
+              echo "::error::Unexpected artifact contents."
+              exit 1
+            fi
+          done
           AAPT2="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/aapt2"
           for apk in "$RUNNER_TEMP"/unsigned/*.apk; do
             HEADER=$("$AAPT2" dump badging "$apk" | sed -n 1p)
@@ -146,7 +153,18 @@ jobs:
             esac
           done
 
-      - name: Align and sign
+      # Reads the artifact, so it runs before the keystore exists and without the secrets.
+      - name: Align
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/aligned"
+          for apk in "$RUNNER_TEMP"/unsigned/*.apk; do
+            "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign" -f -P 16 4 "$apk" "$RUNNER_TEMP/aligned/$(basename "$apk")"
+          done
+
+      - name: Sign
         shell: bash
         env:
           KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
@@ -156,18 +174,16 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          TOOLS="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION"
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
           mkdir -p "$RUNNER_TEMP/signed"
-          for apk in "$RUNNER_TEMP"/unsigned/*.apk; do
-            "$TOOLS/zipalign" -f -P 16 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          for apk in "$RUNNER_TEMP"/aligned/*.apk; do
             # env: keeps the passwords out of the process list.
-            "$TOOLS/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-pass env:KEYSTORE_PASSWORD \
-              --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --v2-signing-enabled true \
-              --v3-signing-enabled true --v4-signing-enabled false \
-              --out "$RUNNER_TEMP/signed/$(basename "$apk")" "$RUNNER_TEMP/aligned.apk"
+            "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner" sign --ks "$RUNNER_TEMP/release.jks" \
+              --ks-pass env:KEYSTORE_PASSWORD --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD \
+              --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false \
+              --out "$RUNNER_TEMP/signed/$(basename "$apk")" "$apk"
           done
-          rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/aligned.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Verify the signature
         shell: bash
@@ -201,4 +217,4 @@ jobs:
 
       - name: Remove the signing material
         if: always()
-        run: rm -f "$RUNNER_TEMP/release.jks" "$RUNNER_TEMP/aligned.apk"
+        run: rm -f "$RUNNER_TEMP/release.jks"

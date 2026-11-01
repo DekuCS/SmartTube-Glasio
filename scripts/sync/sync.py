@@ -11,12 +11,15 @@ import subprocess
 import sys
 import tempfile
 
-import sync_logic as logic
+# Run as `python3 -I -B`, which leaves this directory off the path, so that a file planted here cannot stand in for a
+# standard module. Added last and after the imports above: it can only supply sync_logic.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+import sync_logic as logic  # noqa: E402
 
 UPSTREAM_URL = "https://github.com/yuliskov/SmartTube"
 GRADLE_FILE = "smarttubetv/build.gradle"
 PATCH_FILE = "material-version.properties"
-WORKFLOWS = ".github/workflows"
 TAG_REF = "refs/sync/upstream-tag"
 MERGE_REF = "refs/sync/merge"
 BOT_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
@@ -55,8 +58,8 @@ def gitmodules_entries(text):
         return []
     if result.returncode != 0:
         return None
-    entries = result.stdout.decode(errors="replace").split("\0")
-    return [tuple(entry.split("\n", 1)) for entry in entries if entry]
+    entries = [tuple(entry.split("\n", 1)) for entry in result.stdout.decode(errors="replace").split("\0") if entry]
+    return None if any(len(entry) != 2 for entry in entries) else entries  # a key with no value
 
 
 def normalized_gitmodules(text):
@@ -111,39 +114,72 @@ class Sync:
         self.out = pathlib.Path(out)
         self.published = set(published)
 
+    def known_releases(self):
+        """Every release name that exists or existed: a tag is only ever made by a successful release."""
+        tags = text_of(self.root, "tag", "--list", "material-v*").split()
+        return self.published.union(tags)
+
+    def fetch_tag(self, upstream_url, tag):
+        git(self.root, "fetch", "--no-tags", "--quiet", upstream_url, "+refs/tags/%s:%s" % (tag, TAG_REF))
+
     def plan(self, releases, issues, upstream_url=UPSTREAM_URL, on_tag=lambda tag: None):
         pending = self.unreleased_merge()
         if pending is not None:
             on_tag(pending["tag"])
             if logic.find_open_issue(issues, pending["tag"]) is not None:
                 return {"action": "noop", "reason": "open-issue", "tag": pending["tag"]}
-            return dict(pending, action="release-only", base_sha=text_of(self.root, "rev-parse", "HEAD"))
+            self.fetch_tag(upstream_url, pending["tag"])
+            return self.checked_release(pending)
         tag = logic.pick_stable_tag(releases)
         if tag is None:
             return {"action": "noop", "reason": "no-stable-release"}
         on_tag(tag)
         if logic.find_open_issue(issues, tag) is not None:
             return {"action": "noop", "reason": "open-issue", "tag": tag}
-        git(self.root, "fetch", "--no-tags", "--quiet", upstream_url, "+refs/tags/%s:%s" % (tag, TAG_REF))
+        self.fetch_tag(upstream_url, tag)
         return self.plan_ref(TAG_REF, tag)
 
     def unreleased_merge(self):
-        """The newest merge of this sync on the branch, if its release never appeared.
+        """The newest merge of this sync on the branch, if its version was never released and nothing newer was.
 
         History, not an issue, is the trace: a release that failed or was cancelled after the push stays visible
-        here whether or not Issues works and whether or not someone closed the issue.
+        here whether or not Issues works and whether or not someone closed the issue. This only finds a candidate:
+        anyone who can push can write this author and subject, so checked_release decides.
         """
-        log = text_of(self.root, "log", "--first-parent", "--format=%H%x00%ae%x00%s", "HEAD")
-        for line in log.split("\n"):
+        log = text_of(self.root, "log", "--first-parent", "--merges", "--format=%H%x00%ae%x00%s", "HEAD")
+        for line in log.split("\n") if log else []:
             sha, email, subject = line.split("\0", 2)
             tag = logic.synced_tag(subject)
             if email == BOT_EMAIL and tag is not None:
                 version = self.version_at(sha)
-                if version.tag in self.published:
+                if not logic.is_newer_release(version.tag, self.known_releases()):
                     return None
                 return {"tag": tag, "merge_sha": sha, "version_name": version.name,
                         "version_code": str(version.code), "release_tag": version.tag}
         return None
+
+    def checked_release(self, pending):
+        """Signs nothing on trust: the merge must be the one the sync would make today from the same parents."""
+        tag, sha = pending["tag"], pending["merge_sha"]
+        head = text_of(self.root, "rev-parse", "HEAD")
+        plan = {"tag": tag, "base_sha": head}
+        tag_commit = text_of(self.root, "rev-parse", TAG_REF + "^{commit}")
+        parents = text_of(self.root, "rev-parse", sha + "^@").split()
+        if len(parents) != 2 or parents[1] != tag_commit:
+            return self.stop(plan, "release-check", ["merge %s is not a merge of upstream %s" % (sha, tag)], [])
+
+        git(self.root, "checkout", "--quiet", "--detach", parents[0])
+        try:
+            redone = self.plan_ref(TAG_REF, tag)
+            tree = text_of(self.root, "rev-parse", redone["merge_sha"] + "^{tree}") if "merge_sha" in redone else None
+        finally:
+            git(self.root, "checkout", "--quiet", "--detach", head)
+        if redone["action"] == "stop":
+            return dict(redone, base_sha=head)
+        (self.out / "merge.bundle").unlink(missing_ok=True)  # the merge to release is on the branch already
+        if tree != text_of(self.root, "rev-parse", sha + "^{tree}"):
+            return self.stop(plan, "release-check", ["merge %s has a tree the sync would not build" % sha], [])
+        return dict(pending, action="release-only", base_sha=head)
 
     def version_at(self, spec):
         code, name = logic.parse_gradle_version(show(self.root, "%s:%s" % (spec, GRADLE_FILE)))
@@ -202,7 +238,6 @@ class Sync:
         if git(self.root, "rev-parse", "--quiet", "--verify", "MERGE_HEAD", check=False).returncode != 0:
             raise RuntimeError("git merge did not start: " + result.stderr.decode(errors="replace").strip())
 
-        self.drop_workflow_changes()
         self.take_upstream_pins(commit)
 
         conflicts = names(git(self.root, "diff", "--name-only", "--diff-filter=U", "-z").stdout)
@@ -229,11 +264,6 @@ class Sync:
         return dict(plan, action="proceed", merge_sha=merge_sha, version_name=version.name,
                     version_code=str(version.code), release_tag=version.tag)
 
-    def drop_workflow_changes(self):
-        git(self.root, "reset", "--quiet", "HEAD", "--", WORKFLOWS)
-        git(self.root, "checkout", "--quiet", "HEAD", "--", WORKFLOWS)
-        git(self.root, "clean", "--quiet", "-fd", "--", WORKFLOWS)
-
     def take_upstream_pins(self, commit):
         for path, _ in submodules(show(self.root, commit + ":.gitmodules")):
             pin = text_of(self.root, "rev-parse", "%s:%s" % (commit, path))
@@ -252,8 +282,9 @@ class Sync:
             return None, "version: tag and versionName disagree: " + logic.safe_text(tag + " " + new_name)
         if new.code <= old.code:
             return None, "version: versionCode would not grow: %d to %d" % (old.code, new.code)
-        if new.tag in self.published:
-            return None, "version: release already exists: " + new.tag
+        if not logic.is_newer_release(new.tag, self.known_releases()):
+            return None, "version: %s is not newer than the newest release %s" % (
+                new.tag, logic.newest_release(self.known_releases()))
         return new, None
 
     def stop(self, plan, reason, findings, urls):
