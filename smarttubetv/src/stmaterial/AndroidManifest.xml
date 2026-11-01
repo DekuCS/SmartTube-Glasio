@@ -5,9 +5,19 @@
     <!-- MATERIAL: the in-app updater hands a verified APK to the system installer, which asks the user. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- MATERIAL: permissions of features this flavor does not have: voice search, the overlay, uninstalling apps, DIAL, TV channels. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION" tools:node="remove" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" tools:node="remove" />
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" tools:node="remove" />
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" tools:node="remove" />
+
     <application
         android:name="io.github.ivanosh.stmaterial.MaterialApplication"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/material_data_extraction_rules"
         tools:replace="android:name,android:allowBackup">
 
         <!-- MATERIAL: no external zip import -->
