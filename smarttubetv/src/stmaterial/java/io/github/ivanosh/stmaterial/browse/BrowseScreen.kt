@@ -42,7 +42,9 @@ import androidx.compose.ui.unit.dp
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.tv.R
+import io.github.ivanosh.stmaterial.logic.BackStep
 import io.github.ivanosh.stmaterial.logic.Sections
+import io.github.ivanosh.stmaterial.logic.backStep
 import io.github.ivanosh.stmaterial.ui.CenteredMessage
 import io.github.ivanosh.stmaterial.ui.ErrorState
 import io.github.ivanosh.stmaterial.ui.Feed
@@ -88,6 +90,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
         var contentFocused by remember { mutableStateOf(false) }
         val repeatGuard = remember { KeyRepeatGuard() }
         var backPressed by remember { mutableStateOf(false) }
+        var tabBackPressed by remember { mutableStateOf(false) }
         // The tab whose menu is open, and the tab that gets focus back when it closes.
         var menuFor by remember { mutableStateOf<Int?>(null) }
         // The menu of a card. Focus comes back to the card through the state, as it does after any loss of focus.
@@ -133,6 +136,19 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                 .fillMaxSize()
                 .background(Palette.Background)
                 .onPreviewKeyEvent { event ->
+                    // Back on a tab that is not the start tab goes to the start tab. Menus keep their own Back.
+                    if (event.key == Key.Back && menuFor == null && cardMenu.items == null &&
+                        backStep(contentFocused, state.selected, state.start, state.tabs()) == BackStep.SELECT_START
+                    ) {
+                        when (event.type) {
+                            KeyEventType.KeyDown -> tabBackPressed = true
+                            KeyEventType.KeyUp -> if (tabBackPressed) {
+                                tabBackPressed = false
+                                requesterFor(state.start).requestFocus()
+                            }
+                        }
+                        return@onPreviewKeyEvent true
+                    }
                     val native = event.nativeKeyEvent
                     event.type == KeyEventType.KeyDown && isDpadMove(event.key) &&
                         repeatGuard.shouldDrop(native.repeatCount, native.eventTime, SystemClock.uptimeMillis())
