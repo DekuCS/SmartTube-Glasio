@@ -11,6 +11,10 @@ on:
 # Nothing is writable unless a job asks for it.
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   # Runs for every trigger. Has no access to secrets and cannot write anything.
   test:
@@ -35,6 +39,40 @@ jobs:
       - name: Unit tests
         run: ./gradlew --no-daemon :smarttubetv:testStmaterialDebugUnitTest :common:testStfdroidDebugUnitTest
 
+  # Push to the material branch and manual runs: proves the release variant builds on this runner before a tag does.
+  # Debug-signed (no secrets here), never uploaded.
+  build-check:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/material')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install the SDK parts the build pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "ndk;21.0.6113669" "build-tools;36.0.0" "platforms;android-36"
+
+      - name: Assemble the release variant
+        run: ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
+
   # Tags only. The only job that sees the signing key.
   release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/material-v')
@@ -57,7 +95,26 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
+
+      - name: Tag must match versionName
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/^ *versionName "\(.*\)"$/\1/p' smarttubetv/build.gradle | head -n 1)
+          if [ "$TAG" != "material-v$VERSION" ]; then
+            echo "::error::Tag $TAG does not match versionName $VERSION (expected material-v$VERSION)."
+            exit 1
+          fi
+
+      - name: Install the SDK parts the build pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "ndk;21.0.6113669" "build-tools;36.0.0" "platforms;android-36"
 
       - name: Require the signing secrets
         env:
@@ -73,9 +130,6 @@ jobs:
             fi
           done
 
-      - name: Unit tests
-        run: ./gradlew --no-daemon :smarttubetv:testStmaterialDebugUnitTest :common:testStfdroidDebugUnitTest
-
       - name: Build the signed release APKs
         env:
           KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
@@ -90,13 +144,16 @@ jobs:
           ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
 
       - name: Verify the signature
+        shell: bash
         run: |
+          set -euo pipefail
+          EXPECTED=8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
           for apk in smarttubetv/build/outputs/apk/stmaterial/release/*.apk; do
-            echo "$apk"
-            "$APKSIGNER" verify --print-certs "$apk" | grep -E 'Signer #1 certificate (DN|SHA-256)'
-            if "$APKSIGNER" verify --print-certs "$apk" | grep -q 'CN=Android Debug'; then
-              echo "::error::$apk is signed with the debug key"
+            ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+            echo "$apk $ACTUAL"
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "::error::$apk is not signed with the expected certificate"
               exit 1
             fi
           done
@@ -112,7 +169,8 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           gh release create "$TAG" smarttubetv/build/outputs/apk/stmaterial/release/*.apk \
-            --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes
+            --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes \
+            --notes "Version ${TAG#material-v}. Signing certificate SHA-256 8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c."
 
       - name: Remove the signing material
         if: always()

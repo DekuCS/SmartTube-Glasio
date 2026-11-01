@@ -77,3 +77,7 @@ hs_err_pid*.log
 *.jks
 *.keystore
 release.properties
+keystore.properties
+*.p12
+*.pfx
+*.pkcs12
