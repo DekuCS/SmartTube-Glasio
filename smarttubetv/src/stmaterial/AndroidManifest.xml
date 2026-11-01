@@ -24,6 +24,10 @@
         <activity android:name="com.liskovsoft.smartyoutubetv2.common.misc.BackupReceiverActivity"
             tools:node="remove" />
 
+        <!-- MATERIAL: casting is not included, and this receiver would start the app at every boot and clock change. -->
+        <receiver android:name="com.liskovsoft.smartyoutubetv2.common.misc.RemoteControlReceiver"
+            tools:node="remove" />
+
         <!-- MATERIAL: no home screen channels, no search provider: nothing exported from leanbackassistant. -->
         <receiver android:name="com.liskovsoft.leanbackassistant.channels.UpdateChannelsReceiver"
             tools:node="remove" />
