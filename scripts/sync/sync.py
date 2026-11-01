@@ -44,13 +44,61 @@ def names(output):
     return [name.decode(errors="replace") for name in output.split(b"\0") if name]
 
 
+def gitmodules_entries(text):
+    """git's own reading of a .gitmodules text: [(key, value)], or None if git cannot read it."""
+    with tempfile.NamedTemporaryFile(suffix=".gitmodules") as source:
+        source.write(text.encode())
+        source.flush()
+        result = subprocess.run(("git", "config", "-f", source.name, "--null", "--get-regexp",
+                                 r"^submodule\..*\.(url|path)$"), capture_output=True)
+    if result.returncode == 1:
+        return []
+    if result.returncode != 0:
+        return None
+    entries = result.stdout.decode(errors="replace").split("\0")
+    return [tuple(entry.split("\n", 1)) for entry in entries if entry]
+
+
+def normalized_gitmodules(text):
+    entries = gitmodules_entries(text)
+    if entries is None:
+        return "unreadable\n" + text
+    return "\n".join("%s=%s" % entry for entry in entries)
+
+
+def submodules(text):
+    """[(path, url)], with the value git uses when a key repeats."""
+    modules = {}
+    for key, value in gitmodules_entries(text) or []:
+        name, field = key[len("submodule."):].rsplit(".", 1)
+        modules.setdefault(name, {})[field] = value
+    return [(module.get("path"), module.get("url")) for module in modules.values()]
+
+
+def changed_lines(cwd, old, new, path):
+    """The added and removed lines of one file. --text so that upstream's attributes cannot hide them."""
+    output = git(cwd, "--literal-pathspecs", "diff", "-U0", "--text", "--no-color", "--no-renames", "--no-ext-diff",
+                 "--no-textconv", old, new, "--", path).stdout.decode(errors="replace")
+    lines, in_hunk = [], False
+    for line in output.split("\n"):
+        if line.startswith("@@"):
+            in_hunk = True
+        elif in_hunk and line[:1] in ("+", "-"):
+            lines.append(line[1:])
+    return lines
+
+
 def repo_diff(cwd, label, old, new, compare):
     paths = names(git(cwd, "diff", "--name-only", "--no-renames", "-z", old, new).stdout)
-    texts = {}
+    texts, lines = {}, {}
     for path in paths:
-        if path.rsplit("/", 1)[-1] == ".gitmodules" or logic.is_gradle_file(path):
-            texts[path] = (show(cwd, "%s:%s" % (old, path)), show(cwd, "%s:%s" % (new, path)))
-    return logic.RepoDiff(label, paths, texts, compare)
+        lines[path] = changed_lines(cwd, old, new, path)
+        sides = show(cwd, "%s:%s" % (old, path)), show(cwd, "%s:%s" % (new, path))
+        if path.rsplit("/", 1)[-1] == ".gitmodules":
+            texts[path] = tuple(normalized_gitmodules(side) for side in sides)
+        elif logic.is_gradle_file(path):
+            texts[path] = sides
+    return logic.RepoDiff(label, paths, texts, lines, compare)
 
 
 def compare_url(url, old, new):
@@ -58,11 +106,18 @@ def compare_url(url, old, new):
 
 
 class Sync:
-    def __init__(self, root, out):
+    def __init__(self, root, out, published=()):
         self.root = root
         self.out = pathlib.Path(out)
+        self.published = set(published)
 
     def plan(self, releases, issues, upstream_url=UPSTREAM_URL, on_tag=lambda tag: None):
+        pending = self.unreleased_merge()
+        if pending is not None:
+            on_tag(pending["tag"])
+            if logic.find_open_issue(issues, pending["tag"]) is not None:
+                return {"action": "noop", "reason": "open-issue", "tag": pending["tag"]}
+            return dict(pending, action="release-only", base_sha=text_of(self.root, "rev-parse", "HEAD"))
         tag = logic.pick_stable_tag(releases)
         if tag is None:
             return {"action": "noop", "reason": "no-stable-release"}
@@ -71,6 +126,28 @@ class Sync:
             return {"action": "noop", "reason": "open-issue", "tag": tag}
         git(self.root, "fetch", "--no-tags", "--quiet", upstream_url, "+refs/tags/%s:%s" % (tag, TAG_REF))
         return self.plan_ref(TAG_REF, tag)
+
+    def unreleased_merge(self):
+        """The newest merge of this sync on the branch, if its release never appeared.
+
+        History, not an issue, is the trace: a release that failed or was cancelled after the push stays visible
+        here whether or not Issues works and whether or not someone closed the issue.
+        """
+        log = text_of(self.root, "log", "--first-parent", "--format=%H%x00%ae%x00%s", "HEAD")
+        for line in log.split("\n"):
+            sha, email, subject = line.split("\0", 2)
+            tag = logic.synced_tag(subject)
+            if email == BOT_EMAIL and tag is not None:
+                version = self.version_at(sha)
+                if version.tag in self.published:
+                    return None
+                return {"tag": tag, "merge_sha": sha, "version_name": version.name,
+                        "version_code": str(version.code), "release_tag": version.tag}
+        return None
+
+    def version_at(self, spec):
+        code, name = logic.parse_gradle_version(show(self.root, "%s:%s" % (spec, GRADLE_FILE)))
+        return logic.material_version(code, name, logic.parse_patch(show(self.root, "%s:%s" % (spec, PATCH_FILE))))
 
     def plan_ref(self, ref, tag):
         """Gate, then merge. Leaves the merge commit in merge.bundle; no branch moves."""
@@ -94,7 +171,7 @@ class Sync:
         urls = [compare_url(UPSTREAM_URL, merge_base, commit)]
         diffs = [repo_diff(self.root, "", merge_base, commit, urls[0])]
         findings = []
-        for path, url in logic.parse_gitmodules(show(self.root, base + ":.gitmodules")).values():
+        for path, url in submodules(show(self.root, base + ":.gitmodules")):
             old = git(self.root, "rev-parse", "%s:%s" % (base, path), check=False)
             new = git(self.root, "rev-parse", "%s:%s" % (commit, path), check=False)
             if old.returncode != 0 or new.returncode != 0:
@@ -143,7 +220,7 @@ class Sync:
         patch_path.write_text(logic.with_patch(show(self.root, "%s:%s" % (base, PATCH_FILE)), version.patch))
         git(self.root, "add", "--", PATCH_FILE)
         git(self.root, "-c", "user.name=" + logic.BOT_LOGIN, "-c", "user.email=" + BOT_EMAIL, "commit", "--quiet",
-            "--no-verify", "-m", "Merge upstream " + tag)
+            "--no-verify", "-m", logic.merge_subject(tag))
 
         merge_sha = text_of(self.root, "rev-parse", "HEAD")
         git(self.root, "update-ref", MERGE_REF, merge_sha)
@@ -158,24 +235,25 @@ class Sync:
         git(self.root, "clean", "--quiet", "-fd", "--", WORKFLOWS)
 
     def take_upstream_pins(self, commit):
-        for path, _ in logic.parse_gitmodules(show(self.root, commit + ":.gitmodules")).values():
+        for path, _ in submodules(show(self.root, commit + ":.gitmodules")):
             pin = text_of(self.root, "rev-parse", "%s:%s" % (commit, path))
             git(self.root, "update-index", "--add", "--cacheinfo", "160000,%s,%s" % (pin, path))
 
     def next_version(self, base, tag):
         """(version, problem): the version the merged tree will build, or why it cannot."""
         try:
-            old_code, old_name = logic.parse_gradle_version(show(self.root, "%s:%s" % (base, GRADLE_FILE)))
+            old = self.version_at(base)
             new_code, new_name = logic.parse_gradle_version(show(self.root, ":" + GRADLE_FILE))
-            old_patch = logic.parse_patch(show(self.root, "%s:%s" % (base, PATCH_FILE)))
-            old = logic.material_version(old_code, old_name, old_patch)
-            new = logic.material_version(new_code, new_name, logic.next_patch(old_name, new_name, old_patch))
+            old_name = logic.parse_gradle_version(show(self.root, "%s:%s" % (base, GRADLE_FILE)))[1]
+            new = logic.material_version(new_code, new_name, logic.next_patch(old_name, new_name, old.patch))
         except ValueError as error:
             return None, "version: " + logic.safe_text(str(error))
         if logic.is_stable_tag(tag) and logic.upstream_version(tag) != new_name:
             return None, "version: tag and versionName disagree: " + logic.safe_text(tag + " " + new_name)
         if new.code <= old.code:
             return None, "version: versionCode would not grow: %d to %d" % (old.code, new.code)
+        if new.tag in self.published:
+            return None, "version: release already exists: " + new.tag
         return new, None
 
     def stop(self, plan, reason, findings, urls):
@@ -214,13 +292,12 @@ def command_decide(args):
     set_outputs({"dry_run": args.dry_run})
     with open(args.issues, encoding="utf-8") as source:
         issues = [issue for page in json.load(source) for issue in page]
-    sync = Sync(".", args.out)
-    if args.local_ref:
-        plan = sync.plan_ref(args.local_ref, args.label)
-    else:
-        with open(args.releases, encoding="utf-8") as source:
-            releases = json.load(source)
-        plan = sync.plan(releases, issues, on_tag=lambda tag: set_outputs({"tag": tag}))
+    with open(args.own_releases, encoding="utf-8") as source:
+        published = [release.get("tag_name") for page in json.load(source) for release in page]
+    with open(args.releases, encoding="utf-8") as source:
+        releases = json.load(source)
+    plan = Sync(".", args.out, published).plan(releases, issues, upstream_url=args.upstream_url,
+                                               on_tag=lambda tag: set_outputs({"tag": tag}))
 
     set_outputs({key: value for key, value in plan.items() if key != "findings"})
     mode = "Dry run: " if dry_run else ""
@@ -248,7 +325,10 @@ def command_check_tag(args):
 
 
 def gh(*args):
-    return subprocess.run(("gh",) + args, check=True, capture_output=True, text=True).stdout
+    result = subprocess.run(("gh",) + args, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError("gh %s failed: %s" % (" ".join(args[:2]), result.stderr.strip()))
+    return result.stdout
 
 
 def open_issues(repo):
@@ -256,8 +336,20 @@ def open_issues(repo):
     return [issue for page in pages for issue in page]
 
 
+def file_issue(repo, tag, body):
+    number = logic.find_open_issue(open_issues(repo), tag)
+    with tempfile.NamedTemporaryFile("w", suffix=".md", encoding="utf-8") as body_file:
+        body_file.write(body)
+        body_file.flush()
+        if number is None:
+            gh("issue", "create", "--repo", repo, "--title", logic.issue_title(tag), "--body-file", body_file.name)
+        else:
+            gh("issue", "edit", str(number), "--repo", repo, "--body-file", body_file.name)
+
+
 def command_report(args):
-    """Opens or updates the one issue of the tag. A run that stopped or failed leaves exactly one trace."""
+    """Leaves one issue per tag if it can, and fails the run either way: GitHub's failure email is what reaches
+    the owner when Issues is off or the issue cannot be filed."""
     results = dict(item.split("=", 1) for item in args.results)
     failed = logic.failed_jobs(results)
     if args.action != "stop" and not failed:
@@ -268,19 +360,16 @@ def command_report(args):
     if args.action == "stop":
         body = pathlib.Path(args.body_file).read_text(encoding="utf-8")
     else:
-        pushed = args.merge_sha if results.get("publish") == "success" else ""
+        pushed = args.merge_sha if "success" == results.get("publish") or args.action == "release-only" else ""
         body = logic.failure_body(args.tag, failed, args.run_url, pushed, args.release_tag)
 
-    number = logic.find_open_issue(open_issues(args.repo), args.tag)
-    with tempfile.NamedTemporaryFile("w", suffix=".md", encoding="utf-8") as body_file:
-        body_file.write(body)
-        body_file.flush()
-        if number is None:
-            gh("issue", "create", "--repo", args.repo, "--title", logic.issue_title(args.tag),
-               "--body-file", body_file.name)
-        else:
-            gh("issue", "edit", str(number), "--repo", args.repo, "--body-file", body_file.name)
-    return 0
+    print("::error::The upstream sync needs the owner at %s." % args.tag)
+    try:
+        file_issue(args.repo, args.tag, body)
+    except (RuntimeError, OSError) as error:
+        print("::error::Could not file the issue: %s" % error)
+        print(body)
+    return 1
 
 
 def main():
@@ -288,13 +377,13 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
 
     decide = commands.add_parser("decide", help="pick the tag, gate it, merge it locally")
-    decide.add_argument("--releases", help="JSON of the upstream releases")
+    decide.add_argument("--releases", required=True, help="JSON of the upstream releases")
     decide.add_argument("--issues", required=True, help="JSON pages of this repository's open issues")
     decide.add_argument("--out", required=True, help="directory for merge.bundle and issue-body.md")
     decide.add_argument("--dry-run", choices=("true", "false"), default="false", help="only changes the summary: "
                         "the workflow skips push, release and issue on the dry_run output")
-    decide.add_argument("--local-ref", help="simulation: merge this local ref instead of the picked tag")
-    decide.add_argument("--label", default="local", help="simulation: the name of --local-ref")
+    decide.add_argument("--own-releases", required=True, help="JSON pages of this repository's releases")
+    decide.add_argument("--upstream-url", default=UPSTREAM_URL)
     decide.set_defaults(run=command_decide)
 
     bundle = commands.add_parser("apply-bundle", help="take the merge commit of the gate job")

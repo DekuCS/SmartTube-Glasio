@@ -11,17 +11,29 @@ _STABLE_TAG = re.compile(r"([0-9]+)\.([0-9]+)s")
 _GRADLE_CODE = re.compile(r"^\s*versionCode\s+([0-9]+)\s*$", re.M)
 _GRADLE_NAME = re.compile(r'^\s*versionName\s+"([0-9]+\.[0-9]+)"\s*$', re.M)
 _PATCH_LINE = re.compile(r"^materialPatch=(.*)$", re.M)
-_AUTH_PATH = re.compile(r"(?i:auth/|oauth2|RetrofitOkHttpHelper)|SignIn|(?<![A-Za-z])(?i:sign[_-]?in)")
+# A false stop costs the owner a look, a false pass can cost a token. PoToken is the one family left out on purpose:
+# it identifies the client, not the account, and matching it would stop most syncs.
+_AUTH_PATH = re.compile(
+    r"(?i:auth(?!or(?:s|ed)?(?:[^a-z]|$))|RetrofitOkHttpHelper|credential|login|cookie|account|(?<!po)(?<!po_)token)"
+    r"|SignIn|Signin|(?<![A-Za-z])(?i:sign[_-]?in)")
+_TOKEN_LINE = re.compile(
+    r"(?i)refresh[_-]?token|access[_-]?token|\bid[_-]?token|client[_-]?(?:secret|id)\b|\bauthorization\b|\bbearer\b"
+    r"|persistAccounts|allowBackup|fullBackupContent|dataExtractionRules")
+_BUILD_LOGIC_PATH = re.compile(
+    r"(?i)(?:^|/)(?:gradle/wrapper/|gradlew(?:\.bat)?$|buildSrc/|[^/]*settings[^/]*\.gradle(?:\.kts)?$"
+    r"|gradle\.properties$|gradle/[^/]*\.toml$)")
+_CODE_SOURCE_LINE = re.compile(
+    r"(?i)\bapply\b.*\bfrom\b|\b(?:get)?repositories\b|://|\burl\b|\buri\s*\(|\bmaven\b|\bivy\b|\bflatDir\b"
+    r"|\bjcenter\b|\bmavenLocal\b")
 _REPOSITORIES = re.compile(r"\brepositories\b")
-_SUBMODULE_HEADER = re.compile(r'^\s*\[submodule "(.+)"\]\s*$')
-_SUBMODULE_VALUE = re.compile(r"^\s*(path|url)\s*=\s*(.*?)\s*$")
 _UNSAFE_TEXT = re.compile(r"[^A-Za-z0-9._/+-]")
 
 MaterialVersion = collections.namedtuple("MaterialVersion", "code name tag patch")
 
 # One repository's side of the change: `label` is "" for this repository or the submodule path, `paths` the changed
-# files, `texts` {path: (old, new)} for the .gitmodules and Gradle files among them.
-RepoDiff = collections.namedtuple("RepoDiff", "label paths texts compare")
+# files, `texts` {path: (old, new)} for the Gradle files and git's own reading of the .gitmodules files among them,
+# `lines` {path: [added and removed lines]}.
+RepoDiff = collections.namedtuple("RepoDiff", "label paths texts lines compare")
 
 
 def is_stable_tag(tag):
@@ -37,6 +49,17 @@ def pick_stable_tag(releases):
     tags = [r.get("tag_name") for r in releases if r.get("draft") is False and r.get("prerelease") is False]
     stable = [tag for tag in tags if is_stable_tag(tag)]
     return max(stable, key=_tag_order, default=None)
+
+
+def merge_subject(tag):
+    return "Merge upstream " + tag
+
+
+def synced_tag(subject):
+    """The upstream tag named by the subject of a sync merge, or None."""
+    prefix = merge_subject("")
+    tag = subject[len(prefix):] if subject.startswith(prefix) else None
+    return tag if is_stable_tag(tag) else None
 
 
 def upstream_version(tag):
@@ -81,23 +104,20 @@ def is_auth_path(path):
     return _AUTH_PATH.search(path) is not None
 
 
+def is_token_line(line):
+    return _TOKEN_LINE.search(line) is not None
+
+
+def is_build_logic_path(path):
+    return _BUILD_LOGIC_PATH.search(path) is not None
+
+
+def is_code_source_line(line):
+    return _CODE_SOURCE_LINE.search(line) is not None
+
+
 def is_gradle_file(path):
-    return path.endswith((".gradle", ".gradle.kts"))
-
-
-def parse_gitmodules(text):
-    """{name: (path, url)}"""
-    modules, name = {}, None
-    for line in text.splitlines():
-        header = _SUBMODULE_HEADER.match(line)
-        if header:
-            name = header.group(1)
-            modules[name] = {}
-            continue
-        value = _SUBMODULE_VALUE.match(line)
-        if value and name is not None:
-            modules[name][value.group(1)] = value.group(2)
-    return {key: (entry.get("path"), entry.get("url")) for key, entry in modules.items()}
+    return path.endswith((".gradle", ".kts", ".groovy"))
 
 
 def repository_declarations(text):
@@ -132,6 +152,13 @@ def safe_text(text):
     return _UNSAFE_TEXT.sub("_", text)
 
 
+def _gradle_changes_a_source(path, diff):
+    old, new = diff.texts.get(path, ("", ""))
+    lines = diff.lines.get(path, [])
+    return not lines or repository_declarations(old) != repository_declarations(new) \
+        or any(is_code_source_line(line) for line in lines)
+
+
 def gate_findings(diffs):
     """Why the owner must look first, one line per reason. Empty means the gate is open."""
     findings = []
@@ -141,14 +168,16 @@ def gate_findings(diffs):
             shown = safe_text(prefix + path)
             if is_auth_path(path):
                 findings.append("sign-in path changed: " + shown)
+            if any(is_token_line(line) for line in diff.lines.get(path, [])):
+                findings.append("token handling changed: " + shown)
+            if is_build_logic_path(path):
+                findings.append("build logic changed: " + shown)
             if path.rsplit("/", 1)[-1] == ".gitmodules":
                 old, new = diff.texts.get(path, ("", ""))
-                if parse_gitmodules(old) != parse_gitmodules(new):
+                if old != new:
                     findings.append("submodule URL or path changed: " + shown)
-            if is_gradle_file(path):
-                old, new = diff.texts.get(path, ("", ""))
-                if repository_declarations(old) != repository_declarations(new):
-                    findings.append("Gradle repositories changed: " + shown)
+            if is_gradle_file(path) and _gradle_changes_a_source(path, diff):
+                findings.append("Gradle repositories or code sources changed: " + shown)
     return findings
 
 

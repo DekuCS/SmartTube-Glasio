@@ -33,7 +33,8 @@ APKs land in `smarttubetv/build/outputs/apk/stmaterial/release/` for `arm64-v8a`
 Without a signing key the build uses the debug key and prints a warning; do not share that APK. To sign with your
 own key, set `MATERIAL_KEYSTORE_FILE`, `MATERIAL_KEYSTORE_PASSWORD`, `MATERIAL_KEY_ALIAS` and
 `MATERIAL_KEY_PASSWORD`, or put `storeFile`, `storePassword`, `keyAlias` and `keyPassword` in
-`~/.config/smarttube-material/release.properties`. Releases are built by GitHub Actions and carry a build provenance attestation (`gh attestation verify <apk> --repo ivanosh/SmartTube-Material`).
+`~/.config/smarttube-material/release.properties`. Releases are built by GitHub Actions and carry a build provenance
+attestation (`gh attestation verify <apk> --repo ivanosh/SmartTube-Material`).
 
 Release signing certificate SHA-256:
 `86:19:C3:45:16:11:0B:F5:03:C6:85:0F:1C:40:57:78:FA:E8:FD:31:8B:EB:82:B1:38:DB:20:77:24:74:8E:8C`
@@ -70,6 +71,10 @@ fork's patch number, and the `stmaterial` flavor builds on both:
 The other flavors keep the upstream values. To release our own changes, raise `materialPatch` (1 to 99), commit, and
 push the tag. The release workflow refuses a tag that does not match `versionName`.
 
+Releases are built with no key by a job that runs Gradle (`MATERIAL_UNSIGNED_RELEASE=true` gives unsigned APKs). A
+second job signs them with the SDK's `zipalign` and `apksigner`, checks the certificate digest and publishes. It is the
+only job with the key, and it never checks out or runs anything from the repository.
+
 ## Upstream sync
 
 `.github/workflows/material-sync.yml` runs every 6 hours and can be started by hand from the Actions tab. Manual runs
@@ -82,27 +87,52 @@ are dry runs by default: they report what would happen and leave `material`, the
 4. It merges the tag with a merge commit, never a rebase or a force-push. Submodules take upstream's pins, changes under
    `.github/workflows` are dropped, and `materialPatch` goes back to 1 on a new upstream version.
 5. Tests and `assembleStmaterialRelease` run on that commit in a job with no secrets and nothing writable.
-6. That commit is pushed to `material`, then rebuilt with the signing key and published as a prerelease. Signing, the
-   signer pin and the attestation are the same as for a tagged release.
+6. That commit is pushed to `material` and released as a prerelease, the same way as a tagged release: see Versions.
+
+A merge of an upstream version we already carry takes the next patch instead of 1, because the tag and the versionCode
+must both be new.
 
 The logic is in `scripts/sync/`; its tests run in CI and with `python3 -B -m unittest discover -s scripts/sync`.
 
-What stops it, with one issue per upstream tag and nothing pushed:
+What stops it, with nothing pushed:
 
-- a changed sign-in path, in this tree or behind a submodule pin: `auth/`, `RetrofitOkHttpHelper`, `OAuth2`, `SignIn`
-- a changed URL or path in `.gitmodules`
-- a changed `repositories` declaration in any Gradle file, here or in a submodule
+- a changed sign-in, account or token file, in this tree or behind a submodule pin: any path with `auth`, `SignIn`,
+  `account`, `token`, `credential`, `login` or `cookie` in it, and `RetrofitOkHttpHelper`. `PoToken` files do not count:
+  they identify the client, not the account, and upstream changes them often.
+- a changed line with a token term in any file: refresh, access or ID token, client ID or secret, `Authorization`,
+  `Bearer`, `persistAccounts`, and the manifest's backup settings
+- a change to `gradle/wrapper/`, `gradlew`, `buildSrc/`, `settings*.gradle*`, `gradle.properties` or a version catalog
+- a changed line in Gradle code with `repositories`, `getRepositories`, `apply from`, `maven`, `url`, `uri(` or `://`,
+  here or in a submodule
+- a changed URL or path in `.gitmodules`, as `git config` reads it
 - a pin that cannot be fetched, or a history with no single merge base
 - a merge conflict
-- a tag that disagrees with `versionName`, or a `versionCode` that would not grow
+- a tag that disagrees with `versionName`, a `versionCode` that would not grow, or a release that already exists
 - failed tests or a failed build
 
-The issue names the files and links the compare view. The sync does not retry that tag while the issue is open: deal
-with it (usually a manual merge), then close the issue. If the merge reached `material` and only the release failed, the
-issue says so; pushing the release tag at that commit publishes it.
+These rules prefer a false stop, which costs a look, to a false pass. Four of the last nine upstream stable steps would
+have stopped.
 
-The schedule needs the workflow on the repository's default branch, and GitHub pauses schedules after 60 days without
-activity in the repository.
+A stop or a failure turns the run red, so GitHub sends its failure email, and opens or updates one issue per upstream
+tag. Dry runs only report a stop. The issue names the files and links the compare view. The sync does not retry that
+tag while the issue is open: deal with it (usually a manual merge), then close the issue. If Issues is off, the run says
+why in its log and tries the tag again every 6 hours.
+
+If a merge reached `material` and its release is missing, the next run makes the release, unless that tag's issue is
+open. Nothing else is synced until then.
+
+### What the schedule needs
+
+GitHub fires a schedule only under these conditions, and nothing reports it when one is missing:
+
+- The workflow is on the repository's default branch. That is `master` today, so `material` must become the default
+  branch. Every run warns in its log while it is not.
+- Actions and scheduled workflows are enabled in the Actions tab. GitHub turns them off in a fork until they are
+  enabled by hand, and this repository is a fork.
+- The repository saw activity in the last 60 days; otherwise GitHub pauses the schedule.
+
+The failure email for a scheduled run goes to whoever last changed the workflow's `cron` line, and follows that
+person's notification settings.
 
 ## Sign-out and revoking access
 

@@ -52,16 +52,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          DEFAULT_BRANCH=$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)
+          if [ "$DEFAULT_BRANCH" != material ]; then
+            echo "::warning::The schedule only fires from the default branch, here $DEFAULT_BRANCH. See README-Material.md."
+          fi
           gh api 'repos/yuliskov/SmartTube/releases?per_page=100' > "$RUNNER_TEMP/releases.json"
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" > "$RUNNER_TEMP/issues.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/own-releases.json"
 
       - name: Pick the tag, gate it, merge it
         id: decide
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
-          python3 scripts/sync/sync.py decide --releases "$RUNNER_TEMP/releases.json" \
-            --issues "$RUNNER_TEMP/issues.json" --out "$RUNNER_TEMP/sync-out" --dry-run "$DRY_RUN"
+          python3 -B scripts/sync/sync.py decide --releases "$RUNNER_TEMP/releases.json" \
+            --issues "$RUNNER_TEMP/issues.json" --own-releases "$RUNNER_TEMP/own-releases.json" \
+            --out "$RUNNER_TEMP/sync-out" --dry-run "$DRY_RUN"
 
       - name: Hand the merge and the issue text to the next jobs
         if: always()
@@ -99,7 +105,7 @@ jobs:
         env:
           MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
         run: |
-          python3 scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA"
+          python3 -B scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA"
           git submodule update --init --recursive
 
       - name: Set up JDK 17
@@ -147,12 +153,16 @@ jobs:
         env:
           MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
         run: |
-          python3 scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA" --no-checkout
+          python3 -B scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA" --no-checkout
           git push origin "$MERGE_SHA:refs/heads/material"
 
-  # The same commit, rebuilt with the signing key. Same job as a tagged release.
+  # The same commit, built with no secret and signed in a later job, as for a tagged release. Also runs alone when an
+  # earlier sync pushed its merge but no release followed (action release-only).
   release:
     needs: [decide, publish]
+    if: >-
+      ${{ !cancelled() && needs.decide.result == 'success' && needs.decide.outputs.dry_run == 'false' &&
+      (needs.publish.result == 'success' || needs.decide.outputs.action == 'release-only') }}
     permissions:
       contents: write      # create the GitHub Release
       id-token: write      # sign the provenance attestation
@@ -167,7 +177,8 @@ jobs:
       MATERIAL_KEY_ALIAS: ${{ secrets.MATERIAL_KEY_ALIAS }}
       MATERIAL_KEY_PASSWORD: ${{ secrets.MATERIAL_KEY_PASSWORD }}
 
-  # A stop or a failure leaves one issue per upstream tag. While it is open, decide skips the tag.
+  # A stop or a failure leaves one issue per upstream tag if it can, and turns the run red whether it could or not:
+  # GitHub's failure email is what reaches the owner. While the issue is open, decide skips the tag.
   report:
     needs: [decide, verify, publish, release]
     if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' && needs.decide.outputs.action != 'noop' }}
@@ -203,6 +214,6 @@ jobs:
           RELEASE: ${{ needs.release.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          python3 scripts/sync/sync.py report --repo "$GITHUB_REPOSITORY" --tag "$TAG" --action "$ACTION" \
+          python3 -B scripts/sync/sync.py report --repo "$GITHUB_REPOSITORY" --tag "$TAG" --action "$ACTION" \
             --body-file "$RUNNER_TEMP/sync-out/issue-body.md" --run-url "$RUN_URL" --merge-sha "$MERGE_SHA" --release-tag "$RELEASE_TAG" \
             --results "decide=$DECIDE" "verify=$VERIFY" "publish=$PUBLISH" "release=$RELEASE"

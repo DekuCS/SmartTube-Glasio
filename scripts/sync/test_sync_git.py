@@ -1,5 +1,7 @@
 """The git half of the upstream sync, on small repositories in a temp directory. No network."""
 import argparse
+import contextlib
+import io
 import json
 import os
 import pathlib
@@ -124,7 +126,7 @@ class Decide(Fixture):
         self.bump()
         self.upstream_commit()
         before = run(self.clone, "git", "rev-parse", "refs/heads/material")
-        self.decide()
+        self.assertEqual(self.decide()["action"], "proceed")
         self.assertEqual(run(self.clone, "git", "rev-parse", "refs/heads/material"), before)
 
     def test_already_merged_tag_is_a_no_op(self):
@@ -243,6 +245,75 @@ class Decide(Fixture):
         self.upstream_commit()
         self.assertEqual(self.decide()["action"], "stop")
 
+    def test_gitmodules_url_added_in_upper_case_stops(self):
+        self.bump()
+        text = SUBMODULES % ("file://" + self.core) + "\tURL = https://example.invalid/evil\n"
+        write(self.upstream, ".gitmodules", text)
+        self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
+
+    def test_gitmodules_url_on_the_header_line_stops(self):
+        self.bump()
+        text = SUBMODULES % ("file://" + self.core) + '[submodule "MediaServiceCore"] url = https://example.invalid/evil\n'
+        write(self.upstream, ".gitmodules", text)
+        self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
+
+    def test_gitmodules_that_git_cannot_read_stops(self):
+        self.bump()
+        write(self.upstream, ".gitmodules", SUBMODULES % ("file://" + self.core) + "[broken\n")
+        self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
+
+    def test_gitmodules_change_that_keeps_urls_passes(self):
+        self.bump()
+        write(self.upstream, ".gitmodules", SUBMODULES % ("file://" + self.core) + "\tbranch = main\n")
+        self.upstream_commit()
+        self.assertEqual(self.decide()["action"], "proceed")
+
+    def test_token_term_in_a_changed_line_stops(self):
+        self.bump()
+        write(self.upstream, "app/Main.java", "class Main { void f() { store.persistRefreshToken(t); } }\n")
+        self.upstream_commit()
+        plan = self.decide()
+        self.assertEqual(plan["reason"], "gate")
+        self.assertIn("app/Main.java", pathlib.Path(self.out, "issue-body.md").read_text())
+
+    def test_token_term_behind_a_binary_attribute_still_stops(self):
+        self.bump()
+        write(self.upstream, ".gitattributes", "*.java -diff\n")
+        write(self.upstream, "app/Main.java", "class Main { String refresh_token; }\n")
+        self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
+
+    def test_token_term_behind_a_pin_stops(self):
+        self.bump()
+        write(self.core, "lib/Video.java", "class Video { String accessToken; }\n")
+        pin_new = commit(self.core, "core token")
+        run(self.upstream, "git", "add", "-A")
+        set_pin(self.upstream, pin_new)
+        self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
+
+    def test_wrapper_change_stops(self):
+        self.bump()
+        write(self.upstream, "gradle/wrapper/gradle-wrapper.properties", "distributionUrl=https://evil\n")
+        self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
+
+    def test_url_in_a_gradle_variable_stops(self):
+        self.bump()
+        write(self.upstream, "smarttubetv/extra.gradle", "ext.mirror = 'https://evil.example'\n")
+        self.upstream_commit()
+        self.assertEqual(self.decide()["reason"], "gate")
+
+    def test_existing_release_tag_stops_before_merging(self):
+        self.bump()
+        self.upstream_commit()
+        plan = sync.Sync(self.clone, self.out, published={"material-v32.75-1"}).plan_ref(self.fetch_upstream(), "32.75s")
+        self.assertEqual(plan["action"], "stop")
+        self.assertEqual(plan["reason"], "version")
+
     def test_repositories_change_stops(self):
         self.bump()
         write(self.upstream, "build.gradle", "repositories { maven { url 'https://evil' } }\n")
@@ -275,6 +346,53 @@ class Decide(Fixture):
         self.assertEqual(self.decide()["action"], "stop")
 
 
+class PendingRelease(Fixture):
+    """A merge on material whose release is missing must not turn into a green no-op."""
+
+    def merged(self):
+        write(self.upstream, "smarttubetv/build.gradle", GRADLE % (2465, "32.75"))
+        self.upstream_commit()
+        plan = self.decide()
+        run(self.clone, "git", "checkout", "-q", "material")
+        run(self.clone, "git", "merge", "-q", "--ff-only", plan["merge_sha"])
+        return plan
+
+    def releases(self):
+        return [{"tag_name": "32.75s", "draft": False, "prerelease": False}]
+
+    def test_unreleased_merge_is_released_on_the_next_run(self):
+        merged = self.merged()
+        plan = sync.Sync(self.clone, self.out).plan(self.releases(), [], upstream_url=self.upstream)
+        self.assertEqual(plan["action"], "release-only")
+        self.assertEqual(plan["merge_sha"], merged["merge_sha"])
+        self.assertEqual(plan["release_tag"], "material-v32.75-1")
+        self.assertEqual(plan["tag"], "32.75s")
+
+    def test_released_merge_is_a_no_op(self):
+        self.merged()
+        tags = {"material-v32.75-1"}
+        run(self.upstream, "git", "tag", "32.75s")
+        plan = sync.Sync(self.clone, self.out, published=tags).plan(self.releases(), [], upstream_url=self.upstream)
+        self.assertEqual((plan["action"], plan["reason"]), ("noop", "already-merged"))
+
+    def test_open_issue_holds_the_retry(self):
+        self.merged()
+        issues = [{"number": 9, "title": "[material-sync] upstream 32.75s", "user": {"login": "github-actions[bot]"}}]
+        plan = sync.Sync(self.clone, self.out).plan(self.releases(), issues, upstream_url=self.upstream)
+        self.assertEqual((plan["action"], plan["reason"]), ("noop", "open-issue"))
+
+    def test_our_own_commits_after_the_merge_do_not_hide_it(self):
+        merged = self.merged()
+        write(self.clone, "smarttubetv/src/stmaterial/Ui.kt", "class Ui2\n")
+        commit(self.clone, "a later commit of ours")
+        plan = sync.Sync(self.clone, self.out).plan(self.releases(), [], upstream_url=self.upstream)
+        self.assertEqual(plan["merge_sha"], merged["merge_sha"])
+
+    def test_a_commit_that_only_looks_like_a_merge_does_not_count(self):
+        run(self.clone, "git", "commit", "-q", "--allow-empty", "-m", "Merge upstream 32.75s")
+        self.assertIsNone(sync.Sync(self.clone, self.out).unreleased_merge())
+
+
 class Bundle(Fixture):
     def test_merge_commit_travels_between_jobs_unchanged(self):
         write(self.upstream, "smarttubetv/build.gradle", GRADLE % (2465, "32.75"))
@@ -300,13 +418,66 @@ class Bundle(Fixture):
 
 
 class CommandLine(Fixture):
-    def test_decide_needs_no_network_when_nothing_is_published(self):
-        releases = pathlib.Path(self.tmp.name, "releases.json")
-        issues = pathlib.Path(self.tmp.name, "issues.json")
-        releases.write_text("[]")
-        issues.write_text("[]")
-        plan = sync.Sync(self.clone, self.out).plan(json.loads(releases.read_text()), json.loads(issues.read_text()),
-                                                    upstream_url="file:///nonexistent")
+    def cli(self, *args):
+        output = pathlib.Path(self.tmp.name, "github-output")
+        env = dict(os.environ, GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=os.devnull)
+        script = pathlib.Path(sync.__file__)
+        result = subprocess.run(("python3", "-B", str(script)) + args, cwd=self.clone, env=env, capture_output=True,
+                                text=True)
+        return result, output.read_text() if output.exists() else ""
+
+    def decide_files(self, releases, issues, own):
+        paths = []
+        for name, value in (("r.json", releases), ("i.json", issues), ("o.json", own)):
+            path = pathlib.Path(self.tmp.name, name)
+            path.write_text(json.dumps(value))
+            paths.append(str(path))
+        return paths
+
+    def test_decide_writes_the_outputs_the_workflow_reads(self):
+        releases, issues, own = self.decide_files([], [[]], [[]])
+        result, output = self.cli("decide", "--releases", releases, "--issues", issues, "--own-releases", own,
+                                  "--out", self.out, "--dry-run", "true")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("dry_run=true\n", output)
+        self.assertIn("action=noop\n", output)
+
+    def test_decide_marks_a_real_run(self):
+        releases, issues, own = self.decide_files([], [[]], [[]])
+        _, output = self.cli("decide", "--releases", releases, "--issues", issues, "--own-releases", own,
+                             "--out", self.out, "--dry-run", "false")
+        self.assertIn("dry_run=false\n", output)
+
+    def test_decide_reports_the_tag_before_a_crash(self):
+        rows = [{"tag_name": "32.75s", "draft": False, "prerelease": False}]
+        releases, issues, own = self.decide_files(rows, [[]], [[]])
+        result, output = self.cli("decide", "--releases", releases, "--issues", issues, "--own-releases", own,
+                                  "--out", self.out, "--dry-run", "false", "--upstream-url", "file:///nonexistent")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("tag=32.75s\n", output)
+
+    def test_check_tag(self):
+        self.assertEqual(self.cli("check-tag", "--tag", "material-v32.68-1")[0].returncode, 0)
+        failed = self.cli("check-tag", "--tag", "material-v32.68")[0]
+        self.assertEqual(failed.returncode, 1)
+        self.assertIn("::error::", failed.stdout)
+
+    def test_no_simulation_flags_in_the_production_command(self):
+        self.assertNotIn("--local-ref", self.cli("decide", "--help")[0].stdout)
+
+    def test_apply_bundle_without_checkout_keeps_the_tree(self):
+        write(self.upstream, "smarttubetv/build.gradle", GRADLE % (2465, "32.75"))
+        self.upstream_commit()
+        plan = self.decide()
+        other = str(pathlib.Path(self.tmp.name, "other"))
+        run(self.tmp.name, "git", "clone", "-q", "-b", "material", self.clone, other)
+        run(other, "git", "checkout", "-q", "--detach", self.base)
+        sync.apply_bundle(other, str(pathlib.Path(self.out, "merge.bundle")), plan["merge_sha"], checkout=False)
+        self.assertEqual(run(other, "git", "rev-parse", "HEAD"), self.base)
+        self.assertEqual(run(other, "git", "rev-parse", "refs/sync/merge"), plan["merge_sha"])
+
+    def test_decide_with_nothing_published_touches_no_network(self):
+        plan = sync.Sync(self.clone, self.out).plan([], [], upstream_url="file:///nonexistent")
         self.assertEqual(plan, {"action": "noop", "reason": "no-stable-release"})
 
     def test_open_issue_blocks_before_any_fetch(self):
@@ -316,21 +487,58 @@ class CommandLine(Fixture):
         self.assertEqual(plan, {"action": "noop", "reason": "open-issue", "tag": "32.75s"})
 
 
+class Gitmodules(unittest.TestCase):
+    """Git decides what these files mean, so git reads them."""
+    PLAIN = '[submodule "a"]\n\tpath = a\n\turl = https://x/a\n'
+
+    def same(self, text):
+        return sync.normalized_gitmodules(text) == sync.normalized_gitmodules(self.PLAIN)
+
+    def test_layout_changes_are_not_changes(self):
+        self.assertTrue(self.same('# note\n[SUBMODULE "a"]\n  PATH=a\n  url = https://x/a\n  branch = main\n'))
+
+    def test_reviewers_cases(self):
+        self.assertFalse(self.same(self.PLAIN + "\tURL = https://evil/a\n"))
+        self.assertFalse(self.same(self.PLAIN + '[submodule "a"] url = https://evil/a\n'))
+
+    def test_url_change_new_submodule_and_garbage(self):
+        self.assertFalse(self.same(self.PLAIN.replace("x/a", "evil/a")))
+        self.assertFalse(self.same(self.PLAIN + '[submodule "b"]\n\tpath = b\n\turl = https://x/b\n'))
+        self.assertFalse(self.same(self.PLAIN + "[broken\n"))
+
+    def test_empty(self):
+        self.assertEqual(sync.normalized_gitmodules(""), "")
+
+    def test_submodules_follow_the_value_git_uses(self):
+        text = self.PLAIN + "\tURL = https://other/a\n"
+        self.assertEqual(sync.submodules(text), [("a", "https://other/a")])
+
+
 class Report(unittest.TestCase):
     RUN = "https://github.com/x/y/actions/runs/1"
 
-    def report(self, open_issues, **overrides):
+    def report(self, open_issues, gh_error=None, **overrides):
         values = dict(repo="x/y", tag="32.75s", action="proceed", results=["decide=success", "verify=failure"],
                       body_file="", run_url=self.RUN, merge_sha="", release_tag="")
         values.update(overrides)
+        printed = io.StringIO()
         with mock.patch.object(sync, "open_issues", return_value=open_issues), \
-                mock.patch.object(sync, "gh") as gh:
+                mock.patch.object(sync, "gh", side_effect=gh_error) as gh, contextlib.redirect_stdout(printed):
+            self.bodies = []
+            gh.side_effect = lambda *args: self.record(args, gh_error)
             code = sync.command_report(argparse.Namespace(**values))
+        self.printed = printed.getvalue()
         return code, [call.args for call in gh.call_args_list]
 
-    def test_first_failure_creates_the_issue(self):
+    def record(self, args, error):
+        if "--body-file" in args:
+            self.bodies.append(pathlib.Path(args[args.index("--body-file") + 1]).read_text())
+        if error is not None:
+            raise error
+
+    def test_first_failure_creates_the_issue_and_stays_red(self):
         code, calls = self.report([])
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][:2], ("issue", "create"))
         self.assertIn("[material-sync] upstream 32.75s", calls[0])
@@ -338,23 +546,57 @@ class Report(unittest.TestCase):
     def test_a_second_failure_updates_the_same_issue(self):
         issue = {"number": 5, "title": "[material-sync] upstream 32.75s", "user": {"login": "github-actions[bot]"}}
         code, calls = self.report([issue])
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][:3], ("issue", "edit", "5"))
 
-    def test_success_files_nothing(self):
+    def test_success_files_nothing_and_stays_green(self):
         self.assertEqual(self.report([], results=["decide=success", "verify=success"]), (0, []))
 
     def test_a_failure_without_a_tag_files_nothing_and_stays_red(self):
         self.assertEqual(self.report([], tag="", action="", results=["decide=failure"]), (1, []))
+        self.assertIn("::error::", self.printed)
 
-    def test_a_stop_files_the_body_of_the_gate(self):
+    def test_a_stop_files_the_text_of_the_gate_and_stays_red(self):
         with tempfile.NamedTemporaryFile("w", suffix=".md") as body:
             body.write("gate text")
             body.flush()
             code, calls = self.report([], action="stop", body_file=body.name, results=["decide=success"])
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertEqual(calls[0][:2], ("issue", "create"))
+        self.assertEqual(self.bodies, ["gate text"])
+
+    def test_a_stop_stays_red_when_issues_cannot_be_filed_and_says_why(self):
+        error = RuntimeError("gh issue create failed: the repository has disabled issues")
+        with tempfile.NamedTemporaryFile("w", suffix=".md") as body:
+            body.write("gate text: a/auth/b.java")
+            body.flush()
+            code, _ = self.report([], gh_error=error, action="stop", body_file=body.name, results=["decide=success"])
+        self.assertEqual(code, 1)
+        self.assertIn("disabled issues", self.printed)
+        self.assertIn("a/auth/b.java", self.printed)
+
+    def test_a_failed_listing_of_issues_stays_red_too(self):
+        with mock.patch.object(sync, "open_issues", side_effect=RuntimeError("no")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            code = sync.command_report(argparse.Namespace(
+                repo="x/y", tag="32.75s", action="proceed", results=["verify=failure"], body_file="",
+                run_url=self.RUN, merge_sha="", release_tag=""))
+        self.assertEqual(code, 1)
+
+    def test_a_failed_retry_of_the_release_names_the_merge(self):
+        self.report([], action="release-only", merge_sha="abc123", release_tag="material-v32.75-1",
+                    results=["decide=success", "publish=skipped", "release=failure"])
+        self.assertIn("abc123", self.bodies[0])
+        self.assertNotIn("Nothing was pushed", self.bodies[0])
+
+
+class GhErrors(unittest.TestCase):
+    def test_the_error_carries_what_gh_said(self):
+        failed = subprocess.CompletedProcess(("gh",), 1, "", "HTTP 410: Issues are disabled")
+        with mock.patch.object(sync.subprocess, "run", return_value=failed):
+            with self.assertRaisesRegex(RuntimeError, "Issues are disabled"):
+                sync.gh("issue", "create")
 
 
 if __name__ == "__main__":
