@@ -14,6 +14,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.WebBrowserView
 import com.liskovsoft.smartyoutubetv2.tv.ui.main.MainApplication
 import io.github.ivanosh.stmaterial.browse.MaterialBrowseActivity
 import io.github.ivanosh.stmaterial.dialog.MaterialDialogActivity
+import io.github.ivanosh.stmaterial.player.MaterialPlaybackActivity
 
 class MaterialApplication : MainApplication() {
     /** The single place where the Material screens replace the upstream ones. */
@@ -37,5 +38,7 @@ class MaterialApplication : MainApplication() {
             ChannelUploadsView::class.java,
             WebBrowserView::class.java,
         ).forEach { view -> viewManager.register(view, viewManager.getActivity(view), browse) }
+        // After the list: the parent lookup goes by isInstance, so PlaybackActivity needs the new home too.
+        viewManager.register(PlaybackView::class.java, MaterialPlaybackActivity::class.java, browse)
     }
 }

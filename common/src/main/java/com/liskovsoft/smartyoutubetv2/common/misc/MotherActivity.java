@@ -143,6 +143,11 @@ public class MotherActivity extends FragmentActivity {
             }
         }
 
+        // MATERIAL: after the key translator and the screensaver, before the view hierarchy
+        if (interceptKeyEvent(event)) {
+            return true;
+        }
+
         try {
             return super.dispatchKeyEvent(event);
         } catch (NullPointerException | IllegalArgumentException | IllegalStateException | SecurityException | UnavailableException e) {
@@ -155,6 +160,11 @@ public class MotherActivity extends FragmentActivity {
             e.printStackTrace();
             return false;
         }
+    }
+
+    // MATERIAL: lets the Material player own its navigation keys
+    protected boolean interceptKeyEvent(KeyEvent event) {
+        return false;
     }
 
     @Override

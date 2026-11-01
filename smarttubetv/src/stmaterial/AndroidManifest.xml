@@ -22,6 +22,17 @@
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
             android:screenOrientation="unspecified" />
 
+        <!-- The attributes of the upstream PlaybackActivity: PIP, the player theme and showing over the lock screen depend on them. -->
+        <activity
+            android:name="io.github.ivanosh.stmaterial.player.MaterialPlaybackActivity"
+            android:launchMode="singleInstance"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
+            android:screenOrientation="unspecified"
+            android:showWhenLocked="true"
+            android:theme="@style/App.Theme.Leanback.Player" />
+
         <!-- noHistory and singleInstance as in the upstream dialog; the translucent theme keeps the player visible behind. -->
         <activity
             android:name="io.github.ivanosh.stmaterial.dialog.MaterialDialogActivity"

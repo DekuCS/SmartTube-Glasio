@@ -57,4 +57,12 @@
     <string translatable="false" name="material_section_notifications">Notifications</string>
     <string translatable="false" name="material_section_blocked">Blocked Channels</string>
     <string translatable="false" name="material_section_kids">Kids</string>
+    <string translatable="false" name="material_player_pause">Pause</string>
+    <string translatable="false" name="material_player_play">Play</string>
+    <string translatable="false" name="material_player_next">Next</string>
+    <string translatable="false" name="material_player_quality">Quality</string>
+    <string translatable="false" name="material_player_subtitles">Subtitles</string>
+    <string translatable="false" name="material_player_speed">Speed</string>
+    <string translatable="false" name="material_player_more">More</string>
+    <string translatable="false" name="material_player_marks">Marked by SponsorBlock</string>
 </resources>
