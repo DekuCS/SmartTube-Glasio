@@ -11,8 +11,11 @@ import io.github.ivanosh.stmaterial.logic.DEFAULT_BUTTONS
 import io.github.ivanosh.stmaterial.logic.PanelFocus
 import io.github.ivanosh.stmaterial.logic.PlayerButton
 
-/** A stretch of the progress bar, in fractions of the video. A chapter start is drawn as a gap. */
-data class ProgressMark(val start: Float, val end: Float, val isChapter: Boolean)
+/**
+ * A stretch of the progress bar, in fractions of the video. A chapter start is drawn as a gap.
+ * [argb] is the colour of a SponsorBlock category, 0 when unknown.
+ */
+data class ProgressMark(val start: Float, val end: Float, val isChapter: Boolean, val argb: Int = 0)
 
 /** What the overlay draws. Only [MaterialPlaybackActivity] writes it, and only while something is on screen. */
 class PlayerOverlayState {

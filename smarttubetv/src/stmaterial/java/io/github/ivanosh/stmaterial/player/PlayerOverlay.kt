@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -26,6 +28,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.layout
@@ -42,6 +47,9 @@ import io.github.ivanosh.stmaterial.logic.PanelFocus
 import io.github.ivanosh.stmaterial.logic.PlayerButton
 import io.github.ivanosh.stmaterial.logic.buttonIsOn
 import io.github.ivanosh.stmaterial.logic.formatPlayerTime
+import io.github.ivanosh.stmaterial.logic.handleCenter
+import io.github.ivanosh.stmaterial.logic.layoutTrack
+import io.github.ivanosh.stmaterial.logic.trackBufferSize
 import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.focusRing
 
@@ -100,35 +108,80 @@ private fun Header(state: PlayerOverlayState) {
     }
 }
 
+private val TrackThin = 12.dp
+private val TrackThick = 16.dp
+private val HandleWidth = 4.dp
+private val HandleWidthFocused = 6.dp
+private val HandleHeight = 32.dp
+private val HandleGap = 6.dp
+private val ChapterGap = 4.dp
+private val ChapterRadius = 2.dp
+private val MinMark = 6.dp
+private const val FOCUS_ANIMATION_MS = 120
+
+/**
+ * The Material 3 slider, in one Canvas: a track in pieces (chapter gaps, a clear gap each side of the handle),
+ * and a vertical bar for a handle. The position and the thickness are read while drawing, so the bar
+ * redraws without composing the panel, and nothing is allocated per frame: the pieces go into one buffer.
+ */
 @Composable
 private fun ProgressBar(state: PlayerOverlayState) {
-    Canvas(Modifier.fillMaxWidth().height(24.dp)) {
+    val focused = state.focus == PanelFocus.PROGRESS
+    val thick = animateFloatAsState(if (focused) 1f else 0f, tween(FOCUS_ANIMATION_MS), label = "barThickness")
+    val marks = state.marks
+    val starts = remember(marks) {
+        marks.filter { it.isChapter && it.start > 0f && it.start < 1f }.map { it.start }.distinct().sorted().toFloatArray()
+    }
+    val buffer = remember(starts) { FloatArray(trackBufferSize(starts.size)) }
+    val path = remember { Path() }
+    val radii = remember { FloatArray(8) }
+    Canvas(Modifier.fillMaxWidth().height(HandleHeight)) {
         // Read here, so that the position redraws the bar without composing the panel again.
         val progress = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
-        val top = 8.dp.toPx()
-        val height = 8.dp.toPx()
-        val radius = CornerRadius(4.dp.toPx())
-        drawRoundRect(Palette.ProgressTrack, Offset(0f, top), Size(size.width, height), radius)
-        drawRoundRect(Palette.Accent, Offset(0f, top), Size(size.width * progress, height), radius)
-        for (mark in state.marks) {
-            if (!mark.isChapter) {
-                val left = mark.start * size.width
-                drawRect(MarkColor, Offset(left, top), Size((mark.end * size.width - left).coerceAtLeast(6.dp.toPx()), height))
+        val t = thick.value
+        val trackHeight = (TrackThin + (TrackThick - TrackThin) * t).toPx()
+        val handleWidth = (HandleWidth + (HandleWidthFocused - HandleWidth) * t).toPx()
+        val top = (size.height - trackHeight) / 2
+        val full = trackHeight / 2
+        val small = ChapterRadius.toPx()
+        val count = layoutTrack(size.width, progress, starts, starts.size, ChapterGap.toPx(), handleWidth, HandleGap.toPx(), buffer)
+        val androidPath = path.asAndroidPath()
+        for (i in 0 until count) {
+            val at = i * 5
+            val left = buffer[at]
+            val right = buffer[at + 1]
+            val leftRadius = minOf(if (buffer[at + 3] != 0f) full else small, (right - left) / 2)
+            val rightRadius = minOf(if (buffer[at + 4] != 0f) full else small, (right - left) / 2)
+            radii[0] = leftRadius; radii[1] = leftRadius
+            radii[2] = rightRadius; radii[3] = rightRadius
+            radii[4] = rightRadius; radii[5] = rightRadius
+            radii[6] = leftRadius; radii[7] = leftRadius
+            path.rewind()
+            androidPath.addRoundRect(left, top, right, top + trackHeight, radii, android.graphics.Path.Direction.CW)
+            drawPath(path, if (buffer[at + 2] != 0f) Palette.Accent else Palette.ProgressTrack)
+            if (marks.isNotEmpty()) {
+                // Marks keep to the shape of the piece.
+                clipPath(path) {
+                    for (mark in marks) {
+                        if (mark.isChapter) continue
+                        val from = maxOf(left, mark.start * size.width)
+                        val to = minOf(right, maxOf(mark.end * size.width, mark.start * size.width + MinMark.toPx()))
+                        if (to > from) drawRect(markColor(mark), Offset(from, top), Size(to - from, trackHeight))
+                    }
+                }
             }
         }
-        for (mark in state.marks) {
-            if (mark.isChapter) {
-                drawRect(Palette.Background, Offset(mark.start * size.width, top), Size(6.dp.toPx(), height))
-            }
-        }
-        val center = Offset(size.width * progress, size.height / 2)
-        val thumb = 12.dp.toPx()
-        drawCircle(Color.White, thumb, center)
-        if (state.focus == PanelFocus.PROGRESS) {
-            drawCircle(Palette.FocusRing, thumb + 5.dp.toPx(), center, style = Stroke(4.dp.toPx()))
-        }
+        val center = handleCenter(size.width, progress, handleWidth)
+        drawRoundRect(
+            Color.White,
+            Offset(center - handleWidth / 2, (size.height - HandleHeight.toPx()) / 2),
+            Size(handleWidth, HandleHeight.toPx()),
+            CornerRadius(handleWidth / 2),
+        )
     }
 }
+
+private fun markColor(mark: ProgressMark): Color = if (mark.argb == 0) MarkColor else Color(mark.argb)
 
 @Composable
 private fun TimeRow(state: PlayerOverlayState) {
