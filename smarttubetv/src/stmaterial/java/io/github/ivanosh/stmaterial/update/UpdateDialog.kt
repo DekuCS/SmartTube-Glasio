@@ -7,7 +7,10 @@ import io.github.ivanosh.stmaterial.dialog.DialogPage
 import io.github.ivanosh.stmaterial.dialog.DialogRow
 import io.github.ivanosh.stmaterial.dialog.DialogState
 import io.github.ivanosh.stmaterial.dialog.TextRow
+import io.github.ivanosh.stmaterial.logic.Refusal
+import io.github.ivanosh.stmaterial.logic.UpdateEnd
 import io.github.ivanosh.stmaterial.logic.UpdateOffer
+import io.github.ivanosh.stmaterial.logic.workEnd
 import io.github.ivanosh.stmaterial.logic.checkDownloaded
 import io.github.ivanosh.stmaterial.logic.offerAllowed
 import java.util.concurrent.atomic.AtomicBoolean
@@ -54,7 +57,11 @@ class UpdateDialog(private val activity: Activity, private val state: DialogStat
     fun onBack(): Boolean {
         when (phase) {
             Phase.IDLE -> return false
-            Phase.DOWNLOADING -> cancelled.set(true) // the download loop sees it and reports on the page
+            Phase.DOWNLOADING -> {
+                // The worker sees the flag at its next step and always ends the phase, whichever step that is.
+                cancelled.set(true)
+                installer.abandon()
+            }
             Phase.INSTALLING -> {
                 cancelled.set(true)
                 installer.abandon()
@@ -81,38 +88,43 @@ class UpdateDialog(private val activity: Activity, private val state: DialogStat
         UpdateService.runInBackground {
             val file = UpdateClient.apkFile(app)
             var verified = false
+            var committed = false
+            var refusal: Refusal? = null
+            var downloadFailed = false
             try {
                 val client = UpdateClient(app)
                 val downloaded = client.download(offer, file, { p -> UpdateService.postMain { if (phase == Phase.DOWNLOADING) progress(p) } }, { cancelled.get() })
                 if (cancelled.get()) throw java.io.IOException("Cancelled")
-                val refusal = checkDownloaded(
+                refusal = checkDownloaded(
                     offer, downloaded.sha256, downloaded.size, client.archiveFacts(file),
                     app.packageName, UpdateService.installedVersionCode(app), client.pinnedCert(),
                 )
-                if (refusal != null) {
-                    UpdateService.postMain { phase = Phase.IDLE; refused(refusal.message) }
-                    return@runInBackground
-                }
-                verified = true
-                UpdateService.postMain { if (phase == Phase.DOWNLOADING && !cancelled.get()) { phase = Phase.INSTALLING; show(R.string.material_update_waiting, withClose = false) } }
-                // The copy into the system's session, off the main thread. install() deletes the file.
-                val ok = installer.install(file, offer.asset.sha256.orEmpty()) { cancelled.get() }
-                if (!ok) UpdateService.postMain {
-                    if (!cancelled.get()) {
-                        phase = Phase.IDLE
-                        refused(activity.getString(R.string.material_update_install_failed))
-                    }
+                if (refusal == null && !cancelled.get()) {
+                    verified = true
+                    UpdateService.postMain { if (phase == Phase.DOWNLOADING && !cancelled.get()) { phase = Phase.INSTALLING; show(R.string.material_update_waiting, withClose = false) } }
+                    // The copy into the system's session, off the main thread. install() deletes the file.
+                    committed = installer.install(file, offer.asset.sha256.orEmpty()) { cancelled.get() }
                 }
             } catch (e: java.io.IOException) {
-                UpdateService.postMain {
-                    phase = Phase.IDLE
-                    refused(activity.getString(if (cancelled.get()) R.string.material_update_cancelled else R.string.material_update_download_failed))
-                }
+                downloadFailed = true
             } catch (e: RuntimeException) {
-                UpdateService.postMain { phase = Phase.IDLE; refused(activity.getString(R.string.material_update_download_failed)) }
+                downloadFailed = true
             } finally {
                 // A verified file belongs to the install, which deletes it; any other file goes now.
                 if (!verified) file.delete()
+            }
+            // Every end but a commit is final, whatever was pressed meanwhile: the dialog is never left busy.
+            val end = workEnd(committed, cancelled.get(), refusal, downloadFailed)
+            UpdateService.postMain {
+                if (end != UpdateEnd.WAIT_FOR_SYSTEM) {
+                    phase = Phase.IDLE
+                    refused(when (end) {
+                        UpdateEnd.CANCELLED -> activity.getString(R.string.material_update_cancelled)
+                        UpdateEnd.REFUSED -> refusal?.message.orEmpty()
+                        UpdateEnd.DOWNLOAD_FAILED -> activity.getString(R.string.material_update_download_failed)
+                        else -> activity.getString(R.string.material_update_install_failed)
+                    })
+                }
             }
         }
     }

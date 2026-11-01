@@ -101,7 +101,10 @@ class UpdateInstaller(private val activity: Activity, private val onResult: (Out
                         @Suppress("DEPRECATION")
                         val confirm = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
                         else intent.getParcelableExtra(Intent.EXTRA_INTENT)
-                        if (confirm == null || !isSystemActivity(confirm)) onResult(Outcome.FAILED) else {
+                        if (confirm == null || !isSystemActivity(confirm)) {
+                            abandon()
+                            onResult(Outcome.FAILED)
+                        } else {
                             activity.startActivity(confirm)
                             onResult(Outcome.CONFIRMING)
                         }

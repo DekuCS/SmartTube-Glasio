@@ -32,9 +32,11 @@ object UpdateService {
     fun check(context: Context, channel: UpdateChannel, onResult: (CheckResult) -> Unit) {
         val app = context.applicationContext
         executor.execute {
-            val result = try {
+            // The channel is read again here: a request queued before Off was chosen makes no call.
+            val current = UpdateStore(app).channel
+            val result = if (current == UpdateChannel.OFF) CheckResult.UpToDate else try {
                 val releases = UpdateClient(app).fetchReleases()
-                val offer = pickUpdate(releases, channel, installedVersionName(app), UpdateClient.supportedAbis())
+                val offer = pickUpdate(releases, current, installedVersionName(app), UpdateClient.supportedAbis())
                 if (offer != null) CheckResult.Offer(offer) else CheckResult.UpToDate
             } catch (e: FeedHttpException) {
                 CheckResult.Failed(if (e.code == 403 || e.code == 429) Failure.RATE_LIMITED else Failure.NETWORK)

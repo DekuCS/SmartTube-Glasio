@@ -146,6 +146,18 @@ fun offerAllowed(offer: UpdateOffer, channel: UpdateChannel): Boolean = when (ch
     UpdateChannel.PRERELEASE -> true
 }
 
+/** How a run of the download worker ends. Only [WAIT_FOR_SYSTEM] leaves the dialog busy; every other end is final. */
+enum class UpdateEnd { WAIT_FOR_SYSTEM, CANCELLED, REFUSED, DOWNLOAD_FAILED, INSTALL_FAILED }
+
+/** The end of a worker run from what happened in it. A cancel that comes at any point still ends in a final state. */
+fun workEnd(committed: Boolean, cancelled: Boolean, refusal: Refusal?, downloadFailed: Boolean): UpdateEnd = when {
+    committed -> UpdateEnd.WAIT_FOR_SYSTEM
+    cancelled -> UpdateEnd.CANCELLED
+    refusal != null -> UpdateEnd.REFUSED
+    downloadFailed -> UpdateEnd.DOWNLOAD_FAILED
+    else -> UpdateEnd.INSTALL_FAILED
+}
+
 /** At most once a day. A clock set back counts as due, or the check would wait for the clock to catch up. */
 fun shouldCheck(channel: UpdateChannel, lastCheckMs: Long, nowMs: Long): Boolean = when {
     channel == UpdateChannel.OFF -> false

@@ -328,3 +328,25 @@ class FailClosedFlagsTest {
 
     @Test fun missingPrereleaseIsNotStable() = assertNull(stable(""""draft":false,"""))
 }
+
+class WorkEndTest {
+    @Test fun onlyACommitWaitsForTheSystem() {
+        for (cancelled in listOf(false, true)) for (refusal in listOf(null, Refusal.SIGNER)) for (failed in listOf(false, true)) {
+            assertTrue(workEnd(true, cancelled, refusal, failed) == UpdateEnd.WAIT_FOR_SYSTEM)
+            assertFalse("$cancelled $refusal $failed", workEnd(false, cancelled, refusal, failed) == UpdateEnd.WAIT_FOR_SYSTEM)
+        }
+    }
+
+    @Test fun cancelAtAnyPointIsCancelled() {
+        // Back during verification: the file passed (no refusal), nothing was committed, cancelled is set.
+        assertEquals(UpdateEnd.CANCELLED, workEnd(false, true, null, false))
+        assertEquals(UpdateEnd.CANCELLED, workEnd(false, true, Refusal.DIGEST, false))
+        assertEquals(UpdateEnd.CANCELLED, workEnd(false, true, null, true))
+    }
+
+    @Test fun otherEnds() {
+        assertEquals(UpdateEnd.REFUSED, workEnd(false, false, Refusal.SIGNER, false))
+        assertEquals(UpdateEnd.DOWNLOAD_FAILED, workEnd(false, false, null, true))
+        assertEquals(UpdateEnd.INSTALL_FAILED, workEnd(false, false, null, false))
+    }
+}
