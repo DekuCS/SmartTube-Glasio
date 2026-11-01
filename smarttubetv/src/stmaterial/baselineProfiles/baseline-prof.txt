@@ -1,0 +1,20 @@
+# Ahead-of-time compiled code for the Material UI, on top of the rules the Compose libraries ship.
+# R8 is off for this app, so these names match the APK. See docs/perf.md for what they are worth.
+#
+# Our own screens.
+HSPLio/github/ivanosh/stmaterial/**->**(**)**
+Lio/github/ivanosh/stmaterial/**;
+# All of Compose: the libraries' own rules cover only part of ui and runtime.
+HSPLandroidx/compose/**->**(**)**
+Landroidx/compose/**;
+HSPLandroidx/tv/material3/**->**(**)**
+Landroidx/tv/material3/**;
+HSPLandroidx/collection/**->**(**)**
+Landroidx/collection/**;
+# What Compose runs on, and the loader of the cards.
+HSPLkotlinx/coroutines/**->**(**)**
+Lkotlinx/coroutines/**;
+HSPLkotlin/**->**(**)**
+Lkotlin/**;
+HSPLcom/bumptech/glide/**->**(**)**
+Lcom/bumptech/glide/**;
