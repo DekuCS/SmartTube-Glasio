@@ -58,6 +58,15 @@ if (materialSigning == null && materialReleaseRequested) {
             'stmaterialRelease will be signed with the DEBUG key. Do not distribute this APK.')
 }
 
+// MATERIAL: this fork's patch number on top of the upstream version in defaultConfig.
+def materialVersionProps = new Properties()
+rootProject.file('material-version.properties').withInputStream { materialVersionProps.load(it) }
+def materialPatch = (materialVersionProps['materialPatch'] ?: '') as String
+if (!(materialPatch ==~ /[0-9]{1,2}/) || materialPatch.toInteger() < 1) {
+    throw new GradleException('material-version.properties needs materialPatch between 1 and 99.')
+}
+materialPatch = materialPatch.toInteger()
+
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
 if (keystorePropertiesFile.exists()) {
@@ -221,6 +230,8 @@ android {
         }
         stmaterial {
             applicationId "io.github.ivanosh.smarttubematerial"
+            versionCode android.defaultConfig.versionCode * 100 + materialPatch
+            versionName "${android.defaultConfig.versionName}-${materialPatch}"
             matchingFallbacks = ["stfdroid"]
             minSdkVersion 29
             targetSdkVersion 34
