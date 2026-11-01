@@ -13,3 +13,13 @@ fun outerIndex(rows: List<RowShape>, rowIndex: Int, cardIndex: Int, columns: Int
     val before = (0 until rowIndex).sumOf { itemCount(rows[it], columns) }
     return if (rows[rowIndex].isGrid) before + cardIndex / columns else before
 }
+
+/**
+ * How far the list moves to put the focused card at [target]. A request that is only [tolerance] away from an
+ * idle list is a card that scaled up or down under focus, or a move along the row, and must not move
+ * the column; one that comes while the list is moving is the end of an anchor already in progress.
+ */
+fun anchorDistance(offset: Float, target: Float, scrolling: Boolean, tolerance: Float): Float {
+    val distance = offset - target
+    return if (!scrolling && kotlin.math.abs(distance) <= tolerance) 0f else distance
+}

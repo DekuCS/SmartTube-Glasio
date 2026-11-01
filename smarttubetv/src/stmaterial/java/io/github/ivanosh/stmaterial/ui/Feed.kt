@@ -44,6 +44,7 @@ import io.github.ivanosh.stmaterial.browse.FocusKey
 import io.github.ivanosh.stmaterial.browse.VideoRow
 import io.github.ivanosh.stmaterial.browse.videoKey
 import io.github.ivanosh.stmaterial.logic.RowShape
+import io.github.ivanosh.stmaterial.logic.anchorDistance
 import io.github.ivanosh.stmaterial.logic.lineCount
 import io.github.ivanosh.stmaterial.logic.itemCount
 import io.github.ivanosh.stmaterial.logic.outerIndex
@@ -59,6 +60,8 @@ private val SidePadding = 58.dp
 private val CardGap = 32.dp
 /** The outline and the focus scale reach past a card; a row clips what is further than this. */
 private val CardBleed = 16.dp
+/** Room under the last row for the anchor to reach it whatever has loaded: a screen is at most this tall in dp. */
+private val ListBottomPadding = 1080.dp
 private const val GRID_COLUMNS = 4
 /** Next page when focus is this close to the end. */
 private const val MORE_MARGIN = 5
@@ -73,8 +76,10 @@ private val RowTitleStyle = TextStyle(color = Palette.OnBackground, fontSize = 3
 
 /** Keeps the focused card at a fixed height: the list moves a whole row per step. As in margantcovka/SmartTube-New (MIT). */
 @OptIn(ExperimentalFoundationApi::class)
-private class AnchoredSpec(private val target: Float) : BringIntoViewSpec {
-    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float = offset - target
+private class AnchoredSpec(private val target: Float, private val tolerance: Float, private val listState: LazyListState) : BringIntoViewSpec {
+    // The focus scale of 1.04 and a move along the row change the rect by a few pixels; the column stays.
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+        anchorDistance(offset, target, listState.isScrollInProgress, tolerance)
 }
 
 /** Moves a row only when the card would leave the screen, and then by as little as possible. */
@@ -99,7 +104,7 @@ private fun FeedColumn(
     content: LazyListScope.() -> Unit,
 ) {
     val density = LocalDensity.current
-    val spec = remember(density, cardTop) { AnchoredSpec(with(density) { cardTop.toPx() }) }
+    val spec = remember(density, cardTop, listState) { AnchoredSpec(with(density) { cardTop.toPx() }, with(density) { CardBleed.toPx() }, listState) }
     LaunchedEffect(listState) {
         snapshotFlow { state.focusOnTabs }.collect { if (it) listState.scrollToItem(0) }
     }
@@ -145,7 +150,7 @@ fun Feed(state: BrowseState, actions: FeedActions) {
         state,
         if (gridOnly) GridCardTop else RowCardTop,
         listState,
-        if (gridOnly) PaddingValues(bottom = 400.dp) else PaddingValues(top = ListTopPadding, bottom = 400.dp),
+        if (gridOnly) PaddingValues(bottom = ListBottomPadding) else PaddingValues(top = ListTopPadding, bottom = ListBottomPadding),
         spacing = if (gridOnly) 44.dp - CardBleed * 2 else 44.dp - CardBleed,
     ) {
         var first = 0
