@@ -284,6 +284,7 @@ dependencies {
     stmaterialImplementation 'androidx.tv:tv-material:1.1.0'
     stmaterialImplementation 'com.google.zxing:core:3.5.4' // MATERIAL: sign-in QR code, drawn on the device (Apache 2.0)
     testStmaterialImplementation 'junit:junit:4.13.2'
+    testStmaterialImplementation 'org.json:json:20240303' // MATERIAL: the update feed parser runs on the JVM in tests
 
     implementation 'androidx.leanback:leanback:' + leanbackXVersion
     implementation 'androidx.leanback:leanback-preference:' + leanbackXVersion
