@@ -13,6 +13,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.ViewManager
 import com.liskovsoft.smartyoutubetv2.common.app.views.WebBrowserView
 import com.liskovsoft.smartyoutubetv2.tv.ui.main.MainApplication
 import io.github.ivanosh.stmaterial.browse.MaterialBrowseActivity
+import io.github.ivanosh.stmaterial.dialog.MaterialDialogActivity
 
 class MaterialApplication : MainApplication() {
     /** The single place where the Material screens replace the upstream ones. */
@@ -24,10 +25,11 @@ class MaterialApplication : MainApplication() {
         val browse = MaterialBrowseActivity::class.java
         viewManager.setRoot(browse)
         viewManager.register(BrowseView::class.java, browse)
+        // Every AppDialogPresenter window, the ones over the player included.
+        viewManager.register(AppDialogView::class.java, MaterialDialogActivity::class.java, browse)
         // Back from the other screens has to land on the new home.
         listOf(
             PlaybackView::class.java,
-            AppDialogView::class.java,
             SearchView::class.java,
             SignInView::class.java,
             AddDeviceView::class.java,

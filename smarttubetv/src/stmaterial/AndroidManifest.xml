@@ -21,5 +21,15 @@
             android:name="io.github.ivanosh.stmaterial.browse.MaterialSectionsEditorActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
             android:screenOrientation="unspecified" />
+
+        <!-- noHistory and singleInstance as in the upstream dialog; the translucent theme keeps the player visible behind. -->
+        <activity
+            android:name="io.github.ivanosh.stmaterial.dialog.MaterialDialogActivity"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Material.Theme.Dialog" />
     </application>
 </manifest>

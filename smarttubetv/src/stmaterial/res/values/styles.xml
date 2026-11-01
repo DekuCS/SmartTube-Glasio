@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Translucent, undimmed and unanimated, so a dialog over the player adds nothing but its panel. -->
+    <style name="Material.Theme.Dialog" parent="App.Theme.Leanback.Preferences" />
+</resources>
