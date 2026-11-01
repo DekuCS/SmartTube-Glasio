@@ -247,9 +247,10 @@ class BrowseState(
 
     /** The saved card if it still exists, otherwise the first one. Null when there are no cards. */
     fun restoreFocus(saved: FocusKey? = focused): FocusKey? {
-        if (saved != null) {
-            val row = rows.firstOrNull { it.id == saved.rowId }
-            if (row != null && row.videos.any { videoKey(it) == saved.videoId }) return saved
+        for (candidate in listOf(saved, focused)) {
+            if (candidate == null) continue
+            val row = rows.firstOrNull { it.id == candidate.rowId }
+            if (row != null && row.videos.any { videoKey(it) == candidate.videoId }) return candidate
         }
         val first = rows.firstOrNull { it.videos.isNotEmpty() } ?: return null
         return FocusKey(first.id, videoKey(first.videos[0]))
@@ -269,6 +270,15 @@ class BrowseState(
         selected != Sections.SEARCH_SECTION_ID && (section == null || section.id == selected)
 
     private fun removeFromRows(predicate: (Video) -> Boolean) {
+        // Focus moves to the neighbour of the focused card before it goes: nothing then falls to the first card.
+        focused?.let { current ->
+            val gone = rows.flatMapTo(HashSet()) { row -> row.videos.filter(predicate).map(::videoKey) }
+            val to = focusAfterRemoval(rows.map { row -> CardRow(row.id, row.videos.map(::videoKey)) }, current, gone)
+            if (to != null) {
+                focused = to
+                pendingFocus = to
+            }
+        }
         subscriptions.forget(predicate)
         rows.forEach { it.removeWhere(predicate) }
         rows.removeAll { it.videos.isEmpty() }
