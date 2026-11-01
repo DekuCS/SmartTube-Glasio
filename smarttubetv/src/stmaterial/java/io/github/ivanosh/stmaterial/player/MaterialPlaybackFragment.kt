@@ -1,5 +1,12 @@
 package io.github.ivanosh.stmaterial.player
 
+import android.os.Bundle
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ProgressBar
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackFragment
@@ -28,6 +35,25 @@ class MaterialPlaybackFragment : PlaybackFragment() {
             rememberTitle(video)
             return message?.ifBlank { null } ?: lastTitle.orEmpty()
         }
+
+    /**
+     * The old round progress bar is taken out and [LoadingSpinnerView] takes its place in Leanback's manager.
+     * Every route that showed it goes on through the manager: the presenter's loading (`showProgressBar`) and the
+     * engine's buffering callback. So the conditions are the same, and so is the delay of the manager: it shows the
+     * view 1000 ms after the first request, a rebuffer shorter than that never shows, and it hides at once.
+     */
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+        val root = super.onCreateView(inflater, container, savedInstanceState)
+        if (root is ViewGroup) {
+            val old = root.getChildAt(root.childCount - 1)
+            if (old is ProgressBar) root.removeView(old)
+            val spinner = LoadingSpinnerView(root.context)
+            val side = (SpinnerPlateSize.value * root.resources.displayMetrics.density).toInt()
+            root.addView(spinner, FrameLayout.LayoutParams(side, side, Gravity.CENTER))
+            progressBarManager.setProgressBarView(spinner)
+        }
+        return root
+    }
 
     /** Every way Leanback has of showing the controls ends here: tickle, seek mode, the glue host. */
     override fun showControlsOverlay(runAnimation: Boolean) = Unit
