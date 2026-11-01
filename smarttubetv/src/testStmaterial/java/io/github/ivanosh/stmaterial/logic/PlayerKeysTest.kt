@@ -231,6 +231,26 @@ class PlayerKeysTest {
         assertFalse(shouldAutoHide(ui(PanelFocus.HIDDEN), playing = true, idleMs = 60_000))
     }
 
+    // The presenter opens the panel by itself
+
+    @Test
+    fun aPresenterOpenTakesTheButtonsWhenNoSeekIsGoingOn() {
+        assertEquals(PanelFocus.BUTTONS, presenterOpenFocus(lastSeekKeyMs = null, nowMs = 10_000))
+        assertEquals(PanelFocus.BUTTONS, presenterOpenFocus(lastSeekKeyMs = 1_000, nowMs = 1_000 + SEEK_KEEPS_FOCUS_MS))
+    }
+
+    @Test
+    fun aPresenterOpenRightAfterASeekKeyKeepsTheKeySeeking() {
+        assertEquals(PanelFocus.PROGRESS, presenterOpenFocus(lastSeekKeyMs = 1_000, nowMs = 1_000))
+        assertEquals(PanelFocus.PROGRESS, presenterOpenFocus(lastSeekKeyMs = 1_000, nowMs = 1_000 + SEEK_KEEPS_FOCUS_MS - 1))
+    }
+
+    @Test
+    fun theRestOfAHoldAfterAPresenterOpenStillSeeks() {
+        val opened = ui(PanelFocus.HIDDEN).copy(focus = presenterOpenFocus(lastSeekKeyMs = 1_000, nowMs = 1_100))
+        assertEquals(listOf<PlayerCommand>(PlayerCommand.Seek(step)), press(opened, PlayerKey.Right).second)
+    }
+
     // Time labels
 
     @Test

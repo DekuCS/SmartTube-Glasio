@@ -13,10 +13,20 @@ class MaterialPlaybackFragment : PlaybackFragment() {
     private val host get() = activity as? MaterialPlaybackActivity
     private var controlsShownAnswer = false
     private var videoId: String? = null
+    private var lastTitle: String? = null
 
     /** The text the presenter puts in place of the title, such as why a video is unplayable. */
-    var message: String? = null
-        private set
+    private var message: String? = null
+
+    /**
+     * What the panel shows as the title. Every load of the video clears its metadata title
+     * (`Video.sync(formatInfo)`), and a video opened by a link has no other title until the metadata is back.
+     */
+    val panelTitle: String
+        get() {
+            rememberTitle(video)
+            return message?.ifBlank { null } ?: lastTitle.orEmpty()
+        }
 
     /** Every way Leanback has of showing the controls ends here: tickle, seek mode, the glue host. */
     override fun showControlsOverlay(runAnimation: Boolean) = Unit
@@ -59,9 +69,18 @@ class MaterialPlaybackFragment : PlaybackFragment() {
         // The presenter also calls this with the same video, to clear a message.
         if (video?.videoId != videoId) {
             videoId = video?.videoId
+            lastTitle = null
             host?.onVideoChanged()
         }
+        rememberTitle(video)
     }
+
+    private fun rememberTitle(video: Video?) {
+        video?.titleFull?.ifBlank { null }?.let { lastTitle = it }
+    }
+
+    /** Nothing draws the storyboard, and it costs work per load. */
+    override fun loadStoryboard() = Unit
 
     /** Moves the engine and tells the presenter as the upstream seek bar does, which also brings the chapter title. */
     fun seekTo(positionMs: Long) {

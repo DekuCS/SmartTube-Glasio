@@ -21,6 +21,6 @@ class PlayerOverlayState {
     var chapter by mutableStateOf<String?>(null)
     var positionMs by mutableLongStateOf(0)
     var durationMs by mutableLongStateOf(0)
-    var playing by mutableStateOf(false)
+    var playing by mutableStateOf(true)
     var marks by mutableStateOf(emptyList<ProgressMark>())
 }

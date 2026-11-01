@@ -126,3 +126,16 @@ class DialogState {
         levels = levels.dropLast(1) + Level(changed, top.returnFocus)
     }
 }
+
+/**
+ * The player opens a dialog on the down of OK, so a held OK goes on in the new window: its repeats and its
+ * up would activate the focused row. Confirm keys count only from a press that starts in this window.
+ */
+class ConfirmKeyGuard {
+    private var pressStartedHere = false
+
+    fun shouldDrop(isDown: Boolean, repeatCount: Int): Boolean {
+        if (isDown && repeatCount == 0) pressStartedHere = true
+        return !pressStartedHere
+    }
+}

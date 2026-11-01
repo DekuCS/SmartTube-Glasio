@@ -22,6 +22,7 @@ import io.github.ivanosh.stmaterial.logic.PlayerUi
 import io.github.ivanosh.stmaterial.logic.SEEK_DEBOUNCE_MS
 import io.github.ivanosh.stmaterial.logic.SeekDebounce
 import io.github.ivanosh.stmaterial.logic.playerKey
+import io.github.ivanosh.stmaterial.logic.presenterOpenFocus
 import io.github.ivanosh.stmaterial.logic.shouldAutoHide
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
 
@@ -44,6 +45,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private var seekPreviewUntilMs = 0L
     private var backPassedOn = false
     private var ticking = false
+    private var started = false
+    private var lastSeekKeyMs: Long? = null
 
     val isPanelOpen get() = ui.focus != PanelFocus.HIDDEN
 
@@ -85,10 +88,18 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         )
     }
 
+    override fun onStart() {
+        // Before the fragment starts: that is when the presenter may ask for the panel.
+        started = true
+        super.onStart()
+    }
+
     override fun onStop() {
+        started = false
         // Before the fragment releases the engine.
         sendSeekNow()
-        setUi(ui.copy(focus = PanelFocus.HIDDEN))
+        // Only the state: the presenter would take this for a user closing the controls, with a chapter message to follow.
+        writeUi(ui.copy(focus = PanelFocus.HIDDEN))
         panel.seekPreview = false
         handler.removeCallbacks(tick)
         ticking = false
@@ -150,16 +161,16 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     // Calls from MaterialPlaybackFragment, which answers for the presenter.
 
     fun showPanel(show: Boolean) {
-        if (show && isInPipMode) return
-        when {
-            !show -> setUi(ui.copy(focus = PanelFocus.HIDDEN))
-            !isPanelOpen -> setUi(ui.copy(focus = PanelFocus.BUTTONS, buttonIndex = 0))
+        if (!show) {
+            setUi(ui.copy(focus = PanelFocus.HIDDEN))
+            return
         }
-        if (show) {
-            lastKeyMs = SystemClock.uptimeMillis()
-            refresh()
-            startTicking()
-        }
+        if (!started || isInPipMode) return
+        val now = SystemClock.uptimeMillis()
+        if (!isPanelOpen) setUi(ui.copy(focus = presenterOpenFocus(lastSeekKeyMs, now), buttonIndex = 0))
+        lastKeyMs = now
+        refresh()
+        startTicking()
     }
 
     /** As on the upstream bar, chapters and SponsorBlock add up, and null clears them. */
@@ -176,11 +187,15 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         seek = SeekDebounce()
     }
 
-    private fun setUi(next: PlayerUi) {
-        val wasOpen = isPanelOpen
+    private fun writeUi(next: PlayerUi) {
         ui = next
         panel.focus = next.focus
         panel.buttonIndex = next.buttonIndex
+    }
+
+    private fun setUi(next: PlayerUi) {
+        val wasOpen = isPanelOpen
+        writeUi(next)
         when {
             wasOpen == isPanelOpen -> Unit
             // Upstream shows the chapter title when the controls open, as long as they count as shown.
@@ -192,6 +207,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private fun seekBy(deltaMs: Long) {
         val view = player ?: return
         val now = SystemClock.uptimeMillis()
+        lastSeekKeyMs = now
         seek = seek.onKey(view.positionMs, deltaMs, view.durationMs, now)
         handler.removeCallbacks(applySeek)
         handler.postDelayed(applySeek, SEEK_DEBOUNCE_MS)
@@ -211,9 +227,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private fun refresh() {
         if (!isPanelOpen && !panel.seekPreview) return
         val view = player ?: return
-        val video = view.video
-        panel.title = view.message ?: video?.titleFull.orEmpty()
-        panel.author = video?.author.orEmpty()
+        panel.title = view.panelTitle
+        panel.author = view.video?.author.orEmpty()
         panel.positionMs = seek.targetMs ?: view.positionMs
         panel.durationMs = view.durationMs
         panel.playing = view.playWhenReady

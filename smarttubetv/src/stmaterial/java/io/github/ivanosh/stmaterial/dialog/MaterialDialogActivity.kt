@@ -30,6 +30,7 @@ import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
  */
 class MaterialDialogActivity : MotherActivity(), AppDialogView {
     private val state = DialogState()
+    private val confirmKeyGuard = ConfirmKeyGuard()
     private lateinit var presenter: AppDialogPresenter
     private lateinit var keyTranslator: GlobalKeyTranslator
     private var paused = false
@@ -70,6 +71,11 @@ class MaterialDialogActivity : MotherActivity(), AppDialogView {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // null: the translator has run the key's own action
         val translated = keyTranslator.translate(event) ?: return true
+        if (KeyHelpers.isConfirmKey(translated.keyCode) &&
+            confirmKeyGuard.shouldDrop(translated.action == KeyEvent.ACTION_DOWN, translated.repeatCount)
+        ) {
+            return true
+        }
         return handleNavigation(translated) || super.dispatchKeyEvent(translated)
     }
 

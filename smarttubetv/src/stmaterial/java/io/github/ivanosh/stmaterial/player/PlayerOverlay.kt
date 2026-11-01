@@ -26,7 +26,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -46,26 +48,42 @@ private val subtitleStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp, colo
 private val timeStyle = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, color = Palette.OnBackgroundVariant)
 private val buttonLabelStyle = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, color = Palette.OnBackground)
 
-/** Draws only: the view holds no focus, and [MaterialPlaybackActivity] handles every key. */
+/**
+ * Draws only: the view holds no focus, and [MaterialPlaybackActivity] handles every key.
+ * Stays composed while hidden, so that opening the panel, the most-used action here, changes the
+ * layer and the layout and builds nothing. Nothing writes the state while it is hidden, so it costs no frames.
+ */
 @Composable
 fun PlayerOverlay(state: PlayerOverlayState) {
-    val open = state.focus != PanelFocus.HIDDEN
-    if (!open && !state.seekPreview) return
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = if (state.focus != PanelFocus.HIDDEN || state.seekPreview) 1f else 0f },
+        contentAlignment = Alignment.BottomStart
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .background(Palette.Background)
-                .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
         ) {
-            if (open) Header(state)
+            Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ProgressBar(state)
                 TimeRow(state)
             }
-            if (open) Buttons(state)
+            Box(Modifier.onlyWhenOpen(state).padding(top = 24.dp)) { Buttons(state) }
         }
+    }
+}
+
+/** Takes no room in the seek preview, which shows the progress bar alone. Read in layout, so no composition follows. */
+private fun Modifier.onlyWhenOpen(state: PlayerOverlayState): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    if (state.focus != PanelFocus.HIDDEN) {
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    } else {
+        layout(0, 0) {}
     }
 }
 

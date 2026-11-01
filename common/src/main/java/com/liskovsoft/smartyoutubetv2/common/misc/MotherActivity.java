@@ -143,12 +143,12 @@ public class MotherActivity extends FragmentActivity {
             }
         }
 
-        // MATERIAL: after the key translator and the screensaver, before the view hierarchy
-        if (interceptKeyEvent(event)) {
-            return true;
-        }
-
         try {
+            // MATERIAL: after the key translator and the screensaver, before the view hierarchy
+            if (interceptKeyEvent(event)) {
+                return true;
+            }
+
             return super.dispatchKeyEvent(event);
         } catch (NullPointerException | IllegalArgumentException | IllegalStateException | SecurityException | UnavailableException e) {
             // NullPointerException: 'android.view.Window androidx.core.app.ComponentActivity.getWindow()' on a null object reference

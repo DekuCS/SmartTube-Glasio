@@ -69,6 +69,15 @@ data class SeekDebounce(val targetMs: Long? = null, val lastKeyMs: Long = 0) {
 fun shouldAutoHide(ui: PlayerUi, playing: Boolean, idleMs: Long): Boolean =
     ui.focus != PanelFocus.HIDDEN && playing && idleMs >= PANEL_AUTO_HIDE_MS
 
+const val SEEK_KEEPS_FOCUS_MS = 2_000L
+
+/**
+ * Where the panel opens when the presenter asks for it, such as after an engine reload of a paused video.
+ * A seek key held or just pressed has to go on seeking, so such an open must not put focus on the buttons.
+ */
+fun presenterOpenFocus(lastSeekKeyMs: Long?, nowMs: Long): PanelFocus =
+    if (lastSeekKeyMs != null && nowMs - lastSeekKeyMs < SEEK_KEEPS_FOCUS_MS) PanelFocus.PROGRESS else PanelFocus.BUTTONS
+
 fun formatPlayerTime(ms: Long): String {
     val seconds = ms.coerceAtLeast(0) / 1_000
     val hours = seconds / 3_600
