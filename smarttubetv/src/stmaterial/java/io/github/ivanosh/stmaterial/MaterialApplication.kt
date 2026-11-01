@@ -46,7 +46,22 @@ class MaterialApplication : MainApplication() {
         viewManager.register(SignInView::class.java, MaterialSignInActivity::class.java)
         // MATERIAL: links are never sent to the QR service of api.qrserver.com
         Utils.disableQrService()
+        // MATERIAL: no home screen channels. The receiver is removed from the manifest too; this stops a worker that an older build left.
+        Utils.disableChannelsService()
+        cancelLeftoverChannelsWork()
         // After the list: the parent lookup goes by isInstance, so PlaybackActivity needs the new home too.
         viewManager.register(PlaybackView::class.java, MaterialPlaybackActivity::class.java, browse)
+    }
+
+    /** Once: a periodic worker that a build before this one enqueued survives an update. */
+    private fun cancelLeftoverChannelsWork() {
+        val prefs = getSharedPreferences("material_app", MODE_PRIVATE)
+        if (prefs.getBoolean(CHANNELS_WORK_CANCELLED, false)) return
+        Utils.cancelChannelsWork(this)
+        prefs.edit().putBoolean(CHANNELS_WORK_CANCELLED, true).apply()
+    }
+
+    private companion object {
+        const val CHANNELS_WORK_CANCELLED = "channels_work_cancelled"
     }
 }

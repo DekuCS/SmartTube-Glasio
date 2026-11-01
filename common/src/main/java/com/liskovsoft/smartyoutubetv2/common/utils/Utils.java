@@ -135,6 +135,7 @@ public class Utils {
     private static final String TASK_ID = RemoteControlWorker.class.getSimpleName();
     private static final String TAG = Utils.class.getSimpleName();
     private static final String QR_CODE_URL_TEMPLATE = "https://api.qrserver.com/v1/create-qr-code/?data=%s";
+    private static boolean sChannelsServiceDisabled; // MATERIAL: no home screen channels, so no worker
     private static boolean sQrServiceDisabled; // MATERIAL: the Material UI never sends a link to the QR service
     private static final int GLOBAL_VOLUME_TYPE = AudioManager.STREAM_MUSIC;
     private static final String GLOBAL_VOLUME_SERVICE = Context.AUDIO_SERVICE;
@@ -507,6 +508,16 @@ public class Utils {
                 );
             }
         }
+    }
+
+    // MATERIAL: the unique name of UpdateChannelsWorker
+    public static void cancelChannelsWork(Context context) {
+        SafeWorkManager.getInstance(context).cancelUniqueWork("Update channels");
+    }
+
+    // MATERIAL: set once at start
+    public static void disableChannelsService() {
+        sChannelsServiceDisabled = true;
     }
 
     // MATERIAL: set once at start
@@ -948,6 +959,10 @@ public class Utils {
     }
 
     public static void updateChannels(Context context) {
+        if (sChannelsServiceDisabled) { // MATERIAL:
+            return;
+        }
+
         startReceiver(context, UPDATE_CHANNELS_RECEIVER_CLASS_NAME);
     }
 

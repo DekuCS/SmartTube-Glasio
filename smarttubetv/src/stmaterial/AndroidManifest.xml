@@ -14,6 +14,15 @@
         <activity android:name="com.liskovsoft.smartyoutubetv2.common.misc.BackupReceiverActivity"
             tools:node="remove" />
 
+        <!-- MATERIAL: no home screen channels, no search provider: nothing exported from leanbackassistant. -->
+        <receiver android:name="com.liskovsoft.leanbackassistant.channels.UpdateChannelsReceiver"
+            tools:node="remove" />
+        <provider android:name="com.liskovsoft.leanbackassistant.search.VideoContentProvider"
+            android:authorities="org.smarttube"
+            tools:node="remove" />
+        <activity android:name="com.liskovsoft.leanbackassistant.search.SearchableActivity"
+            tools:node="remove" />
+
         <activity
             android:name="io.github.ivanosh.stmaterial.browse.MaterialBrowseActivity"
             android:launchMode="singleInstance"
