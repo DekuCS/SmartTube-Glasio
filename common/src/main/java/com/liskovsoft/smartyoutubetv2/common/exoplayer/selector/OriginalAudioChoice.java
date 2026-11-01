@@ -33,7 +33,7 @@ public final class OriginalAudioChoice {
         }
 
         if (labels.size() <= 1) {
-            return labels.isEmpty() ? null : labels.iterator().next();
+            return null; // nothing to choose between. Filtering would only drop the tracks without a label
         }
 
         if (manualChoice != null && !manualChoice.isEmpty()) {
@@ -51,7 +51,7 @@ public final class OriginalAudioChoice {
         }
 
         // No marked original: a track without any marker, then a human dub, never an auto dub
-        for (Kind kind : new Kind[] {Kind.PLAIN, Kind.DUBBED, Kind.SECONDARY, Kind.DESCRIPTIVE}) {
+        for (Kind kind : new Kind[] {Kind.PLAIN, Kind.DUBBED, Kind.SECONDARY, Kind.DESCRIPTIVE, Kind.UNKNOWN}) {
             String label = firstWithKind(labels, kind);
 
             if (label != null) {
@@ -68,9 +68,18 @@ public final class OriginalAudioChoice {
     @Nullable
     private static String bestMatch(Set<String> labels, String languageCode) {
         String result = null;
+        String legacyFixed = fixLangCode(languageCode);
 
         for (String label : labels) {
-            if (!label.toLowerCase(Locale.ROOT).startsWith(languageCode)) {
+            if (label.toLowerCase(Locale.ROOT).equals(languageCode)) { // the exact label of a track picked from the list
+                return label;
+            }
+        }
+
+        for (String label : labels) {
+            String lower = label.toLowerCase(Locale.ROOT);
+
+            if (!lower.startsWith(languageCode) && !lower.startsWith(legacyFixed)) {
                 continue;
             }
 
@@ -97,7 +106,21 @@ public final class OriginalAudioChoice {
         return null;
     }
 
-    private enum Kind { ORIGINAL, PLAIN, DUBBED, SECONDARY, DESCRIPTIVE, AUTO_DUBBED }
+    /** Locale.getLanguage() still returns the legacy codes */
+    private static String fixLangCode(String code) {
+        switch (code) {
+            case "in":
+                return "id";
+            case "iw":
+                return "he";
+            case "ji":
+                return "yi";
+            default:
+                return code;
+        }
+    }
+
+    private enum Kind { ORIGINAL, PLAIN, DUBBED, SECONDARY, DESCRIPTIVE, UNKNOWN, AUTO_DUBBED }
 
     private static Kind kindOf(String label) {
         String lower = label.toLowerCase(Locale.ROOT);
@@ -114,6 +137,6 @@ public final class OriginalAudioChoice {
             return Kind.DESCRIPTIVE;
         }
 
-        return Kind.PLAIN;
+        return lower.contains("(") ? Kind.UNKNOWN : Kind.PLAIN; // an acont this code does not know
     }
 }

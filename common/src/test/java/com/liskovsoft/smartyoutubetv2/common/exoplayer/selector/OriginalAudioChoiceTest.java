@@ -74,9 +74,30 @@ public class OriginalAudioChoiceTest {
     }
 
     @Test
-    public void singleTrackIsKept() {
-        assertEquals("ru (original)", OriginalAudioChoice.choose(Collections.singletonList("ru (original)"), null));
-        assertEquals("ru (original)", OriginalAudioChoice.choose(Collections.singletonList("ru (original)"), "en"));
+    public void singleLabelGivesNoOpinionSoNoTrackIsDropped() {
+        assertNull(OriginalAudioChoice.choose(Collections.singletonList("ru (original)"), null));
+        assertNull(OriginalAudioChoice.choose(Collections.singletonList("ru (original)"), "en"));
+        // one auto-dub plus tracks without a label: filtering would drop the unlabelled tracks
+        assertNull(OriginalAudioChoice.choose(Arrays.asList("en (dubbed-auto)", null, null), null));
+    }
+
+    @Test
+    public void unknownMarkerRanksBelowPlainAndHumanDub() {
+        assertEquals("ru", OriginalAudioChoice.choose(Arrays.asList("de (weird)", "ru", "en (dubbed-auto)"), null));
+        assertEquals("fr (dubbed)", OriginalAudioChoice.choose(Arrays.asList("de (weird)", "fr (dubbed)"), null));
+    }
+
+    @Test
+    public void legacyLocaleCodesMatch() {
+        List<String> tracks = Arrays.asList("ru (original)", "id (dubbed)", "he (dubbed)");
+        assertEquals("id (dubbed)", OriginalAudioChoice.choose(tracks, "in"));
+        assertEquals("he (dubbed)", OriginalAudioChoice.choose(tracks, "iw"));
+    }
+
+    @Test
+    public void exactLabelOfAPickedTrackIsKept() {
+        List<String> tracks = Arrays.asList("ru (original)", "en\u2010us (dubbed)", "en\u2010us (dubbed-auto)");
+        assertEquals("en\u2010us (dubbed-auto)", OriginalAudioChoice.choose(tracks, "en\u2010us (dubbed-auto)"));
     }
 
     @Test

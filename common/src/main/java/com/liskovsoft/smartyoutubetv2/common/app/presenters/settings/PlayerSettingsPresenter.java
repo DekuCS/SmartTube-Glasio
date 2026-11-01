@@ -65,7 +65,9 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         appendVideoBufferCategory(settingsPresenter);
         appendVideoZoomCategory(settingsPresenter);
         appendVideoSpeedCategory(settingsPresenter);
-        appendAudioLanguageCategory(settingsPresenter);
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: the language is picked per video in the player, nothing is saved here
+            appendAudioLanguageCategory(settingsPresenter);
+        }
         appendAudioDelayCategory(settingsPresenter);
         appendMasterVolumeCategory(settingsPresenter);
         if (!mSidebarService.isMaterialUi()) { // MATERIAL: the Material player has a fixed key table, panel and seek preview

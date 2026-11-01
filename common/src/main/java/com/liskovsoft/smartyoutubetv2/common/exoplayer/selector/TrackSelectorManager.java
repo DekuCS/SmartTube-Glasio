@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -734,7 +733,7 @@ public class TrackSelectorManager implements TrackSelectorCallback {
     }
 
     // MATERIAL:
-    static MediaTrack[][] filterToOriginalAudio(MediaTrack[][] trackGroupList, String manualLanguage) {
+    public static MediaTrack[][] filterToOriginalAudio(MediaTrack[][] trackGroupList, String manualLanguage) {
         List<String> languages = new ArrayList<>();
 
         for (MediaTrack[] trackGroup : trackGroupList) {
@@ -750,8 +749,6 @@ public class TrackSelectorManager implements TrackSelectorCallback {
         }
 
         String chosen = OriginalAudioChoice.choose(languages, manualLanguage);
-
-        Log.d(TAG, "Audio languages: %s, manual: %s, chosen: %s", new LinkedHashSet<>(languages), manualLanguage, chosen);
 
         if (chosen == null) {
             return trackGroupList;
