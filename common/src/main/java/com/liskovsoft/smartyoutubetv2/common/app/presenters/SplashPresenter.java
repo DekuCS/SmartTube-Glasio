@@ -336,7 +336,14 @@ public class SplashPresenter extends BasePresenter<SplashView> {
         // No passwd or the app already started
         if (password == null || getViewManager().getTopView() != null) {
             onSuccess.run();
-            getView().finishView(); // critical part, fix black screen on app exit
+            // MATERIAL: finishing the singleInstance Splash task before the first screen has a window hands focus
+            // to the launcher for a moment, and a launcher that reacts to it can stay in front. Finish once the screen is up.
+            SplashView view = getView();
+            if (getViewManager().isNewViewPending()) {
+                Utils.postDelayed(view::finishView, 600);
+            } else {
+                view.finishView(); // critical part, fix black screen on app exit
+            }
         } else {
             SimpleEditDialog.showPassword(
                     getContext(),

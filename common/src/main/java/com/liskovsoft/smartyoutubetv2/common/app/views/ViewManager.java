@@ -142,10 +142,13 @@ public class ViewManager {
             if (parentActivity == null || isPlayerOnlyModeEnabled()) {
                 Log.d(TAG, "Parent activity name doesn't stored in registry. Exiting to Home...");
 
-                mIsMoveToBackEnabled = true;
-
+                // MATERIAL: the flag stayed set after moveTaskToBack, so the next addTop moved the task back again
+                // and reopening the app from Recents landed on the launcher. The player-only mode ends with the player.
                 if (isPlayerOnlyModeEnabled()) {
                     safeMoveTaskToBack(activity);
+                    mIsPlayerOnlyModeEnabled = false;
+                } else {
+                    mIsMoveToBackEnabled = true;
                 }
             } else {
                 try {
