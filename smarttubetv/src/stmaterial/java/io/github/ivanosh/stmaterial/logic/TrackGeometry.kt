@@ -19,6 +19,17 @@ fun pieceAt(buffer: FloatArray, index: Int): TrackPiece {
     return TrackPiece(buffer[i], buffer[i + 1], buffer[i + 2] != 0f, buffer[i + 3] != 0f, buffer[i + 4] != 0f)
 }
 
+/** Writes a piece at [index] and returns the next index: a plain function, so no closure is allocated per call. */
+private fun putPiece(out: FloatArray, index: Int, left: Float, right: Float, active: Boolean, leftFull: Boolean, rightFull: Boolean): Int {
+    val i = index * STRIDE
+    out[i] = left
+    out[i + 1] = right
+    out[i + 2] = if (active) 1f else 0f
+    out[i + 3] = if (leftFull) 1f else 0f
+    out[i + 4] = if (rightFull) 1f else 0f
+    return index + 1
+}
+
 /**
  * Cuts the track of [width] into pieces: the chapter starts ([chapterStarts], ascending fractions strictly
  * between 0 and 1) leave gaps of [gap], and the handle of [handleWidth] leaves [handleGap] clear on each side.
@@ -41,16 +52,6 @@ fun layoutTrack(
     val inactiveStart = center + half + handleGap
     var count = 0
 
-    fun add(left: Float, right: Float, active: Boolean, leftFull: Boolean, rightFull: Boolean) {
-        val i = count * STRIDE
-        out[i] = left
-        out[i + 1] = right
-        out[i + 2] = if (active) 1f else 0f
-        out[i + 3] = if (leftFull) 1f else 0f
-        out[i + 4] = if (rightFull) 1f else 0f
-        count++
-    }
-
     var segmentStart = 0f
     var startFull = true
     for (k in 0..chapters) {
@@ -60,9 +61,9 @@ fun layoutTrack(
         val endFull = last
         if (end > segmentStart) {
             val activeRight = min(end, activeEnd)
-            if (activeRight > segmentStart) add(segmentStart, activeRight, true, startFull, if (activeRight < end) true else endFull)
+            if (activeRight > segmentStart) count = putPiece(out, count, segmentStart, activeRight, true, startFull, if (activeRight < end) true else endFull)
             val inactiveLeft = max(segmentStart, inactiveStart)
-            if (end > inactiveLeft) add(inactiveLeft, end, false, if (inactiveLeft > segmentStart) true else startFull, endFull)
+            if (end > inactiveLeft) count = putPiece(out, count, inactiveLeft, end, false, if (inactiveLeft > segmentStart) true else startFull, endFull)
         }
         segmentStart = max(segmentStart, boundary + gap / 2)
         startFull = false

@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,8 +61,6 @@ private val SidePadding = 58.dp
 private val CardGap = 32.dp
 /** The outline and the focus scale reach past a card; a row clips what is further than this. */
 private val CardBleed = 16.dp
-/** Room under the last row for the anchor to reach it whatever has loaded: a screen is at most this tall in dp. */
-private val ListBottomPadding = 1080.dp
 private const val GRID_COLUMNS = 4
 /** Next page when focus is this close to the end. */
 private const val MORE_MARGIN = 5
@@ -145,12 +144,14 @@ fun Feed(state: BrowseState, actions: FeedActions) {
     }
 
     val density = LocalDensity.current
+    // Room under the last row for the anchor to reach it whatever has loaded: one viewport.
+    val bottomPadding = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
     val rowSpec = remember(density) { MarginSpec(with(density) { SidePadding.toPx() }) }
     FeedColumn(
         state,
         if (gridOnly) GridCardTop else RowCardTop,
         listState,
-        if (gridOnly) PaddingValues(bottom = ListBottomPadding) else PaddingValues(top = ListTopPadding, bottom = ListBottomPadding),
+        if (gridOnly) PaddingValues(bottom = bottomPadding) else PaddingValues(top = ListTopPadding, bottom = bottomPadding),
         spacing = if (gridOnly) 44.dp - CardBleed * 2 else 44.dp - CardBleed,
     ) {
         var first = 0

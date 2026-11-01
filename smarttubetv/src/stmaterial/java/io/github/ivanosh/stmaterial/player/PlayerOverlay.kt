@@ -124,7 +124,7 @@ private const val FOCUS_ANIMATION_MS = 120
 /**
  * The Material 3 slider, in one Canvas: a track in pieces (chapter gaps, a clear gap each side of the handle),
  * and a vertical bar for a handle. The position and the thickness are read while drawing, so the bar
- * redraws without composing the panel, and nothing is allocated per frame: the pieces go into one buffer.
+ * redraws without composing the panel, and drawing walks pre-sized arrays by index (no closure, no iterator); only what Canvas itself allocates remains.
  */
 @Composable
 private fun ProgressBar(state: PlayerOverlayState) {
@@ -135,6 +135,10 @@ private fun ProgressBar(state: PlayerOverlayState) {
         marks.filter { it.isChapter && it.start > 0f && it.start < 1f }.map { it.start }.distinct().sorted().toFloatArray()
     }
     val buffer = remember(starts) { FloatArray(trackBufferSize(starts.size)) }
+    // Plain arrays of the SponsorBlock marks, so that drawing walks them by index and creates no iterator.
+    val markStarts = remember(marks) { marks.filter { !it.isChapter }.map { it.start }.toFloatArray() }
+    val markEnds = remember(marks) { marks.filter { !it.isChapter }.map { it.end }.toFloatArray() }
+    val markColors = remember(marks) { marks.filter { !it.isChapter }.map { markColor(it) }.toTypedArray() }
     val path = remember { Path() }
     val radii = remember { FloatArray(8) }
     Canvas(Modifier.fillMaxWidth().height(HandleHeight)) {
@@ -146,6 +150,7 @@ private fun ProgressBar(state: PlayerOverlayState) {
         val top = (size.height - trackHeight) / 2
         val full = trackHeight / 2
         val small = ChapterRadius.toPx()
+        val minMark = MinMark.toPx()
         val count = layoutTrack(size.width, progress, starts, starts.size, ChapterGap.toPx(), handleWidth, HandleGap.toPx(), buffer)
         val androidPath = path.asAndroidPath()
         for (i in 0 until count) {
@@ -161,14 +166,13 @@ private fun ProgressBar(state: PlayerOverlayState) {
             path.rewind()
             androidPath.addRoundRect(left, top, right, top + trackHeight, radii, android.graphics.Path.Direction.CW)
             drawPath(path, if (buffer[at + 2] != 0f) Palette.Accent else Palette.ProgressTrack)
-            if (marks.isNotEmpty()) {
+            if (markStarts.isNotEmpty()) {
                 // Marks keep to the shape of the piece.
                 clipPath(path) {
-                    for (mark in marks) {
-                        if (mark.isChapter) continue
-                        val from = maxOf(left, mark.start * size.width)
-                        val to = minOf(right, maxOf(mark.end * size.width, mark.start * size.width + MinMark.toPx()))
-                        if (to > from) drawRect(markColor(mark), Offset(from, top), Size(to - from, trackHeight))
+                    for (m in markStarts.indices) {
+                        val from = maxOf(left, markStarts[m] * size.width)
+                        val to = minOf(right, maxOf(markEnds[m] * size.width, markStarts[m] * size.width + minMark))
+                        if (to > from) drawRect(markColors[m], Offset(from, top), Size(to - from, trackHeight))
                     }
                 }
             }
