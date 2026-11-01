@@ -264,6 +264,7 @@ dependencies {
     stmaterialImplementation 'androidx.compose.foundation:foundation'
     stmaterialImplementation 'androidx.activity:activity-compose:1.11.0'
     stmaterialImplementation 'androidx.tv:tv-material:1.1.0'
+    stmaterialImplementation 'com.google.zxing:core:3.5.4' // MATERIAL: sign-in QR code, drawn on the device (Apache 2.0)
     testStmaterialImplementation 'junit:junit:4.13.2'
 
     implementation 'androidx.leanback:leanback:' + leanbackXVersion

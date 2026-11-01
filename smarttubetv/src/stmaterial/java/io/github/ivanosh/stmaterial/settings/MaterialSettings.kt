@@ -187,6 +187,7 @@ class MaterialSettingsActivity : ComponentActivity() {
             TextRow(2, getString(R.string.material_about_based_on)),
         )
         notice.forEachIndexed { index, paragraph -> rows += TextRow(3 + index, paragraph) }
+        rows += TextRow(3 + notice.size, getString(R.string.material_about_qr))
         return DialogPage.of(getString(R.string.material_set_about), rows)
     }
 }

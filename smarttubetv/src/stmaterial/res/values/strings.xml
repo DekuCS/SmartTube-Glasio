@@ -131,5 +131,7 @@
     <string translatable="false" name="material_key_search">Search</string>
     <string translatable="false" name="material_signin_getting">Getting a code…</string>
     <string translatable="false" name="material_signin_instruction">Open this address on a phone or computer and enter the code. Back cancels.</string>
+    <string translatable="false" name="material_signin_scan">Scan with your phone, or open the address and enter the code.</string>
+    <string translatable="false" name="material_about_qr">QR codes are drawn with ZXing, used under the Apache License 2.0.</string>
     <string translatable="false" name="material_signin_failed_hint">Press Back to close.</string>
 </resources>
