@@ -114,8 +114,15 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         applyButtons(store.buttons())
     }
 
+    override fun onPause() {
+        // A press that began before this has no release for us to act on.
+        okHold = okHold.reset()
+        super.onPause()
+    }
+
     override fun onStop() {
         started = false
+        okHold = okHold.reset()
         // Before the fragment releases the engine.
         sendSeekNow()
         // Only the state: the presenter would take this for a user closing the controls, with a chapter message to follow.
@@ -149,7 +156,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             }
             if (key == PlayerKey.Ok) {
                 val pressed = okHold.index
-                val (next, action) = okHold.up()
+                val (next, action) = okHold.up(ui, event.isCanceled)
                 okHold = next
                 // A short press of Subscribe (or any button with a hold action) acts now that it is known not to be a hold.
                 if (action == OkAction.Press && pressed != null) {
@@ -299,7 +306,10 @@ class MaterialPlaybackActivity : PlaybackActivity() {
 
     private fun writeUi(next: PlayerUi) {
         ui = next
-        if (next.focus == PanelFocus.HIDDEN) panel.sheetGroups = null
+        if (next.focus == PanelFocus.HIDDEN) {
+            panel.sheetGroups = null
+            okHold = okHold.reset()
+        }
         panel.focus = next.focus
         panel.buttonIndex = next.buttonIndex
     }

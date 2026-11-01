@@ -113,6 +113,15 @@ data class OkHold(val index: Int? = null, val fired: Boolean = false) {
         else -> this to OkAction.Swallow
     }
 
-    fun up(): Pair<OkHold, OkAction> =
-        OkHold() to if (index != null && !fired) OkAction.Press else OkAction.Swallow
+    /**
+     * The release of OK. A short press acts only if this press is still the tracked one: not cancelled (the window
+     * lost focus mid-press), the panel still open on the same button, and the press not already dealt with.
+     */
+    fun up(ui: PlayerUi, cancelled: Boolean = false): Pair<OkHold, OkAction> {
+        val pressed = index != null && !fired && !cancelled && ui.focus == PanelFocus.BUTTONS && ui.buttonIndex == index
+        return OkHold() to if (pressed) OkAction.Press else OkAction.Swallow
+    }
+
+    /** Forgets a tracked press, as when the player pauses, the panel hides or the player is left. */
+    fun reset() = OkHold()
 }

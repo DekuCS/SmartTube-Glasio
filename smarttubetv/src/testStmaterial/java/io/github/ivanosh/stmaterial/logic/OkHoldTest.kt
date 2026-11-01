@@ -13,7 +13,7 @@ class OkHoldTest {
     fun aShortPressActsOnReleaseOnly() {
         val (held, down) = OkHold().down(onSubscribe, holdable = true, repeating = false)
         assertEquals(OkAction.Swallow, down)
-        val (done, up) = held.up()
+        val (done, up) = held.up(onSubscribe)
         assertEquals(OkAction.Press, up)
         assertEquals(7, held.index)
         assertEquals(OkHold(), done)
@@ -29,7 +29,7 @@ class OkHoldTest {
             actions += action
         }
         assertEquals(listOf(OkAction.Hold, OkAction.Swallow, OkAction.Swallow, OkAction.Swallow), actions)
-        assertEquals(OkAction.Swallow, state.up().second)
+        assertEquals(OkAction.Swallow, state.up(onSubscribe).second)
     }
 
     @Test
@@ -37,7 +37,7 @@ class OkHoldTest {
         val (state, down) = OkHold().down(onNext, holdable = false, repeating = false)
         assertEquals(OkAction.Normal, down)
         assertEquals(OkAction.Swallow, state.down(onNext, false, repeating = true).second)
-        assertEquals(OkAction.Swallow, state.up().second)
+        assertEquals(OkAction.Swallow, state.up(onSubscribe).second)
     }
 
     @Test
@@ -54,12 +54,12 @@ class OkHoldTest {
         assertEquals(OkAction.Normal, down)
         // The panel is now open with Subscribe under the cursor; the repeats and the release must not act.
         assertEquals(OkAction.Swallow, state.down(onSubscribe.copy(buttonIndex = 0), true, repeating = true).second)
-        assertEquals(OkAction.Swallow, state.up().second)
+        assertEquals(OkAction.Swallow, state.up(onSubscribe).second)
     }
 
     @Test
     fun aReleaseWithoutATrackedPressDoesNothing() {
-        assertEquals(OkAction.Swallow, OkHold().up().second)
+        assertEquals(OkAction.Swallow, OkHold().up(onSubscribe).second)
     }
 
     @Test
@@ -67,6 +67,37 @@ class OkHoldTest {
         val held = OkHold(7, fired = true)
         val (state, action) = held.down(onSubscribe, true, repeating = false)
         assertEquals(OkAction.Swallow, action)
-        assertEquals(OkAction.Press, state.up().second)
+        assertEquals(OkAction.Press, state.up(onSubscribe).second)
+    }
+
+    @Test
+    fun aCancelledReleaseNeverActs() {
+        val (held, _) = OkHold().down(onSubscribe, holdable = true, repeating = false)
+        val (after, action) = held.up(onSubscribe, cancelled = true)
+        assertEquals(OkAction.Swallow, action)
+        assertEquals(OkHold(), after)
+    }
+
+    @Test
+    fun aReleaseAfterThePanelClosedNeverActs() {
+        val (held, _) = OkHold().down(onSubscribe, holdable = true, repeating = false)
+        assertEquals(OkAction.Swallow, held.up(onSubscribe.copy(focus = PanelFocus.HIDDEN)).second)
+        assertEquals(OkAction.Swallow, held.up(onSubscribe.copy(focus = PanelFocus.PROGRESS)).second)
+        assertEquals(OkAction.Swallow, held.up(onNext).second)
+    }
+
+    @Test
+    fun resettingDropsATrackedPress() {
+        val (held, _) = OkHold().down(onSubscribe, holdable = true, repeating = false)
+        assertEquals(OkHold(), held.reset())
+        assertEquals(OkAction.Swallow, held.reset().up(onSubscribe).second)
+    }
+
+    @Test
+    fun aSecondReleaseWithoutItsOwnPressDoesNothing() {
+        val (held, _) = OkHold().down(onSubscribe, holdable = true, repeating = false)
+        val (after, first) = held.up(onSubscribe)
+        assertEquals(OkAction.Press, first)
+        assertEquals(OkAction.Swallow, after.up(onSubscribe).second)
     }
 }
