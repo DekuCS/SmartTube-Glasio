@@ -25,6 +25,39 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
+// MATERIAL: signing credentials for stmaterialRelease. Null when none are available.
+// 1. Environment (CI): MATERIAL_KEYSTORE_FILE, MATERIAL_KEYSTORE_PASSWORD, MATERIAL_KEY_ALIAS, MATERIAL_KEY_PASSWORD.
+// 2. Properties file (storeFile, storePassword, keyAlias, keyPassword): $MATERIAL_RELEASE_PROPERTIES or
+//    ~/.config/smarttube-material/release.properties.
+def materialSigning = null
+def envKeystore = System.getenv('MATERIAL_KEYSTORE_FILE')
+if (envKeystore) {
+    materialSigning = [storeFile: envKeystore,
+                       storePassword: System.getenv('MATERIAL_KEYSTORE_PASSWORD'),
+                       keyAlias: System.getenv('MATERIAL_KEY_ALIAS'),
+                       keyPassword: System.getenv('MATERIAL_KEY_PASSWORD')]
+} else {
+    def materialPropsFile = new File(System.getenv('MATERIAL_RELEASE_PROPERTIES') ?:
+            "${System.getProperty('user.home')}/.config/smarttube-material/release.properties")
+    if (materialPropsFile.exists()) {
+        def props = new Properties()
+        materialPropsFile.withInputStream { props.load(it) }
+        materialSigning = [storeFile: props['storeFile'], storePassword: props['storePassword'],
+                           keyAlias: props['keyAlias'], keyPassword: props['keyPassword']]
+    }
+}
+if (materialSigning != null && materialSigning.values().any { !it }) {
+    throw new GradleException('stmaterial release signing is configured but incomplete: need store file, store password, key alias and key password.')
+}
+if (materialSigning == null && System.getenv('MATERIAL_REQUIRE_RELEASE_SIGNING') == 'true') {
+    throw new GradleException('MATERIAL_REQUIRE_RELEASE_SIGNING is set but no release signing key was found. Refusing to build.')
+}
+def materialReleaseRequested = getGradle().getStartParameter().getTaskRequests().toString().contains('StmaterialRelease')
+if (materialSigning == null && materialReleaseRequested) {
+    logger.warn('WARNING: no stmaterial release key (MATERIAL_KEYSTORE_FILE env or ~/.config/smarttube-material/release.properties). ' +
+            'stmaterialRelease will be signed with the DEBUG key. Do not distribute this APK.')
+}
+
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
 if (keystorePropertiesFile.exists()) {
@@ -91,6 +124,16 @@ android {
     }
 
     signingConfigs {
+        // MATERIAL: release signing for the stmaterial flavor. Secrets come from the environment (CI) or from a
+        // properties file outside the repo, never from files in the repository.
+        stmaterialRelease {
+            if (materialSigning != null) {
+                storeFile = file(materialSigning.storeFile)
+                storePassword = materialSigning.storePassword
+                keyAlias = materialSigning.keyAlias
+                keyPassword = materialSigning.keyPassword
+            }
+        }
         release {
             if (keystorePropertiesFile.exists()) {
                 storeFile = file(keystoreProperties['storeFile'])
@@ -156,7 +199,10 @@ android {
 
     lintOptions {
         abortOnError true
-        //checkReleaseBuilds false // fix for ClassNotFoundException: com.android.tools.lint.client.api.Vendor
+        // MATERIAL: lintVital on release builds runs AGP 8.13 lint, which bundles a Kotlin 2.2 metadata reader and
+        // logs 58 "e:" lines for classes compiled by Kotlin 2.4 ("metadata 2.4.0, expected 2.2.0"). They are noise
+        // and make lint of the Kotlin code unreliable, so the release build does not run it.
+        checkReleaseBuilds false
     }
 
     // gradle 4.6 migration: disable dimensions mechanism
@@ -178,6 +224,7 @@ android {
             matchingFallbacks = ["stfdroid"]
             minSdkVersion 29
             targetSdkVersion 34
+            // The release variant is switched to signingConfigs.stmaterialRelease in androidComponents below.
             signingConfig signingConfigs.debug
         }
         stfdroid {
@@ -195,6 +242,11 @@ android {
 
 // The ABI splits are shared by all flavors, stmaterial supports only the two ARM ones.
 androidComponents {
+    onVariants(selector().withName('stmaterialRelease')) { variant ->
+        if (materialSigning != null) {
+            variant.signingConfig.setConfig(android.signingConfigs.stmaterialRelease)
+        }
+    }
     onVariants(selector().withFlavor(new kotlin.Pair('default', 'stmaterial'))) { variant ->
         variant.outputs.each { output ->
             if (output.filters.any { it.identifier == 'x86' }) {

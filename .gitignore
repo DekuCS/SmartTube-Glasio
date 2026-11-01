@@ -72,3 +72,8 @@ fabric.properties
 *BAK.java
 hs_err_pid*.log
 .kotlin
+
+# Signing material
+*.jks
+*.keystore
+release.properties
