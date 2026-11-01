@@ -142,4 +142,33 @@
     <string translatable="false" name="material_signin_scan">Scan with your phone, or open the address and enter the code.</string>
     <string translatable="false" name="material_about_qr">QR codes are drawn with ZXing, used under the Apache License 2.0.</string>
     <string translatable="false" name="material_signin_failed_hint">Press Back to close.</string>
+    <string translatable="false" name="material_set_updates">Updates</string>
+    <string translatable="false" name="material_upd_off">Off</string>
+    <string translatable="false" name="material_upd_off_desc">Never check for a new version.</string>
+    <string translatable="false" name="material_upd_stable">Stable</string>
+    <string translatable="false" name="material_upd_stable_desc">Only releases that were promoted by the owner.</string>
+    <string translatable="false" name="material_upd_prerelease">Prerelease</string>
+    <string translatable="false" name="material_upd_prerelease_desc">The newest build, published without review.</string>
+    <string translatable="false" name="material_upd_check_now">Check now</string>
+    <string translatable="false" name="material_upd_installed">Installed: %1$s</string>
+    <string translatable="false" name="material_upd_checking">Checking…</string>
+    <string translatable="false" name="material_upd_is_off">Updates are off. Choose Stable or Prerelease first.</string>
+    <string translatable="false" name="material_upd_latest">You have the latest version.</string>
+    <string translatable="false" name="material_upd_net">Could not reach GitHub.</string>
+    <string translatable="false" name="material_upd_rate">GitHub is limiting requests. Try again later.</string>
+    <string translatable="false" name="material_upd_bad_feed">The list of releases could not be read.</string>
+    <string translatable="false" name="material_update_title">SmartTube Material %1$s</string>
+    <string translatable="false" name="material_update_prerelease_tag">(prerelease)</string>
+    <string translatable="false" name="material_update_heading">Update</string>
+    <string translatable="false" name="material_update_install">Download and install</string>
+    <string translatable="false" name="material_update_later">Not now</string>
+    <string translatable="false" name="material_update_close">Close</string>
+    <string translatable="false" name="material_update_cancel">Cancel</string>
+    <string translatable="false" name="material_update_downloading">Downloading %1$d%%</string>
+    <string translatable="false" name="material_update_waiting">Checked. Opening the system installer…</string>
+    <string translatable="false" name="material_update_confirming">Confirm the installation in the system screen.</string>
+    <string translatable="false" name="material_update_cancelled">Cancelled. Nothing was installed.</string>
+    <string translatable="false" name="material_update_install_failed">The system installer did not accept the update.</string>
+    <string translatable="false" name="material_update_download_failed">The download failed. Nothing was installed.</string>
+    <string translatable="false" name="material_update_not_installed">Not installed</string>
 </resources>

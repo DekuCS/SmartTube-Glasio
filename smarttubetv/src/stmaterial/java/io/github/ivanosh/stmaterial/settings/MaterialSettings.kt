@@ -24,6 +24,7 @@ import com.liskovsoft.smartyoutubetv2.tv.R
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
 import io.github.ivanosh.stmaterial.browse.MaterialSectionsEditorActivity
 import io.github.ivanosh.stmaterial.dialog.ButtonRow
+import io.github.ivanosh.stmaterial.dialog.ChoiceRow
 import io.github.ivanosh.stmaterial.dialog.DialogPage
 import io.github.ivanosh.stmaterial.dialog.DialogRow
 import io.github.ivanosh.stmaterial.dialog.DialogScreen
@@ -31,7 +32,13 @@ import io.github.ivanosh.stmaterial.dialog.DialogState
 import io.github.ivanosh.stmaterial.dialog.EntryRow
 import io.github.ivanosh.stmaterial.dialog.TextRow
 import io.github.ivanosh.stmaterial.player.MaterialButtonsEditorActivity
+import io.github.ivanosh.stmaterial.logic.UpdateChannel
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
+import io.github.ivanosh.stmaterial.update.CheckResult
+import io.github.ivanosh.stmaterial.update.Failure
+import io.github.ivanosh.stmaterial.update.UpdateDialog
+import io.github.ivanosh.stmaterial.update.UpdateService
+import io.github.ivanosh.stmaterial.update.UpdateStore
 import io.github.ivanosh.stmaterial.ui.Palette
 
 /** The paragraphs of a text that is wrapped by lines: a blank line ends one, the lines of one are joined by spaces. */
@@ -47,9 +54,11 @@ class MaterialSettingsActivity : ComponentActivity() {
     private val state = DialogState()
     /** The sign-in screen is a screen of its own; when it is closed the account page has to show the result. */
     private var accountPending = false
+    private lateinit var updates: UpdateDialog
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        updates = UpdateDialog(this, state) { state.pop() }
         state.push(root())
         setContentView(ComposeView(this).apply {
             setContent {
@@ -78,6 +87,10 @@ class MaterialSettingsActivity : ComponentActivity() {
         when (row) {
             is EntryRow -> state.open(row)
             is ButtonRow -> (row.ref as? Runnable)?.run()
+            is ChoiceRow -> (row.ref as? UpdateChannel)?.let {
+                state.choose(row.key)
+                UpdateStore(this).channel = it
+            }
             else -> Unit
         }
     }
@@ -94,6 +107,7 @@ class MaterialSettingsActivity : ComponentActivity() {
             button(5, R.string.material_set_quality, ::showQualityDialog),
             button(6, R.string.material_set_language) { LanguageSettingsPresenter.instance(this).show() },
             EntryRow(7, getString(R.string.material_set_blocked), 1, ::blockedPage),
+            EntryRow(10, getString(R.string.material_set_updates), 1) { updatesPage() },
             EntryRow(8, getString(R.string.material_set_advanced), 1, ::advancedPage),
             EntryRow(9, getString(R.string.material_set_about), 1, ::aboutPage),
         ),
@@ -175,6 +189,55 @@ class MaterialSettingsActivity : ComponentActivity() {
             button(4, R.string.material_adv_afr) { AutoFrameRateSettingsPresenter.instance(this).show() },
         ),
     )
+
+    // Updates
+
+    private fun updatesPage(status: String? = null): DialogPage {
+        val channel = UpdateStore(this).channel
+        fun choice(key: Int, value: UpdateChannel, title: Int, description: Int) =
+            ChoiceRow(key, getString(title), getString(description), channel == value, false, value)
+        val rows = mutableListOf<DialogRow>(
+            choice(1, UpdateChannel.OFF, R.string.material_upd_off, R.string.material_upd_off_desc),
+            choice(2, UpdateChannel.STABLE, R.string.material_upd_stable, R.string.material_upd_stable_desc),
+            choice(3, UpdateChannel.PRERELEASE, R.string.material_upd_prerelease, R.string.material_upd_prerelease_desc),
+            button(4, R.string.material_upd_check_now, ::checkNow),
+            TextRow(5, getString(R.string.material_upd_installed, UpdateService.installedVersionName(this))),
+        )
+        if (status != null) rows += TextRow(6, status)
+        return DialogPage.of(getString(R.string.material_set_updates), rows)
+    }
+
+    private fun checkNow() {
+        val store = UpdateStore(this)
+        val channel = store.channel
+        if (channel == UpdateChannel.OFF) {
+            state.replace(updatesPage(getString(R.string.material_upd_is_off)))
+            return
+        }
+        store.lastCheckMs = System.currentTimeMillis()
+        state.replace(updatesPage(getString(R.string.material_upd_checking)))
+        val shownPage = state.page?.id
+        UpdateService.check(this, channel) { result ->
+            if (isDestroyed || state.page?.id != shownPage) return@check
+            when (result) {
+                is CheckResult.Offer -> {
+                    state.replace(updatesPage())
+                    state.push(updates.offerPage(result.offer))
+                }
+                CheckResult.UpToDate -> state.replace(updatesPage(getString(R.string.material_upd_latest)))
+                is CheckResult.Failed -> state.replace(updatesPage(getString(when (result.reason) {
+                    Failure.NETWORK -> R.string.material_upd_net
+                    Failure.RATE_LIMITED -> R.string.material_upd_rate
+                    Failure.BAD_FEED -> R.string.material_upd_bad_feed
+                })))
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        updates.release()
+    }
 
     // About
 

@@ -56,8 +56,45 @@ Every release is marked as a prerelease, so GitHub's "latest" link does not reac
 
 ## Updates
 
-There is no built-in updater. To update, install the newer APK over the old one the same way; releases are signed with
-the same key, so settings stay. A build signed with a different key must be uninstalled first.
+Settings has an "Updates" page with the channel and "Check now":
+
+- **Off**: never checks.
+- **Stable** (default): takes only GitHub releases that are not marked prerelease. Every release is published as a
+  prerelease, so the owner promotes one by hand (edit the release, clear "prerelease"); until then Stable sees nothing
+  new. Withdrawing a release (see below) takes it out of both channels.
+- **Prerelease**: takes the newest release of either kind. Those builds are published without review; the page says so.
+
+The app asks `api.github.com/repos/ivanosh/SmartTube-Material/releases` (unauthenticated, HTTPS) once a day at most, when
+the browse screen is shown, and on "Check now". There is no background job. A failed check is silent, except for
+"Check now", which says why. The prompt opens only over the browse screen, never over the player: a result that comes
+while something else is in front waits for the next time the browse screen is shown.
+
+Why the GitHub Releases API and not upstream's `appupdatechecker2` manifest: that manifest is a JSON file with no
+checksum, no channel and no signer check, would need a separate file per channel published by the workflow, and takes
+download URLs from the file. The release API already says which releases are prereleases, and for each asset it gives the
+SHA-256 (`digest`) that GitHub computed at upload, so the release workflow publishes nothing extra. Upstream's updater is
+still in the build but is given no URLs and is not used.
+
+Before the system installer sees a file, all of these must hold, or nothing is installed and a short message shows:
+
+- the download came from `github.com` or its download hosts over HTTPS (every redirect is checked; the first address is
+  built from the tag and the asset name, not taken from the response), and has the size the release lists;
+- its SHA-256 equals the digest of the release;
+- the APK for this device's ABI (`arm64-v8a`, `armeabi-v7a`, else the universal one);
+- the package manager reads it as `io.github.ivanosh.smarttubematerial`, with the version name of the release and a
+  version code above the installed one (a downgrade is refused);
+- its one signing certificate has SHA-256 `8619c345...748e8c` (the key above), checked in code with
+  `PackageManager.getPackageArchiveInfo`.
+
+The install goes through the system installer, which asks for confirmation; the TV asks once to allow this app to install
+unknown apps. There is no silent install. The downloaded file is deleted as soon as it is handed over, and after any
+failure. `REQUEST_INSTALL_PACKAGES` is declared by the `stmaterial` flavor.
+
+Installing by hand over the old build still works the same way (see Install). A build signed with a different key must be
+uninstalled first.
+
+A debug build can be pointed at a test server (`files/update-debug.properties` with `base=` and `cert=`, written with
+`adb shell run-as`). The release build has no such code.
 
 ## Versions
 
@@ -178,5 +215,5 @@ services", find YouTube TV and choose "Remove access".
 - Performance on a Chromecast is not measured yet. Emulator numbers are in [docs/perf.md](docs/perf.md).
 - The release APK is not minified, so it is large (see docs/perf.md).
 - Not included: casting, voice search, several accounts, comments, Shorts, live chat, home screen channels, data
-  transfer and an in-app updater.
+  transfer.
 - At most 8 tabs. Settings cannot be hidden or made the start tab.

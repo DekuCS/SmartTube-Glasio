@@ -26,6 +26,7 @@ import io.github.ivanosh.stmaterial.logic.SignedOutNotice
 import io.github.ivanosh.stmaterial.logic.signedOutNotice
 import io.github.ivanosh.stmaterial.logic.resolveStart
 import io.github.ivanosh.stmaterial.settings.MaterialSettingsActivity
+import io.github.ivanosh.stmaterial.update.UpdateScheduler
 import com.liskovsoft.smartyoutubetv2.tv.R
 
 /**
@@ -135,6 +136,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
         super.onResume()
         presenter.onViewResumed()
         reloadSections()
+        UpdateScheduler.onBrowseResumed(this)
     }
 
     /** The editor has stored a new list while this screen was stopped. */
@@ -161,6 +163,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
 
     override fun onPause() {
         super.onPause()
+        UpdateScheduler.onBrowsePaused(this)
         presenter.onViewPaused()
     }
 

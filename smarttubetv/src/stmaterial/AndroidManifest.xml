@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- MATERIAL: the in-app updater hands a verified APK to the system installer, which asks the user. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name="io.github.ivanosh.stmaterial.MaterialApplication"
         android:allowBackup="false"
@@ -82,5 +85,13 @@
             android:name="io.github.ivanosh.stmaterial.settings.MaterialSettingsActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
             android:screenOrientation="unspecified" />
+
+        <!-- Translucent like the dialogs. Opened only over the browse screen. -->
+        <activity
+            android:name="io.github.ivanosh.stmaterial.update.UpdateActivity"
+            android:excludeFromRecents="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Material.Theme.Dialog" />
     </application>
 </manifest>
