@@ -359,6 +359,16 @@ class Gate(unittest.TestCase):
             findings = logic.gate_findings([diff(paths=[path], texts={path: ("", "")}, lines={path: [line]})])
             self.assertTrue(any("signing or update" in f for f in findings), (path, line))
 
+    def test_gradle_lines_that_change_what_the_flavor_is_built_from_stop(self):
+        path = "smarttubetv/build.gradle"
+        for line in ('sourceSets { main.manifest.srcFile "x" }', 'applicationId "x"', "srcDirs += 'evil'",
+                     'stmaterialImplementation "evil:x:1"'):
+            findings = logic.gate_findings([diff(paths=[path], texts={path: ("", "")}, lines={path: [line]})])
+            self.assertTrue(any("built from" in f for f in findings), line)
+
+    def test_those_words_outside_gradle_files_pass(self):
+        self.assertEqual(logic.gate_findings([diff(paths=["app/X.java"], lines={"app/X.java": ["applicationId"]})]), [])
+
     def test_gradle_lines_without_those_terms_still_pass(self):
         path = "smarttubetv/build.gradle"
         self.assertEqual(logic.gate_findings([diff(paths=[path], texts={path: ("", "")},

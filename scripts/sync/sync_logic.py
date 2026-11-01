@@ -33,6 +33,8 @@ _MANIFEST_PATH = re.compile(r"(?:^|/)AndroidManifest\.xml$")
 _BACKUP_PATH = re.compile(r"(?i)backup")
 _UPDATER_PATH = re.compile(r"(?i)appupdate|update_urls")
 _RELEASE_LINE = re.compile(r"(?i)signingConfig|update_urls")
+# In Gradle files only: what the flavor is built from and under which name.
+_BUILD_SHAPE_LINE = re.compile(r"(?i)sourceSets|srcDirs?\b|srcFile|applicationId|stmaterial")
 # What runs the sync itself, in this repository only. Stopped rather than dropped: code here runs with write access.
 _SYNC_MACHINERY_PATH = re.compile(r"(?i)(?:scripts/sync|\.github)/")
 _RELEASE_TAG = re.compile(r"material-v([0-9]+)\.([0-9]+)-([0-9]+)")
@@ -163,6 +165,10 @@ def is_release_line(line):
     return _RELEASE_LINE.search(line) is not None
 
 
+def is_build_shape_line(line):
+    return _BUILD_SHAPE_LINE.search(line) is not None
+
+
 def is_gradle_file(path):
     return path.endswith((".gradle", ".kts", ".groovy"))
 
@@ -224,6 +230,8 @@ def gate_findings(diffs):
             reason = release_path_finding(path, not diff.label)
             if reason:
                 findings.append(reason + ": " + shown)
+            if is_gradle_file(path) and any(is_build_shape_line(line) for line in diff.lines.get(path, [])):
+                findings.append("what the flavor is built from changed: " + shown)
             if any(is_release_line(line) for line in diff.lines.get(path, [])):
                 findings.append("signing or update line changed: " + shown)
             if path.rsplit("/", 1)[-1] == ".gitmodules":
