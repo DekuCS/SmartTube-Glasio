@@ -12,6 +12,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsGroup
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.ErrorFragmentData
+import com.liskovsoft.smartyoutubetv2.common.app.models.errors.SignInError
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.BrowsePresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView
@@ -21,6 +22,8 @@ import io.github.ivanosh.stmaterial.data.HistorySource
 import io.github.ivanosh.stmaterial.data.SectionStore
 import io.github.ivanosh.stmaterial.logic.EditorState
 import io.github.ivanosh.stmaterial.logic.Sections
+import io.github.ivanosh.stmaterial.logic.SignedOutNotice
+import io.github.ivanosh.stmaterial.logic.signedOutNotice
 import io.github.ivanosh.stmaterial.logic.resolveStart
 import io.github.ivanosh.stmaterial.settings.MaterialSettingsActivity
 import com.liskovsoft.smartyoutubetv2.tv.R
@@ -250,6 +253,23 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     /** A late error of the section being left must not land on the one being selected. */
     override fun showError(data: ErrorFragmentData) {
         if (isLoadPending) return
+        val section = state.selectedSection
+        val notice = signedOutNotice(data is SignInError, section?.id, section?.isAuthOnly == true)
+        if (notice == SignedOutNotice.PUBLIC || notice == SignedOutNotice.HOME) {
+            // Retry has no action of its own: onErrorAction refreshes the section.
+            var message = getString(R.string.material_signed_out_empty)
+            if (notice == SignedOutNotice.HOME) message += "\n" + getString(R.string.material_signed_out_home)
+            state.showError(
+                ErrorData(
+                    message = message,
+                    actionText = getString(R.string.material_retry),
+                    action = null,
+                    secondaryText = getString(R.string.material_account_sign_in),
+                    secondaryAction = data::onAction,
+                )
+            )
+            return
+        }
         val actionText = data.actionText
         state.showError(
             ErrorData(

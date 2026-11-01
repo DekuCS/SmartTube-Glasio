@@ -6,6 +6,8 @@
     <string translatable="false" name="material_search_hint">Press OK to search</string>
     <string translatable="false" name="material_settings">Settings</string>
     <string translatable="false" name="material_retry">Retry</string>
+    <string translatable="false" name="material_signed_out_empty">YouTube has nothing to show here without an account.</string>
+    <string translatable="false" name="material_signed_out_home">Sign in, or watch something first and Home will fill in.</string>
     <string translatable="false" name="material_loading">Loading…</string>
     <string translatable="false" name="material_empty">Nothing here yet</string>
     <string translatable="false" name="material_menu_open_first">Open first</string>

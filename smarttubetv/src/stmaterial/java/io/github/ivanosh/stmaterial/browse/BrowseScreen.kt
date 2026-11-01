@@ -214,6 +214,8 @@ private fun Content(state: BrowseState, actions: BrowseActions, feedActions: Fee
             message = error.message,
             actionText = error.actionText ?: stringResource(R.string.material_retry),
             onAction = { actions.onErrorAction(error) },
+            secondaryText = error.secondaryText,
+            onSecondary = { error.secondaryAction?.invoke() },
             onFocused = { state.onContentFocused(0) },
         )
         state.loading -> CenteredMessage(stringResource(R.string.material_loading))

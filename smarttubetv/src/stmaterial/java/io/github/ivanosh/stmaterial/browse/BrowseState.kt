@@ -17,7 +17,13 @@ import io.github.ivanosh.stmaterial.logic.SubscriptionRowIds
 data class FocusKey(val rowId: String, val videoId: String)
 
 /** [action] is null when the presenter offers no action, and the screen then retries the section. */
-data class ErrorData(val message: String, val actionText: String?, val action: (() -> Unit)?)
+data class ErrorData(
+    val message: String,
+    val actionText: String?,
+    val action: (() -> Unit)?,
+    val secondaryText: String? = null,
+    val secondaryAction: (() -> Unit)? = null,
+)
 
 /** Id of a video inside a row. Video.equals is heavy, and lazy lists need unique keys. */
 fun videoKey(video: Video): String =
