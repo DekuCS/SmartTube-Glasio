@@ -29,6 +29,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCatego
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.service.SidebarService;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.BrowsePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter.VideoMenuCallback;
@@ -354,6 +355,9 @@ public class AppDialogUtil {
 
         List<String> addedCodes = new ArrayList<>();
         List<String> lastLanguages = playerData.getLastAudioLanguages();
+        // MATERIAL: a choice lasts for the current video only and is never saved. Nothing chosen means original.
+        boolean isMaterial = SidebarService.instance(context).isMaterialUi();
+        String currentLanguage = isMaterial ? Helpers.firstNonNull(playerData.getTempAudioLanguage(), "") : playerData.getAudioLanguage();
 
         for (Locale locale : Locale.getAvailableLocales()) {
             String languageCode = locale.getLanguage().toLowerCase();
@@ -364,10 +368,10 @@ public class AppDialogUtil {
 
             options.add(UiOptionItem.from(locale.getDisplayLanguage(),
                     optionItem -> {
-                        playerData.setAudioLanguage(languageCode);
+                        selectAudioLanguage(playerData, languageCode, isMaterial);
                         onSetCallback.run();
                     },
-                    languageCode.equals(playerData.getAudioLanguage())));
+                    languageCode.equals(currentLanguage)));
             addedCodes.add(languageCode);
         }
 
@@ -386,20 +390,29 @@ public class AppDialogUtil {
 
             options.add(idx++, UiOptionItem.from(locale.getDisplayLanguage(),
                     optionItem -> {
-                        playerData.setAudioLanguage(languageCode);
+                        selectAudioLanguage(playerData, languageCode, isMaterial);
                         onSetCallback.run();
                     },
-                    languageCode.equals(playerData.getAudioLanguage())));
+                    languageCode.equals(currentLanguage)));
         }
 
         options.add(0, UiOptionItem.from(context.getString(R.string.original_lang),
                 optionItem -> {
-                    playerData.setAudioLanguage("");
+                    selectAudioLanguage(playerData, "", isMaterial);
                     onSetCallback.run();
                 },
-                "".equals(playerData.getAudioLanguage())));
+                "".equals(currentLanguage)));
 
         return OptionCategory.from(AUDIO_LANGUAGE_ID, OptionCategory.TYPE_RADIO_LIST, title, options);
+    }
+
+    // MATERIAL: in the Material UI a language applies to the current video only
+    private static void selectAudioLanguage(PlayerData playerData, String languageCode, boolean isMaterial) {
+        if (isMaterial) {
+            playerData.setTempAudioLanguage(languageCode);
+        } else {
+            playerData.setAudioLanguage(languageCode);
+        }
     }
 
     public static OptionCategory createAudioDelayCategory(Context context) {

@@ -71,6 +71,7 @@ public class VideoStateController extends BasePlayerController {
         setPlayEnabled(true); // video just added
 
         getPlayerData().setTempVideoFormat(null);
+        getPlayerData().setTempAudioLanguage(null); // MATERIAL: a manual audio language lasts for one video
 
         enableIncognitoIfNeeded(item);
 

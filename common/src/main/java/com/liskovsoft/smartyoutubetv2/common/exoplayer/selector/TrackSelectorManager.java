@@ -21,6 +21,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.VideoTrack;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector.RestoreTrackSelector;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector.RestoreTrackSelector.TrackSelectorCallback;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.service.SidebarService;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
@@ -29,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -595,6 +597,13 @@ public class TrackSelectorManager implements TrackSelectorCallback {
      * Trying to filter languages preferred by the user
      */
     private MediaTrack[][] filterByLanguage(MediaTrack[][] trackGroupList, MediaTrack originTrack) {
+        // MATERIAL: the automatic choice is always the original track. Neither the device language nor a language
+        // saved earlier take part. A track picked from the track list (unsaved, with a language) keeps the old path.
+        if (originTrack instanceof AudioTrack && SidebarService.instance(mContext).isMaterialUi() &&
+                (originTrack.isSaved || originTrack.format == null || TextUtils.isEmpty(originTrack.format.language))) {
+            return filterToOriginalAudio(trackGroupList, PlayerData.instance(mContext).getTempAudioLanguage());
+        }
+
         if (!(originTrack instanceof AudioTrack) || trackGroupList.length <= 2) { // non-translated list has max 2 groups
             return trackGroupList;
         }
@@ -722,6 +731,53 @@ public class TrackSelectorManager implements TrackSelectorCallback {
         }
 
         return trackGroupList;
+    }
+
+    // MATERIAL:
+    static MediaTrack[][] filterToOriginalAudio(MediaTrack[][] trackGroupList, String manualLanguage) {
+        List<String> languages = new ArrayList<>();
+
+        for (MediaTrack[] trackGroup : trackGroupList) {
+            if (trackGroup == null) {
+                continue;
+            }
+
+            for (MediaTrack track : trackGroup) {
+                if (track != null && track.format != null) {
+                    languages.add(track.format.language);
+                }
+            }
+        }
+
+        String chosen = OriginalAudioChoice.choose(languages, manualLanguage);
+
+        Log.d(TAG, "Audio languages: %s, manual: %s, chosen: %s", new LinkedHashSet<>(languages), manualLanguage, chosen);
+
+        if (chosen == null) {
+            return trackGroupList;
+        }
+
+        List<MediaTrack[]> result = new ArrayList<>();
+
+        for (MediaTrack[] trackGroup : trackGroupList) {
+            if (trackGroup == null) {
+                continue;
+            }
+
+            List<MediaTrack> group = new ArrayList<>();
+
+            for (MediaTrack track : trackGroup) {
+                if (track != null && track.format != null && chosen.equals(track.format.language)) {
+                    group.add(track);
+                }
+            }
+
+            if (!group.isEmpty()) {
+                result.add(group.toArray(new MediaTrack[0]));
+            }
+        }
+
+        return result.isEmpty() ? trackGroupList : result.toArray(new MediaTrack[0][]);
     }
 
     // Track array manipulation.
