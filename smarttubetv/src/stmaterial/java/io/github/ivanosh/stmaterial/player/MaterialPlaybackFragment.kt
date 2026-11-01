@@ -58,6 +58,12 @@ class MaterialPlaybackFragment : PlaybackFragment() {
     /** Every way Leanback has of showing the controls ends here: tickle, seek mode, the glue host. */
     override fun showControlsOverlay(runAnimation: Boolean) = Unit
 
+    /**
+     * Leanback's gradient behind its controls. It is set at full alpha when a hidden row is selected with the panel
+     * open, and only Leanback's own fade would clear it, which never runs here. So it stayed over the video.
+     */
+    override fun setBackgroundResource(resId: Int) = Unit
+
     override fun showOverlay(show: Boolean) {
         host?.showPanel(show)
     }
