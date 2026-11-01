@@ -28,3 +28,10 @@ data class SearchInput(val text: String = "", val limit: Int = SEARCH_MAX_LENGTH
 
     val canSearch: Boolean get() = query != null
 }
+
+/** Suggestions to show: no nulls or blanks, no repeats (the service merges history with suggestions), at most [limit]. */
+fun cleanSuggestions(tags: List<String?>?, limit: Int): List<String> =
+    tags.orEmpty().filterNotNull().filter { it.isNotBlank() }.distinct().take(limit)
+
+/** A suggestion answer belongs to the query it was asked for; a later key makes it stale. */
+fun isCurrentAnswer(asked: String, now: String): Boolean = asked == now

@@ -8,6 +8,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter.VideoMenuCallback
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager
+import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil
 import com.liskovsoft.smartyoutubetv2.tv.R
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
@@ -79,6 +80,8 @@ class CardMenu(
                 }
                 VideoAction.BLOCK_CHANNEL -> MenuItem(activity.getString(R.string.material_video_block_channel)) {
                     menu.blockChannel(video, removalCallback(R.string.material_video_blocked, true))
+                    // The list is stored ten seconds after a change; a kill before that would bring the channel back.
+                    BlockedChannelData.instance(activity).persistNow()
                 }
                 VideoAction.REMOVE_FROM_HISTORY -> MenuItem(activity.getString(R.string.material_video_remove_history)) {
                     menu.removeFromHistory(video, removalCallback(R.string.material_video_removed_history, false))

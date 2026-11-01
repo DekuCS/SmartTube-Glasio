@@ -106,3 +106,26 @@ class SearchInputTest {
         assertEquals("1234567890", DIGIT_ROW)
     }
 }
+
+class SuggestionsTest {
+    @Test
+    fun duplicatesAndNullsAreDropped() {
+        assertEquals(listOf("a", "b"), cleanSuggestions(listOf("a", null, "b", "a", "", "  "), 8))
+    }
+
+    @Test
+    fun limitIsHeldAfterDedupe() {
+        assertEquals(listOf("a", "b"), cleanSuggestions(listOf("a", "a", "b", "c"), 2))
+    }
+
+    @Test
+    fun nullListIsEmpty() {
+        assertEquals(emptyList<String>(), cleanSuggestions(null, 8))
+    }
+
+    @Test
+    fun answerCountsOnlyWhileTheQueryIsUnchanged() {
+        assertTrue(isCurrentAnswer(asked = "ca", now = "ca"))
+        assertTrue(!isCurrentAnswer(asked = "ca", now = "cat"))
+    }
+}

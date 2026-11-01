@@ -26,7 +26,7 @@ class MaterialApplication : MainApplication() {
     override fun registerViews() {
         super.registerViews()
         // Before any presenter: BrowsePresenter maps the Settings section only once, when it is created.
-        SidebarService.instance(this).lockSettingsSection()
+        SidebarService.instance(this).enableMaterialUi()
         val viewManager = ViewManager.instance(this)
         val browse = MaterialBrowseActivity::class.java
         viewManager.setRoot(browse)
@@ -45,7 +45,7 @@ class MaterialApplication : MainApplication() {
         // Not in the view stack: closing the sign-in code returns to the screen that opened it, settings or home.
         viewManager.register(SignInView::class.java, MaterialSignInActivity::class.java)
         // MATERIAL: links are never sent to the QR service of api.qrserver.com
-        Utils.sQrServiceDisabled = true
+        Utils.disableQrService()
         // After the list: the parent lookup goes by isInstance, so PlaybackActivity needs the new home too.
         viewManager.register(PlaybackView::class.java, MaterialPlaybackActivity::class.java, browse)
     }

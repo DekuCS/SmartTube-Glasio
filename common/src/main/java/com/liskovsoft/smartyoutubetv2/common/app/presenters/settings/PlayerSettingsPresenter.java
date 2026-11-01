@@ -58,7 +58,7 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
 
         appendPlaybackModeCategory(settingsPresenter);
         appendVideoPresetsCategory(settingsPresenter);
-        if (!mSidebarService.isSettingsSectionLocked()) { // MATERIAL: the panel buttons come from the Material editor
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: the panel buttons come from the Material editor
             appendPlayerButtonsCategory(settingsPresenter);
         }
         appendNetworkEngineCategory(settingsPresenter);
@@ -68,7 +68,7 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         appendAudioLanguageCategory(settingsPresenter);
         appendAudioDelayCategory(settingsPresenter);
         appendMasterVolumeCategory(settingsPresenter);
-        if (!mSidebarService.isSettingsSectionLocked()) { // MATERIAL: the Material player has a fixed key table, panel and seek preview
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: the Material player has a fixed key table, panel and seek preview
             appendOKButtonCategory(settingsPresenter);
             appendUIAutoHideCategory(settingsPresenter);
             appendSeekTypeCategory(settingsPresenter);
@@ -77,12 +77,14 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         AppDialogUtil.appendSeekIntervalDialogItems(getContext(), settingsPresenter, mPlayerData, false);
         //appendRememberSpeedCategory(settingsPresenter);
         //appendScreenOffTimeoutCategory(settingsPresenter);
-        appendEndingTimeCategory(settingsPresenter);
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: the Material panel has no ending or remaining time
+            appendEndingTimeCategory(settingsPresenter);
+        }
         appendPixelRatioCategory(settingsPresenter);
         //appendPlayerExitCategory(settingsPresenter);
         appendSleepTimerCategory(settingsPresenter);
         appendMiscCategory(settingsPresenter);
-        if (!mSidebarService.isSettingsSectionLocked()) { // MATERIAL: no Developer options page in this app
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: no Developer options page in this app
             appendDeveloperCategory(settingsPresenter);
         }
 
@@ -355,9 +357,11 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
     private void appendMiscCategory(AppDialogPresenter settingsPresenter) {
         List<OptionItem> options = new ArrayList<>();
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.suggestions_horizontally_scrolled),
-                option -> mPlayerTweaksData.setSuggestionsHorizontallyScrolled(option.isSelected()),
-                mPlayerTweaksData.isSuggestionsHorizontallyScrolled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.suggestions_horizontally_scrolled),
+                    option -> mPlayerTweaksData.setSuggestionsHorizontallyScrolled(option.isSelected()),
+                    mPlayerTweaksData.isSuggestionsHorizontallyScrolled()));
+        }
 
         options.add(UiOptionItem.from(getContext().getString(R.string.dont_resize_video_to_fit_dialog),
                 option -> mPlayerTweaksData.setDontResizeVideoToFitDialogEnabled(option.isSelected()),
@@ -396,13 +400,17 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 option -> mPlayerTweaksData.setLoopShortsEnabled(option.isSelected()),
                 mPlayerTweaksData.isLoopShortsEnabled()));
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.place_chat_left),
-                option -> mPlayerTweaksData.setChatPlacedLeft(option.isSelected()),
-                mPlayerTweaksData.isChatPlacedLeft()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.place_chat_left),
+                    option -> mPlayerTweaksData.setChatPlacedLeft(option.isSelected()),
+                    mPlayerTweaksData.isChatPlacedLeft()));
+        }
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.place_comments_left),
-                option -> mPlayerTweaksData.setCommentsPlacedLeft(option.isSelected()),
-                mPlayerTweaksData.isCommentsPlacedLeft()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.place_comments_left),
+                    option -> mPlayerTweaksData.setCommentsPlacedLeft(option.isSelected()),
+                    mPlayerTweaksData.isCommentsPlacedLeft()));
+        }
 
         options.add(UiOptionItem.from(getContext().getString(R.string.player_disable_suggestions),
                 option -> mPlayerTweaksData.setSuggestionsDisabled(option.isSelected()),
@@ -435,42 +443,56 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 option -> mPlayerTweaksData.setRememberPositionOfShortVideosEnabled(option.isSelected()),
                 mPlayerTweaksData.isRememberPositionOfShortVideosEnabled()));
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_speed_button_old_behavior),
-                option -> mPlayerTweaksData.setSpeedButtonOldBehaviorEnabled(option.isSelected()),
-                mPlayerTweaksData.isSpeedButtonOldBehaviorEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_speed_button_old_behavior),
+                    option -> mPlayerTweaksData.setSpeedButtonOldBehaviorEnabled(option.isSelected()),
+                    mPlayerTweaksData.isSpeedButtonOldBehaviorEnabled()));
+        }
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_show_clock),
-                option -> mPlayerData.setClockEnabled(option.isSelected()),
-                mPlayerData.isClockEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_show_clock),
+                    option -> mPlayerData.setClockEnabled(option.isSelected()),
+                    mPlayerData.isClockEnabled()));
+        }
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_show_quality_info),
-                option -> mPlayerData.setQualityInfoEnabled(option.isSelected()),
-                mPlayerData.isQualityInfoEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_show_quality_info),
+                    option -> mPlayerData.setQualityInfoEnabled(option.isSelected()),
+                    mPlayerData.isQualityInfoEnabled()));
+        }
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_show_quality_info_bitrate),
-                option -> mPlayerTweaksData.setQualityInfoBitrateEnabled(option.isSelected()),
-                mPlayerTweaksData.isQualityInfoBitrateEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_show_quality_info_bitrate),
+                    option -> mPlayerTweaksData.setQualityInfoBitrateEnabled(option.isSelected()),
+                    mPlayerTweaksData.isQualityInfoBitrateEnabled()));
+        }
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_global_focus),
-                getContext().getString(R.string.player_global_focus_desc),
-                option -> mPlayerTweaksData.setSyncRowButtonIndexEnabled(option.isSelected()),
-                mPlayerTweaksData.isSyncRowButtonIndexEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_global_focus),
+                    getContext().getString(R.string.player_global_focus_desc),
+                    option -> mPlayerTweaksData.setSyncRowButtonIndexEnabled(option.isSelected()),
+                    mPlayerTweaksData.isSyncRowButtonIndexEnabled()));
+        }
 
         options.add(UiOptionItem.from(getContext().getString(R.string.player_ui_on_next),
                 option -> mPlayerTweaksData.setPlayerUiOnNextEnabled(option.isSelected()),
                 mPlayerTweaksData.isPlayerUiOnNextEnabled()));
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_ui_animations),
-                option -> mPlayerTweaksData.setUIAnimationsEnabled(option.isSelected()),
-                mPlayerTweaksData.isUIAnimationsEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_ui_animations),
+                    option -> mPlayerTweaksData.setUIAnimationsEnabled(option.isSelected()),
+                    mPlayerTweaksData.isUIAnimationsEnabled()));
+        }
 
         options.add(UiOptionItem.from(getContext().getString(R.string.player_likes_count),
                 option -> mPlayerTweaksData.setLikesCounterEnabled(option.isSelected()),
                 mPlayerTweaksData.isLikesCounterEnabled()));
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_show_tooltips),
-                option -> mPlayerData.setTooltipsEnabled(option.isSelected()),
-                mPlayerData.isTooltipsEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_show_tooltips),
+                    option -> mPlayerData.setTooltipsEnabled(option.isSelected()),
+                    mPlayerData.isTooltipsEnabled()));
+        }
 
         // See: Utils.updateTooltip
         //options.add(UiOptionItem.from(getContext().getString(R.string.player_show_tooltips) + ": " + getContext().getString(R.string.long_press_for_options),
@@ -480,9 +502,11 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         //        },
         //        mGeneralData.isFirstUseTooltipEnabled()));
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.player_button_long_click),
-                option -> mPlayerTweaksData.setButtonLongClickEnabled(option.isSelected()),
-                mPlayerTweaksData.isButtonLongClickEnabled()));
+        if (!mSidebarService.isMaterialUi()) { // MATERIAL: acts only on the old player UI
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_button_long_click),
+                    option -> mPlayerTweaksData.setButtonLongClickEnabled(option.isSelected()),
+                    mPlayerTweaksData.isButtonLongClickEnabled()));
+        }
 
         options.add(UiOptionItem.from(getContext().getString(R.string.real_channel_icon),
                 option -> mPlayerTweaksData.setRealChannelIconEnabled(option.isSelected()),

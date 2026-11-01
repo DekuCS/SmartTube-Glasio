@@ -99,10 +99,21 @@ private fun Rows(state: DialogState, page: DialogPage, onActivate: (DialogRow) -
     val focusKey = remember { state.initialFocus() }
     val start = remember { page.rows.indexOfFirst { it.key == focusKey }.coerceAtLeast(0) }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (start - ROWS_ABOVE_FOCUS).coerceAtLeast(0))
-    val initial = remember { FocusRequester() }
+    val requesters = remember { HashMap<Int, FocusRequester>() }
+    val requesterFor = { key: Int -> requesters.getOrPut(key) { FocusRequester() } }
     LaunchedEffect(Unit) {
         withFrameNanos { }
-        runCatching { initial.requestFocus() }
+        runCatching { focusKey?.let(requesterFor)?.requestFocus() }
+    }
+    // The line that had focus went (an item removed in place): focus moves to the line that took its place.
+    var lastKey by remember { mutableStateOf(focusKey) }
+    var lastIndex by remember { mutableStateOf(start) }
+    LaunchedEffect(page.rows) {
+        if (page.rows.none { it.key == lastKey } && page.rows.isNotEmpty()) {
+            withFrameNanos { }
+            val next = page.rows[lastIndex.coerceAtMost(page.rows.lastIndex)]
+            runCatching { requesterFor(next.key).requestFocus() }
+        }
     }
     LazyColumn(
         state = listState,
@@ -112,22 +123,28 @@ private fun Rows(state: DialogState, page: DialogPage, onActivate: (DialogRow) -
             .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        itemsIndexed(page.rows, key = { _, row -> row.key }) { _, row ->
-            DialogLine(row, onActivate, if (row.key == focusKey) Modifier.focusRequester(initial) else Modifier)
+        itemsIndexed(page.rows, key = { _, row -> row.key }) { index, row ->
+            DialogLine(row, onActivate, Modifier.focusRequester(requesterFor(row.key))) {
+                lastKey = row.key
+                lastIndex = index
+            }
         }
     }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun DialogLine(row: DialogRow, onActivate: (DialogRow) -> Unit, modifier: Modifier) {
+private fun DialogLine(row: DialogRow, onActivate: (DialogRow) -> Unit, modifier: Modifier, onFocused: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Surface(
         onClick = { onActivate(row) },
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
-            .onFocusChanged { focused = it.isFocused },
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            },
         shape = ClickableSurfaceDefaults.shape(RowShape),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,

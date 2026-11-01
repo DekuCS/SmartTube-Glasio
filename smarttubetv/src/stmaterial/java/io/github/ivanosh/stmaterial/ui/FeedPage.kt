@@ -36,7 +36,6 @@ interface FeedPageActions : FeedActions {
     fun videoMenuItems(video: Video): List<MenuItem>
 }
 
-private const val MESSAGE_MS = 3000L
 private val TitleStyle = TextStyle(color = Palette.OnBackground, fontSize = 40.sp, lineHeight = 48.sp, fontWeight = FontWeight.Medium)
 
 /**
@@ -47,41 +46,10 @@ private val TitleStyle = TextStyle(color = Palette.OnBackground, fontSize = 40.s
 @Composable
 fun FeedPage(title: String?, state: BrowseState, actions: FeedPageActions) {
     var contentFocused by remember { mutableStateOf(false) }
-    var cardMenu by remember { mutableStateOf<List<MenuItem>?>(null) }
-    // Focus falls away when the menu goes, and that forgets the card, so the menu keeps it.
-    var cardMenuOrigin by remember { mutableStateOf<FocusKey?>(null) }
-    val feedActions = remember(actions) {
-        object : FeedPageActions by actions {
-            override fun onVideoLongClicked(video: Video) {
-                val items = actions.videoMenuItems(video)
-                if (items.isNotEmpty()) {
-                    cardMenuOrigin = state.focused
-                    cardMenu = items
-                }
-            }
-        }
-    }
-
-    val orphaned = !contentFocused && cardMenu == null
+    val menu = rememberCardMenuHost(state, actions)
     val hasCards = !state.isEmpty
-    LaunchedEffect(orphaned, hasCards) {
-        if (!orphaned || !hasCards) return@LaunchedEffect
-        withFrameNanos { }
+    CardFocusEffects(state, menu, orphaned = !contentFocused && menu.items == null, hasTargets = hasCards) {
         state.restoreFocus()?.let { state.pendingFocus = it }
-    }
-    LaunchedEffect(cardMenu) {
-        val origin = cardMenuOrigin
-        if (cardMenu == null && origin != null) {
-            cardMenuOrigin = null
-            withFrameNanos { }
-            state.restoreFocus(origin)?.let { state.pendingFocus = it }
-        }
-    }
-    LaunchedEffect(state.message) {
-        if (state.message != null) {
-            delay(MESSAGE_MS)
-            state.message = null
-        }
     }
 
     MaterialTvTheme {
@@ -92,14 +60,14 @@ fun FeedPage(title: String?, state: BrowseState, actions: FeedPageActions) {
                 }
                 Box(Modifier.fillMaxSize().onFocusChanged { contentFocused = it.hasFocus }) {
                     when {
-                        hasCards -> Feed(state, feedActions)
+                        hasCards -> Feed(state, menu.feedActions)
                         state.loading -> CenteredMessage(stringResource(R.string.material_loading))
                         else -> CenteredMessage(stringResource(R.string.material_empty))
                     }
                 }
             }
             state.message?.let { MessageLine(it, Modifier.align(Alignment.BottomCenter)) }
-            cardMenu?.let { items -> ContextMenu(items = items, onDismiss = { cardMenu = null }) }
+            menu.items?.let { items -> ContextMenu(items = items, onDismiss = menu::dismiss) }
         }
     }
 }

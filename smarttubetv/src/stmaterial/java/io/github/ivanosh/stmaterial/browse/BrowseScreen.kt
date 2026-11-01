@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.tv.material3.Text
-import kotlinx.coroutines.delay
 import io.github.ivanosh.stmaterial.ui.ContextMenu
 import io.github.ivanosh.stmaterial.ui.MenuItem
 import androidx.compose.ui.focus.FocusRequester
@@ -46,7 +45,9 @@ import io.github.ivanosh.stmaterial.logic.Sections
 import io.github.ivanosh.stmaterial.ui.CenteredMessage
 import io.github.ivanosh.stmaterial.ui.ErrorState
 import io.github.ivanosh.stmaterial.ui.Feed
+import io.github.ivanosh.stmaterial.ui.CardFocusEffects
 import io.github.ivanosh.stmaterial.ui.FeedPageActions
+import io.github.ivanosh.stmaterial.ui.rememberCardMenuHost
 import io.github.ivanosh.stmaterial.ui.MessageLine
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
 import io.github.ivanosh.stmaterial.ui.Palette
@@ -63,7 +64,6 @@ interface BrowseActions : FeedPageActions {
 }
 
 private const val TABS_ANIMATION_MS = 200
-private const val MESSAGE_MS = 3000L
 private val TabsTravel = 132.dp
 
 // The content starts below the bar and not under it: focus search takes a list as one rectangle first,
@@ -90,21 +90,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
         // The tab whose menu is open, and the tab that gets focus back when it closes.
         var menuFor by remember { mutableStateOf<Int?>(null) }
         // The menu of a card. Focus comes back to the card through the state, as it does after any loss of focus.
-        var cardMenu by remember { mutableStateOf<List<MenuItem>?>(null) }
-        // The card that had focus when the menu opened. Focus falls to the tabs when the menu goes, and
-        // that forgets the card, so the menu keeps it.
-        var cardMenuOrigin by remember { mutableStateOf<FocusKey?>(null) }
-        val feedActions = remember(actions) {
-            object : BrowseActions by actions {
-                override fun onVideoLongClicked(video: Video) {
-                    val items = actions.videoMenuItems(video)
-                    if (items.isNotEmpty()) {
-                        cardMenuOrigin = state.focused
-                        cardMenu = items
-                    }
-                }
-            }
-        }
+        val cardMenu = rememberCardMenuHost(state, actions)
 
         fun focusTabs() {
             val ids = state.tabs()
@@ -114,14 +100,8 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
 
         // Nothing holds focus: the first frame, or what had it is gone (error replaced, card removed,
         // section cleared). A card takes it back if there is one, otherwise the selected tab.
-        val orphaned = !barFocused && !contentFocused && menuFor == null && cardMenu == null
-        val hasTabs = state.tabs().isNotEmpty()
-        LaunchedEffect(orphaned, hasTabs) {
-            if (!orphaned || !hasTabs) return@LaunchedEffect
-            withFrameNanos { }
-            val card = if (state.focused != null) state.restoreFocus() else null
-            if (card != null) state.pendingFocus = card else focusTabs()
-        }
+        val orphaned = !barFocused && !contentFocused && menuFor == null && cardMenu.items == null
+        CardFocusEffects(state, cardMenu, orphaned, hasTargets = state.tabs().isNotEmpty(), fallback = ::focusTabs)
 
         var menuClosedOn by remember { mutableStateOf<Int?>(null) }
         LaunchedEffect(menuFor) {
@@ -130,21 +110,6 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                 menuClosedOn = null
                 withFrameNanos { }
                 if (origin == MediaGroup.TYPE_SETTINGS || origin in state.tabs()) requesterFor(origin).requestFocus() else focusTabs()
-            }
-        }
-        LaunchedEffect(cardMenu) {
-            val origin = cardMenuOrigin
-            if (cardMenu == null && origin != null) {
-                cardMenuOrigin = null
-                withFrameNanos { }
-                val card = state.restoreFocus(origin)
-                if (card != null) state.pendingFocus = card else focusTabs()
-            }
-        }
-        LaunchedEffect(state.message) {
-            if (state.message != null) {
-                delay(MESSAGE_MS)
-                state.message = null
             }
         }
 
@@ -191,7 +156,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                     }
             ) {
                 key(state.selected) {
-                    Content(state, feedActions)
+                    Content(state, actions, cardMenu.feedActions)
                 }
             }
             Tabs(
@@ -211,8 +176,8 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                     .graphicsLayer { translationY = -TabsTravel.toPx() * tabsAway.value },
             )
             state.message?.let { MessageLine(it, Modifier.align(Alignment.BottomCenter)) }
-            cardMenu?.let { items ->
-                ContextMenu(items = items, onDismiss = { cardMenu = null })
+            cardMenu.items?.let { items ->
+                ContextMenu(items = items, onDismiss = cardMenu::dismiss)
             }
             menuFor?.let { id ->
                 val openFirst = stringResource(R.string.material_menu_open_first)
@@ -240,11 +205,11 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
 }
 
 @Composable
-private fun Content(state: BrowseState, actions: BrowseActions) {
+private fun Content(state: BrowseState, actions: BrowseActions, feedActions: FeedPageActions) {
     val error = state.error
     when {
         state.selected == Sections.SEARCH_SECTION_ID -> CenteredMessage(stringResource(R.string.material_search_hint))
-        !state.isEmpty -> Feed(state, actions)
+        !state.isEmpty -> Feed(state, feedActions)
         error != null -> ErrorState(
             message = error.message,
             actionText = error.actionText ?: stringResource(R.string.material_retry),

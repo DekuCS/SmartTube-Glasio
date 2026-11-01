@@ -129,7 +129,7 @@ class DialogStateTest {
     }
 
     @Test
-    fun `replace swaps the top page and keeps the one below with its focus`() {
+    fun `replace swaps the lines of the top page under the same id and keeps the one below with its focus`() {
         val state = DialogState()
         val entry = EntryRow(7, "Account", 1) { DialogPage.of("Account", listOf(ButtonRow(1, "Sign in", null))) }
         state.push(DialogPage.of("Settings", listOf(entry)))
@@ -138,7 +138,7 @@ class DialogStateTest {
         state.replace(DialogPage.of("Account", listOf(ButtonRow(2, "Sign out", null))))
         assertEquals(listOf(2), state.page!!.rows.map { it.key })
         assertEquals(2, state.depth)
-        assertTrue(state.page!!.id != before)
+        assertEquals(before, state.page!!.id)
         assertTrue(state.pop())
         assertEquals(7, state.initialFocus())
     }

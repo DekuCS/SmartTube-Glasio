@@ -135,6 +135,7 @@ public class Utils {
     private static final String TASK_ID = RemoteControlWorker.class.getSimpleName();
     private static final String TAG = Utils.class.getSimpleName();
     private static final String QR_CODE_URL_TEMPLATE = "https://api.qrserver.com/v1/create-qr-code/?data=%s";
+    private static boolean sQrServiceDisabled; // MATERIAL: the Material UI never sends a link to the QR service
     private static final int GLOBAL_VOLUME_TYPE = AudioManager.STREAM_MUSIC;
     private static final String GLOBAL_VOLUME_SERVICE = Context.AUDIO_SERVICE;
     public static final Handler sHandler = new Handler(Looper.getMainLooper());
@@ -508,8 +509,14 @@ public class Utils {
         }
     }
 
-    // MATERIAL: the Material UI never sends a link to the third party QR service; set once at start
-    public static boolean sQrServiceDisabled;
+    // MATERIAL: set once at start
+    public static void disableQrService() {
+        sQrServiceDisabled = true;
+    }
+
+    public static boolean isQrServiceDisabled() {
+        return sQrServiceDisabled;
+    }
 
     public static String toQrCodeLink(String data) {
         if (sQrServiceDisabled) { // MATERIAL:

@@ -70,9 +70,13 @@ class DialogState {
         levels = kept + Level(page.withId(nextId++))
     }
 
-    /** Takes the top page's place with [page], for a page whose lines changed under it (an account gone, a channel unblocked). */
+    /**
+     * Takes the top page's place with [page], for a page whose lines changed under it (an account gone, a
+     * channel unblocked). The id stays, so the screen keeps its scroll position and focus.
+     */
     fun replace(page: DialogPage) {
-        levels = levels.dropLast(1) + Level(page.withId(nextId++))
+        val top = levels.lastOrNull()
+        levels = levels.dropLast(1) + Level(page.withId(top?.page?.id ?: nextId++))
     }
 
     fun open(entry: EntryRow) = push(entry.open(), openedFrom = entry.key)

@@ -42,6 +42,8 @@ import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.browse.FeedActivity
 import io.github.ivanosh.stmaterial.logic.KeyboardLanguage
 import io.github.ivanosh.stmaterial.logic.SearchInput
+import io.github.ivanosh.stmaterial.logic.cleanSuggestions
+import io.github.ivanosh.stmaterial.logic.isCurrentAnswer
 import io.github.ivanosh.stmaterial.ui.FeedPage
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
 import io.github.ivanosh.stmaterial.ui.PAGE_TITLE_HEIGHT
@@ -107,7 +109,13 @@ class MaterialSearchActivity : FeedActivity<SearchPresenter>(), SearchView {
         // Suggestions follow the query; a key held down asks once the typing pauses.
         LaunchedEffect(input.text) {
             delay(SUGGESTIONS_DELAY_MS)
-            tagsProvider?.search(input.text) { tags -> suggestions = tags.orEmpty().take(SUGGESTIONS_LIMIT) }
+            val asked = input.text
+            tagsProvider?.search(asked) { tags ->
+                // Answers come late and in any order; one for an earlier query must not replace the current ones.
+                if (!isCurrentAnswer(asked, input.text)) return@search
+                val all = tags.orEmpty()
+                suggestions = cleanSuggestions(all.map { it.tag }, SUGGESTIONS_LIMIT).mapNotNull { name -> all.firstOrNull { it.tag == name } }
+            }
         }
         Column(Modifier.fillMaxSize().background(Palette.Background), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.height(PAGE_TITLE_HEIGHT).fillMaxWidth().padding(horizontal = 58.dp), contentAlignment = Alignment.CenterStart) {
@@ -216,6 +224,10 @@ class MaterialSearchActivity : FeedActivity<SearchPresenter>(), SearchView {
     /** With a text, the results at once (a search started from the player, a suggestion); without, the keyboard. */
     override fun startSearch(searchText: String?) {
         if (searchText.isNullOrBlank()) {
+            if (showingResults) {
+                presenter.disposeActions()
+                clearFeed()
+            }
             input = SearchInput()
             showingResults = false
             return

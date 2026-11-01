@@ -28,9 +28,17 @@ class NoticeTest {
     /** The notice in the app is a copy of the file of the repository; it must not drift. */
     @Test
     fun shippedNoticeIsTheLicenseFile() {
-        val shipped = File("src/stmaterial/res/raw/smarttube_license.txt").readText()
-        val license = File("../LICENSE").readText()
+        val module = moduleDir()
+        val shipped = File(module, "src/stmaterial/res/raw/smarttube_license.txt").readText()
+        val license = File(module.parentFile, "LICENSE").readText()
         assertEquals(license, shipped)
         assertTrue(paragraphs(shipped).first() == "MIT License")
+    }
+
+    /** The module directory, found from the test classes' own location, not from the working directory. */
+    private fun moduleDir(): File {
+        var dir: File? = File(NoticeTest::class.java.protectionDomain.codeSource.location.toURI())
+        while (dir != null && !File(dir, "src/stmaterial").isDirectory) dir = dir.parentFile
+        return checkNotNull(dir) { "module directory not found" }
     }
 }

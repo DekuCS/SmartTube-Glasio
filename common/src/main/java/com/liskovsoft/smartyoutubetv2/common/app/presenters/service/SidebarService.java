@@ -26,6 +26,7 @@ public class SidebarService implements ProfileChangeListener {
     private final AppPrefs mPrefs;
     private boolean mIsSettingsSectionEnabled;
     private boolean mIsSettingsSectionLocked; // MATERIAL:
+    private boolean mIsMaterialUi; // MATERIAL:
     private int mBootSectionId;
     private final static int RESERVED_ID = 100;
 
@@ -235,6 +236,17 @@ public class SidebarService implements ProfileChangeListener {
     // MATERIAL: the Settings gear is the only way in, so the section can't be hidden
     public void lockSettingsSection() {
         mIsSettingsSectionLocked = true;
+    }
+
+    // MATERIAL: the Material UI is in use: its own player panel, keys and settings pages replace the old ones
+    public void enableMaterialUi() {
+        mIsMaterialUi = true;
+        lockSettingsSection();
+    }
+
+    // MATERIAL: settings that only act on the old UI check this
+    public boolean isMaterialUi() {
+        return mIsMaterialUi;
     }
 
     // MATERIAL:
