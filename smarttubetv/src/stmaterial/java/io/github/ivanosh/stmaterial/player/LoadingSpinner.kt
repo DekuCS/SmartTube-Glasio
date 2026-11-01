@@ -3,7 +3,6 @@ package io.github.ivanosh.stmaterial.player
 import android.content.Context
 import android.view.View
 import android.widget.FrameLayout
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -25,6 +24,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import io.github.ivanosh.stmaterial.logic.CYCLES_PER_TURN
+import io.github.ivanosh.stmaterial.logic.arcStart
+import io.github.ivanosh.stmaterial.logic.arcSweep
 import io.github.ivanosh.stmaterial.ui.Palette
 
 private val IndicatorSize = 56.dp
@@ -32,13 +34,7 @@ private val IndicatorStroke = 5.dp
 internal val SpinnerPlateSize = 88.dp
 private val PlateColor = Palette.Background.copy(alpha = 0.8f)
 
-// The Material 3 indeterminate circular indicator: the arc grows and shrinks while it turns.
 private const val CYCLE_MS = 1332
-private const val CYCLES_PER_TURN = 5
-private const val HEAD_AND_TAIL_SPAN = 290f
-private const val ROTATION_PER_CYCLE = 286f
-private const val START_OFFSET = -90f
-private val CircularEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
 /**
  * The player's loading indicator, a view that the Leanback progress bar manager shows and hides (see
@@ -77,15 +73,9 @@ private fun LoadingSpinner() {
     val stroke = remember(density) { Stroke(with(density) { IndicatorStroke.toPx() }, cap = StrokeCap.Round) }
     Canvas(Modifier.size(SpinnerPlateSize)) {
         val clock = turn.value
-        val position = clock * CYCLES_PER_TURN
-        val phase = position - position.toInt()
-        // The head runs ahead in the first half of the cycle, the tail catches up in the second.
-        val head = CircularEasing.transform((phase * 2f).coerceAtMost(1f)) * HEAD_AND_TAIL_SPAN
-        val tail = CircularEasing.transform(((phase - 0.5f) * 2f).coerceAtLeast(0f)) * HEAD_AND_TAIL_SPAN
-        val start = START_OFFSET + clock * 360f + phase * ROTATION_PER_CYCLE + tail
         drawCircle(PlateColor)
         val diameter = IndicatorSize.toPx() - stroke.width
         val inset = (size.width - diameter) / 2f
-        drawArc(Palette.Accent, start, head - tail, false, Offset(inset, inset), Size(diameter, diameter), style = stroke)
+        drawArc(Palette.Accent, arcStart(clock), arcSweep(clock), false, Offset(inset, inset), Size(diameter, diameter), style = stroke)
     }
 }
