@@ -1,7 +1,5 @@
 package com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers;
 
-import android.text.TextUtils;
-
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.BasePlayerController;
@@ -10,6 +8,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.service.SidebarService;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.AudioPickPolicy;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil;
 
@@ -96,12 +95,14 @@ public class HQDialogController extends BasePlayerController {
 
         FormatItem formatItem = UiOptionItem.toFormat(option);
         // MATERIAL: an audio track picked from the list is the manual choice for this video. One owner of that choice.
-        if (formatItem.getType() == FormatItem.TYPE_AUDIO && !TextUtils.isEmpty(formatItem.getLanguage()) &&
-                SidebarService.instance(getContext()).isMaterialUi()) {
-            getPlayerData().setTempAudioLanguage(formatItem.getLanguage());
+        boolean persist = true;
+        if (formatItem.getType() == FormatItem.TYPE_AUDIO && SidebarService.instance(getContext()).isMaterialUi()) {
+            persist = AudioPickPolicy.applyPick(getPlayerData(), getPlayer().getAudioFormats(), formatItem);
         }
         getPlayer().setFormat(formatItem);
-        persistFormat(formatItem);
+        if (persist) {
+            persistFormat(formatItem);
+        }
 
         if (getPlayerData().getFormat(formatItem.getType()).isPreset()) {
             // Preset currently active. Show warning about format reset.

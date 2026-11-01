@@ -50,6 +50,7 @@ public class PlayerData extends DataChangeBase implements PlayerConstants, Profi
     private int mBackgroundMode;
     private FormatItem mVideoFormat;
     private FormatItem mTempVideoFormat;
+    private FormatItem mTempAudioFormat; // MATERIAL: audio track picked for the current video only
     private String mTempAudioLanguage; // MATERIAL: audio language picked for the current video only
     private FormatItem mAudioFormat;
     private FormatItem mSubtitleFormat;
@@ -412,6 +413,16 @@ public class PlayerData extends DataChangeBase implements PlayerConstants, Profi
     // MATERIAL: not persisted. Cleared when the next video opens. Null: nothing chosen, "": original
     public void setTempAudioLanguage(String language) {
         mTempAudioLanguage = language;
+    }
+
+    // MATERIAL: not persisted. Cleared when the next video opens
+    public void setTempAudioFormat(FormatItem format) {
+        mTempAudioFormat = format;
+    }
+
+    // MATERIAL:
+    public FormatItem getTempAudioFormat() {
+        return mTempAudioFormat;
     }
 
     // MATERIAL:

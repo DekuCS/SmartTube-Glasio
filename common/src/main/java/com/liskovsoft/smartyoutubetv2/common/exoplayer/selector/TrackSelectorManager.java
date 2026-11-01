@@ -477,6 +477,12 @@ public class TrackSelectorManager implements TrackSelectorCallback {
 
             MediaTrack[][] mediaTracks = filterByLanguage(renderer.mediaTracks, originTrack);
 
+            // MATERIAL: select as if nothing was saved: the best track of the language under the normal rules
+            if (SidebarService.instance(mContext).isMaterialUi() && isSavedFromOtherLanguage(originTrack, mediaTracks)) {
+                MediaTrack defaultTrack = FormatItem.toMediaTrack(PlayerData.instance(mContext).getDefaultAudioFormat());
+                originTrack = defaultTrack != null ? defaultTrack : originTrack;
+            }
+
             outerloop:
             for (int groupIndex = 0; groupIndex < mediaTracks.length; groupIndex++) {
                 prevResult = result;
@@ -730,6 +736,42 @@ public class TrackSelectorManager implements TrackSelectorCallback {
         }
 
         return trackGroupList;
+    }
+
+    /**
+     * MATERIAL: a saved audio format of a language the video does not start with must not steer the choice
+     * by its bitrate and codec (e.g. left by a pick on another video)
+     */
+    public static boolean isSavedFromOtherLanguage(MediaTrack saved, MediaTrack[][] filtered) {
+        if (!(saved instanceof AudioTrack) || !saved.isSaved || saved.format == null || TextUtils.isEmpty(saved.format.language)) {
+            return false;
+        }
+
+        for (MediaTrack[] group : filtered) {
+            if (group == null) {
+                continue;
+            }
+
+            for (MediaTrack track : group) {
+                if (track != null && track.format != null && saved.format.language.equals(track.format.language)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * MATERIAL: the selector keeps an audio override keyed by the track groups. A pick made on a video would come
+     * back with the same video. Called when a new source opens. Audio is then chosen again from the rules.
+     */
+    public void clearAudioOverride() {
+        if (mTrackSelector == null || !SidebarService.instance(mContext).isMaterialUi()) {
+            return;
+        }
+
+        mTrackSelector.setParameters(mTrackSelector.buildUponParameters().clearSelectionOverrides(RENDERER_INDEX_AUDIO));
     }
 
     // MATERIAL:

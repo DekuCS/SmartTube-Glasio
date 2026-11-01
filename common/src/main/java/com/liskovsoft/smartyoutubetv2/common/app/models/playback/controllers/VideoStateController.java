@@ -71,6 +71,7 @@ public class VideoStateController extends BasePlayerController {
         setPlayEnabled(true); // video just added
 
         getPlayerData().setTempVideoFormat(null);
+        getPlayerData().setTempAudioFormat(null); // MATERIAL:
         getPlayerData().setTempAudioLanguage(null); // MATERIAL: a manual audio language lasts for one video
 
         enableIncognitoIfNeeded(item);
@@ -460,6 +461,12 @@ public class VideoStateController extends BasePlayerController {
 
     private void restoreAudioFormat() {
         if (getPlayer() == null) {
+            return;
+        }
+
+        // MATERIAL: a track picked from the list for this video, not saved
+        if (getPlayerData().getTempAudioFormat() != null) {
+            getPlayer().setFormat(getPlayerData().getTempAudioFormat());
             return;
         }
 

@@ -371,7 +371,7 @@ public class AppDialogUtil {
                         selectAudioLanguage(playerData, languageCode, isMaterial);
                         onSetCallback.run();
                     },
-                    languageCode.equals(currentLanguage)));
+                    isCurrentLanguage(currentLanguage, languageCode)));
             addedCodes.add(languageCode);
         }
 
@@ -393,7 +393,7 @@ public class AppDialogUtil {
                         selectAudioLanguage(playerData, languageCode, isMaterial);
                         onSetCallback.run();
                     },
-                    languageCode.equals(currentLanguage)));
+                    isCurrentLanguage(currentLanguage, languageCode)));
         }
 
         options.add(0, UiOptionItem.from(context.getString(R.string.original_lang),
@@ -404,6 +404,15 @@ public class AppDialogUtil {
                 "".equals(currentLanguage)));
 
         return OptionCategory.from(AUDIO_LANGUAGE_ID, OptionCategory.TYPE_RADIO_LIST, title, options);
+    }
+
+    // MATERIAL: the current language can be the full label of a track picked from the list, e.g. "en-us (dubbed-auto)"
+    private static boolean isCurrentLanguage(String current, String code) {
+        if (current == null || code.isEmpty()) {
+            return code.equals(current);
+        }
+
+        return current.equals(code) || (current.startsWith(code) && !Character.isLetter(current.charAt(code.length())));
     }
 
     // MATERIAL: in the Material UI a language applies to the current video only

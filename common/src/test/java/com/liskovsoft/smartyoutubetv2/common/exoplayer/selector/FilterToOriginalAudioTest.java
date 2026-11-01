@@ -11,7 +11,9 @@ import org.robolectric.annotation.Config;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
@@ -75,5 +77,23 @@ public class FilterToOriginalAudioTest {
 
         // The next video: the manual choice is cleared
         assertArrayEquals(new MediaTrack[] {ru}, TrackSelectorManager.filterToOriginalAudio(groups, null)[0]);
+    }
+
+    @Test
+    public void savedTrackOfAnotherLanguageIsIgnored() {
+        MediaTrack ru = track("1", "ru (original)");
+        MediaTrack[][] filtered = {{ru}};
+        AudioTrack savedEn = track("2", EN_AUTO);
+        savedEn.isSaved = true;
+        AudioTrack savedRu = track("3", "ru (original)");
+        savedRu.isSaved = true;
+        AudioTrack savedDefault = track("4", null);
+        savedDefault.isSaved = true;
+        AudioTrack pickedEn = track("5", EN_AUTO); // a pick of this video is not saved
+
+        assertTrue(TrackSelectorManager.isSavedFromOtherLanguage(savedEn, filtered));
+        assertFalse(TrackSelectorManager.isSavedFromOtherLanguage(savedRu, filtered));
+        assertFalse(TrackSelectorManager.isSavedFromOtherLanguage(savedDefault, filtered));
+        assertFalse(TrackSelectorManager.isSavedFromOtherLanguage(pickedEn, filtered));
     }
 }

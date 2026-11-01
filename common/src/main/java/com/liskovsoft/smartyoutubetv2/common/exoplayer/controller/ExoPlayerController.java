@@ -175,6 +175,7 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
 
         mTrackSelectorManager.setMergedSource(mediaSource instanceof MergingMediaSource);
         mTrackSelectorManager.invalidate();
+        mTrackSelectorManager.clearAudioOverride(); // MATERIAL: a pick of a video must not come back with it
         mOnSourceChanged = true;
         mEventListener.onSourceChanged(getVideo());
         mPlayer.prepare(mediaSource);
