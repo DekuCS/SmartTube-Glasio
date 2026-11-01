@@ -416,9 +416,10 @@ public class AppDialogUtil {
     }
 
     // MATERIAL: in the Material UI a language applies to the current video only
-    private static void selectAudioLanguage(PlayerData playerData, String languageCode, boolean isMaterial) {
+    static void selectAudioLanguage(PlayerData playerData, String languageCode, boolean isMaterial) {
         if (isMaterial) {
             playerData.setTempAudioLanguage(languageCode);
+            playerData.setTempAudioFormat(null); // the restart would re-apply a track picked from the list
         } else {
             playerData.setAudioLanguage(languageCode);
         }
