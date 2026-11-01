@@ -2,6 +2,9 @@ package io.github.ivanosh.stmaterial.update
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import io.github.ivanosh.stmaterial.logic.offerAllowed
 import io.github.ivanosh.stmaterial.logic.UpdateOffer
 import io.github.ivanosh.stmaterial.logic.shouldCheck
 import java.lang.ref.WeakReference
@@ -12,6 +15,8 @@ import java.lang.ref.WeakReference
  * browse screen to be shown again. Nothing runs in the background and nothing repeats.
  */
 object UpdateScheduler {
+    private const val SETTLE_MS = 400L
+    private val handler = Handler(Looper.getMainLooper())
     private var pending: UpdateOffer? = null
     private var checking = false
     private var active: WeakReference<Activity>? = null
@@ -31,16 +36,18 @@ object UpdateScheduler {
         }
         val store = UpdateStore(activity)
         val channel = store.channel
+        // A file left by a killed process goes whether or not a check is due.
+        if (!checking) UpdateClient.deleteLeftovers(activity)
         if (checking || !shouldCheck(channel, store.lastCheckMs, now)) return
         store.lastCheckMs = now
         checking = true
-        UpdateClient.deleteLeftovers(activity)
         UpdateService.check(activity, channel) { result ->
             checking = false
             if (result is CheckResult.Offer) {
                 pending = result.offer
-                // Only if the browse screen is still the one in front; otherwise onBrowseResumed shows it later.
-                active?.get()?.let(::showPending)
+                // Only if the browse screen is still the one in front a moment later (it may be starting the
+                // player); otherwise onBrowseResumed shows it next time.
+                handler.postDelayed({ active?.get()?.let(::showPending) }, SETTLE_MS)
             }
         }
     }
@@ -52,6 +59,8 @@ object UpdateScheduler {
     private fun showPending(activity: Activity) {
         val offer = pending ?: return
         pending = null
+        // The channel may have changed since the check.
+        if (!offerAllowed(offer, UpdateStore(activity).channel)) return
         offerForDialog = offer
         activity.startActivity(Intent(activity, UpdateActivity::class.java))
     }

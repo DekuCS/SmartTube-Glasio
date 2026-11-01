@@ -29,7 +29,9 @@ class UpdateActivity : ComponentActivity() {
             setContent { MaterialTvTheme { DialogScreen(state, dialog::activate) } }
         })
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() = finish()
+            override fun handleOnBackPressed() {
+                if (!dialog.onBack()) finish()
+            }
         })
     }
 

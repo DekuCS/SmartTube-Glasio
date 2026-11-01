@@ -278,3 +278,53 @@ class VerifyTest {
     @Test fun pinnedCertIsTheDocumentedOne() =
         assertEquals("8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c", PINNED_CERT_SHA256)
 }
+
+class StaleOfferTest {
+    private fun offer(pre: Boolean) = pickUpdate(listOf(release("32.68-2", pre)), UpdateChannel.PRERELEASE, "32.68-1", ARM64)!!
+
+    @Test fun offIsNeverAllowed() {
+        assertFalse(offerAllowed(offer(false), UpdateChannel.OFF))
+        assertFalse(offerAllowed(offer(true), UpdateChannel.OFF))
+    }
+
+    @Test fun stableNeverShowsAPrerelease() {
+        assertFalse(offerAllowed(offer(true), UpdateChannel.STABLE))
+        assertTrue(offerAllowed(offer(false), UpdateChannel.STABLE))
+    }
+
+    @Test fun prereleaseTakesBoth() {
+        assertTrue(offerAllowed(offer(true), UpdateChannel.PRERELEASE))
+        assertTrue(offerAllowed(offer(false), UpdateChannel.PRERELEASE))
+    }
+}
+
+class FailClosedFlagsTest {
+    private fun feed(flags: String) =
+        """[{"tag_name":"material-v32.68-2",$flags "assets":[{"name":"SmartTube_material_32.68-2_arm64-v8a.apk","size":10,"digest":"sha256:$SHA"}]}]"""
+
+    private fun stable(flags: String) = pickUpdate(parseReleases(feed(flags)), UpdateChannel.STABLE, "32.68-1", ARM64)
+    private fun any(flags: String) = pickUpdate(parseReleases(feed(flags)), UpdateChannel.PRERELEASE, "32.68-1", ARM64)
+
+    @Test fun exactBooleansAreOffered() = assertEquals("32.68-2", stable(""""draft":false,"prerelease":false,""")?.versionName)
+
+    @Test fun missingDraftIsADraft() {
+        assertNull(stable(""""prerelease":false,"""))
+        assertNull(any(""""prerelease":false,"""))
+    }
+
+    @Test fun nonBooleanDraftIsADraft() {
+        listOf("\"false\"", "0", "null", "\"\"").forEach {
+            assertNull(it, any(""""draft":$it,"prerelease":false,"""))
+        }
+    }
+
+    @Test fun draftTrueIsADraft() = assertNull(any(""""draft":true,"prerelease":false,"""))
+
+    @Test fun nonBooleanPrereleaseIsNotStable() {
+        listOf("\"false\"", "0", "null", "\"\"").forEach {
+            assertNull(it, stable(""""draft":false,"prerelease":$it,"""))
+        }
+    }
+
+    @Test fun missingPrereleaseIsNotStable() = assertNull(stable(""""draft":false,"""))
+}

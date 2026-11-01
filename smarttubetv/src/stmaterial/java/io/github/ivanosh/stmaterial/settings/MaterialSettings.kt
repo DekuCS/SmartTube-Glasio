@@ -33,6 +33,7 @@ import io.github.ivanosh.stmaterial.dialog.EntryRow
 import io.github.ivanosh.stmaterial.dialog.TextRow
 import io.github.ivanosh.stmaterial.player.MaterialButtonsEditorActivity
 import io.github.ivanosh.stmaterial.logic.UpdateChannel
+import io.github.ivanosh.stmaterial.logic.offerAllowed
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
 import io.github.ivanosh.stmaterial.update.CheckResult
 import io.github.ivanosh.stmaterial.update.Failure
@@ -70,6 +71,7 @@ class MaterialSettingsActivity : ComponentActivity() {
         window.setBackgroundDrawable(null)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (updates.onBack()) return
                 if (!state.pop()) finish()
             }
         })
@@ -222,7 +224,8 @@ class MaterialSettingsActivity : ComponentActivity() {
             when (result) {
                 is CheckResult.Offer -> {
                     state.replace(updatesPage())
-                    state.push(updates.offerPage(result.offer))
+                    // The channel may have changed while the check ran.
+                    if (offerAllowed(result.offer, UpdateStore(this).channel)) state.push(updates.offerPage(result.offer))
                 }
                 CheckResult.UpToDate -> state.replace(updatesPage(getString(R.string.material_upd_latest)))
                 is CheckResult.Failed -> state.replace(updatesPage(getString(when (result.reason) {

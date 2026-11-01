@@ -171,4 +171,5 @@
     <string translatable="false" name="material_update_install_failed">The system installer did not accept the update.</string>
     <string translatable="false" name="material_update_download_failed">The download failed. Nothing was installed.</string>
     <string translatable="false" name="material_update_not_installed">Not installed</string>
+    <string translatable="false" name="material_update_channel_changed">This update is not offered on the channel chosen now.</string>
 </resources>

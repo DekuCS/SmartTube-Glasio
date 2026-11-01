@@ -43,7 +43,7 @@ const val RELEASES_URL = "https://api.github.com/repos/$REPO/releases?per_page=3
 private const val TAG_PREFIX = "material-v"
 private const val UNIVERSAL = "universal"
 private val APK_ABIS = listOf("arm64-v8a", "armeabi-v7a")
-private val VERSION = Regex("""\d{1,4}(\.\d{1,4}){1,3}-\d{1,2}""")
+private val VERSION = Regex("""[0-9]{1,4}(\.[0-9]{1,4}){1,3}-[0-9]{1,2}""")
 private val HEX64 = Regex("[0-9a-fA-F]{64}")
 private val HOSTS = setOf("github.com", "api.github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com")
 
@@ -84,9 +84,10 @@ fun parseReleases(json: String): List<Release> {
         }
         releases += Release(
             tag = tag,
-            // A feed that does not say is not trusted: it counts as a prerelease.
-            prerelease = item.optBoolean("prerelease", true),
-            draft = item.optBoolean("draft", false),
+            // Fail closed: only a JSON `false` is "not a prerelease" and "not a draft". Missing, null, a string or a
+            // number is a prerelease and a draft.
+            prerelease = item.opt("prerelease") != false,
+            draft = item.opt("draft") != false,
             body = if (item.isNull("body")) "" else item.optString("body", ""),
             assets = assets,
         )
@@ -132,6 +133,17 @@ fun pickUpdate(
         }
         .maxWithOrNull { a, b -> compareVersions(a.first, b.first) }
         ?.second
+}
+
+/**
+ * Whether an offer found earlier may still be shown or downloaded under the channel chosen now. The channel can
+ * change between the check and the prompt, so this is asked again at both places: Off never offers, Stable never a
+ * prerelease.
+ */
+fun offerAllowed(offer: UpdateOffer, channel: UpdateChannel): Boolean = when (channel) {
+    UpdateChannel.OFF -> false
+    UpdateChannel.STABLE -> !offer.prerelease
+    UpdateChannel.PRERELEASE -> true
 }
 
 /** At most once a day. A clock set back counts as due, or the check would wait for the clock to catch up. */
