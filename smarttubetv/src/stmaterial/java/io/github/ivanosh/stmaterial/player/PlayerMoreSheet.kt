@@ -102,7 +102,8 @@ fun BoxScope.MoreSheet(state: PlayerOverlayState) {
                     is SheetLine.Item -> SheetRow(
                         icon = buttonIcon(line.button),
                         label = stringResource(buttonLabel(line.button)),
-                        value = if (line.button in STATEFUL_BUTTONS) {
+                        // Repeat has seven modes and no short name for them, so it shows none.
+                        value = if (line.button in STATEFUL_BUTTONS && line.button != PlayerButton.Repeat) {
                             val on = buttonIsOn(line.button, viewId(line.button)?.let { state.buttonStates[it] })
                             stringResource(if (on) R.string.material_state_on else R.string.material_state_off)
                         } else "",

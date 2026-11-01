@@ -185,6 +185,10 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         panel.buttonStates[buttonId] = state
     }
 
+    fun clearButtonStates() {
+        panel.buttonStates.clear()
+    }
+
     fun showPanel(show: Boolean) {
         if (!show) {
             setUi(ui.copy(focus = PanelFocus.HIDDEN))

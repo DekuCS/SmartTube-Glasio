@@ -36,6 +36,9 @@
         <!-- Translucent like the dialogs: the player under it is paused, not stopped, and plays on. -->
         <activity
             android:name="io.github.ivanosh.stmaterial.player.MaterialButtonsEditorActivity"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
             android:screenOrientation="unspecified"
             android:theme="@style/Material.Theme.Dialog" />

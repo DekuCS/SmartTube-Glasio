@@ -3,6 +3,7 @@ package io.github.ivanosh.stmaterial.player
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackFragment
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The engine and the presenter contract of [PlaybackFragment] without its visible controls. Leanback's own
@@ -81,17 +82,34 @@ class MaterialPlaybackFragment : PlaybackFragment() {
 
     /**
      * What the presenter sets for a button goes to the panel and to More, which show it. The hidden
-     * Leanback actions get it too, since the presenter reads it back with [getButtonState].
+     * Leanback actions get it too, since the presenter reads it back with [getButtonState]. The presenter
+     * writes from its own thread and the UI reads, so the map is concurrent and the overlay is written on the UI thread.
      */
-    val buttonStates = HashMap<Int, Int>()
+    val buttonStates = ConcurrentHashMap<Int, Int>()
 
     override fun setButtonState(buttonId: Int, buttonState: Int) {
         super.setButtonState(buttonId, buttonState)
         buttonStates[buttonId] = buttonState
-        host?.onButtonState(buttonId, buttonState)
+        activity?.runOnUiThread { host?.onButtonState(buttonId, buttonState) }
     }
 
     override fun getButtonState(buttonId: Int): Int = buttonStates[buttonId] ?: super.getButtonState(buttonId)
+
+    /** The glue is made again with the engine, and its buttons start over, so the states kept here would be stale. */
+    private fun forgetButtonStates() {
+        buttonStates.clear()
+        activity?.runOnUiThread { host?.clearButtonStates() }
+    }
+
+    override fun restartEngine() {
+        forgetButtonStates()
+        super.restartEngine()
+    }
+
+    override fun maybeReleasePlayer() {
+        super.maybeReleasePlayer()
+        forgetButtonStates()
+    }
 
     /** Nothing draws the storyboard, and it costs work per load. */
     override fun loadStoryboard() = Unit
