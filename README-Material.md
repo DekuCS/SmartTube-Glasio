@@ -1,7 +1,7 @@
 # SmartTube Material
 
 A fork of [SmartTube](https://github.com/yuliskov/SmartTube) with a new D-pad-only interface for Android TV, built
-with Jetpack Compose for TV: a top tab bar (no drawer), a player panel with five slots and "More", and no blur,
+with Jetpack Compose for TV: a top tab bar (no drawer), a player panel with up to eight buttons and "More", and no blur,
 parallax, auto-preview or background jobs. The playback and YouTube code is still upstream's. The English UI is the
 only language.
 
