@@ -69,6 +69,8 @@ abstract class FeedActivity<P> : LeanbackActivity() where P : BasePresenter<*>, 
 
     override fun onPause() {
         super.onPause()
+        // singleInstance: the same screen comes back from the player, and a key held then did not start here.
+        confirmKeyGuard.reset()
         presenter.onViewPaused()
     }
 

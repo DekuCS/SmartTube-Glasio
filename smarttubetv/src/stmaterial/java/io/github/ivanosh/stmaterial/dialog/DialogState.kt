@@ -147,4 +147,9 @@ class ConfirmKeyGuard {
         if (isDown && repeatCount == 0) pressStartedHere = true
         return !pressStartedHere
     }
+
+    /** For a screen that is reused: the next press it sees must start there again. */
+    fun reset() {
+        pressStartedHere = false
+    }
 }

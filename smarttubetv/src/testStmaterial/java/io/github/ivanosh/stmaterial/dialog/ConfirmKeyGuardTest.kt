@@ -37,4 +37,15 @@ class ConfirmKeyGuardTest {
         assertTrue(second.shouldDrop(isDown = true, repeatCount = 5))
         assertTrue(second.shouldDrop(isDown = false, repeatCount = 0))
     }
+
+    @Test
+    fun resetRearmsTheGuardSoAReusedScreenDropsAKeyHeldFromElsewhere() {
+        val guard = ConfirmKeyGuard()
+        assertFalse(guard.shouldDrop(isDown = true, repeatCount = 0))
+        assertFalse(guard.shouldDrop(isDown = false, repeatCount = 0))
+        guard.reset()
+        assertTrue(guard.shouldDrop(isDown = true, repeatCount = 7))
+        assertTrue(guard.shouldDrop(isDown = false, repeatCount = 0))
+        assertFalse(guard.shouldDrop(isDown = true, repeatCount = 0))
+    }
 }
