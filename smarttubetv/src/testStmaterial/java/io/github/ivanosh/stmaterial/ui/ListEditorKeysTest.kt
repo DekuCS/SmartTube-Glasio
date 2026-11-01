@@ -199,4 +199,12 @@ class ListEditorKeysTest {
         }
         assertEquals(Side.Shown, empty.press(EditorKey.Left).ui.cursor.side)
     }
+
+    @Test
+    fun withNothingShownTheCursorCanStillGoBackToTheResetRow() {
+        val r = ui(shown = emptyList(), side = Side.Hidden, index = 1).press(EditorKey.Left)
+        assertEquals(EditorCursor(Side.Shown, 0), r.ui.cursor)
+        // And over to the hidden side again.
+        assertEquals(Side.Hidden, r.ui.press(EditorKey.Right).ui.cursor.side)
+    }
 }

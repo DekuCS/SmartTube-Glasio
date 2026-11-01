@@ -54,7 +54,6 @@ class MaterialButtonsEditorActivity : ComponentActivity() {
                             subtitle = stringResource(R.string.material_buttons_subtitle),
                             shownHeader = stringResource(R.string.material_buttons_on_panel),
                             hiddenHeader = stringResource(R.string.material_buttons_in_more),
-                            keepOne = stringResource(R.string.material_buttons_keep_one),
                             wasReset = stringResource(R.string.material_buttons_was_reset),
                             displaced = { label, limit -> getString(R.string.material_buttons_displaced, label, limit) },
                         ),

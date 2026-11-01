@@ -92,8 +92,9 @@ fun <T> editorKey(ui: EditorUi<T>, key: EditorKey): KeyResult<T> {
             when {
                 picked == null -> {
                     val size = if (target == Side.Shown) state.shown.size else state.hidden.size
-                    if (target == cursor.side || size == 0) KeyResult(ui)
-                    else KeyResult(ui.copy(cursor = EditorCursor(target, cursor.index.coerceAtMost(size - 1))))
+                    // An empty shown list still has its Reset row, so the cursor may go there.
+                    if (target == cursor.side || (size == 0 && target == Side.Hidden)) KeyResult(ui)
+                    else KeyResult(ui.copy(cursor = EditorCursor(target, cursor.index.coerceAtMost(maxOf(size - 1, 0)))))
                 }
                 sideOf(state, picked) == target -> KeyResult(ui)
                 else -> {
