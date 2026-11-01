@@ -260,16 +260,16 @@ def command_report(args):
     """Opens or updates the one issue of the tag. A run that stopped or failed leaves exactly one trace."""
     results = dict(item.split("=", 1) for item in args.results)
     failed = logic.failed_jobs(results)
-    if args.action == "stop":
-        body = pathlib.Path(args.body_file).read_text(encoding="utf-8")
-    elif failed:
-        pushed = args.merge_sha if results.get("publish") == "success" else ""
-        body = logic.failure_body(args.tag or "unknown", failed, args.run_url, pushed, args.release_tag)
-    else:
+    if args.action != "stop" and not failed:
         return 0
     if not logic.is_stable_tag(args.tag):
         print("::error::The run failed before it chose an upstream tag, so there is no issue to file.")
         return 1
+    if args.action == "stop":
+        body = pathlib.Path(args.body_file).read_text(encoding="utf-8")
+    else:
+        pushed = args.merge_sha if results.get("publish") == "success" else ""
+        body = logic.failure_body(args.tag, failed, args.run_url, pushed, args.release_tag)
 
     number = logic.find_open_issue(open_issues(args.repo), args.tag)
     with tempfile.NamedTemporaryFile("w", suffix=".md", encoding="utf-8") as body_file:

@@ -170,7 +170,7 @@ jobs:
   # A stop or a failure leaves one issue per upstream tag. While it is open, decide skips the tag.
   report:
     needs: [decide, verify, publish, release]
-    if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' }}
+    if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' && needs.decide.outputs.action != 'noop' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

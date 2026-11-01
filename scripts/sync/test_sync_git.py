@@ -1,10 +1,12 @@
 """The git half of the upstream sync, on small repositories in a temp directory. No network."""
+import argparse
 import json
 import os
 import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 import sync
 
@@ -312,6 +314,47 @@ class CommandLine(Fixture):
         issues = [{"number": 9, "title": "[material-sync] upstream 32.75s", "user": {"login": "github-actions[bot]"}}]
         plan = sync.Sync(self.clone, self.out).plan(releases, issues, upstream_url="file:///nonexistent")
         self.assertEqual(plan, {"action": "noop", "reason": "open-issue", "tag": "32.75s"})
+
+
+class Report(unittest.TestCase):
+    RUN = "https://github.com/x/y/actions/runs/1"
+
+    def report(self, open_issues, **overrides):
+        values = dict(repo="x/y", tag="32.75s", action="proceed", results=["decide=success", "verify=failure"],
+                      body_file="", run_url=self.RUN, merge_sha="", release_tag="")
+        values.update(overrides)
+        with mock.patch.object(sync, "open_issues", return_value=open_issues), \
+                mock.patch.object(sync, "gh") as gh:
+            code = sync.command_report(argparse.Namespace(**values))
+        return code, [call.args for call in gh.call_args_list]
+
+    def test_first_failure_creates_the_issue(self):
+        code, calls = self.report([])
+        self.assertEqual(code, 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][:2], ("issue", "create"))
+        self.assertIn("[material-sync] upstream 32.75s", calls[0])
+
+    def test_a_second_failure_updates_the_same_issue(self):
+        issue = {"number": 5, "title": "[material-sync] upstream 32.75s", "user": {"login": "github-actions[bot]"}}
+        code, calls = self.report([issue])
+        self.assertEqual(code, 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][:3], ("issue", "edit", "5"))
+
+    def test_success_files_nothing(self):
+        self.assertEqual(self.report([], results=["decide=success", "verify=success"]), (0, []))
+
+    def test_a_failure_without_a_tag_files_nothing_and_stays_red(self):
+        self.assertEqual(self.report([], tag="", action="", results=["decide=failure"]), (1, []))
+
+    def test_a_stop_files_the_body_of_the_gate(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".md") as body:
+            body.write("gate text")
+            body.flush()
+            code, calls = self.report([], action="stop", body_file=body.name, results=["decide=success"])
+        self.assertEqual(code, 0)
+        self.assertEqual(calls[0][:2], ("issue", "create"))
 
 
 if __name__ == "__main__":

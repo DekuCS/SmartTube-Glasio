@@ -232,6 +232,16 @@ class Issues(unittest.TestCase):
         self.assertIn("https://github.com/x/y/compare/a...b", body)
         self.assertIn("32.75s", body)
 
+    def test_failure_body_before_and_after_the_push(self):
+        run = "https://github.com/x/y/actions/runs/1"
+        before = logic.failure_body("32.75s", ["verify"], run, "", "")
+        self.assertIn("Nothing was pushed", before)
+        self.assertIn(run, before)
+        after = logic.failure_body("32.75s", ["release"], run, "abc123", "material-v32.75-1")
+        self.assertNotIn("Nothing was pushed", after)
+        self.assertIn("abc123", after)
+        self.assertIn("material-v32.75-1", after)
+
     def test_untrusted_text_cannot_leave_the_code_block(self):
         cleaned = logic.safe_text("a`b\n@owner $(id)/c.java")
         for character in "`\n@$()":
