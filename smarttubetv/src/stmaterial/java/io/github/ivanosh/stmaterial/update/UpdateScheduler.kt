@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView
+import com.liskovsoft.smartyoutubetv2.common.app.views.ViewManager
 import io.github.ivanosh.stmaterial.logic.offerAllowed
 import io.github.ivanosh.stmaterial.logic.UpdateOffer
 import io.github.ivanosh.stmaterial.logic.shouldCheck
@@ -58,6 +60,8 @@ object UpdateScheduler {
 
     private fun showPending(activity: Activity) {
         val offer = pending ?: return
+        // The player is starting: the offer waits for the next time browse is in front.
+        if (ViewManager.instance(activity).isViewPending(PlaybackView::class.java)) return
         pending = null
         // The channel may have changed since the check.
         if (!offerAllowed(offer, UpdateStore(activity).channel)) return

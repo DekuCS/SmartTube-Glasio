@@ -1,6 +1,5 @@
 package io.github.ivanosh.stmaterial.dialog
 
-import android.app.Activity
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.compose.ui.platform.ComposeView

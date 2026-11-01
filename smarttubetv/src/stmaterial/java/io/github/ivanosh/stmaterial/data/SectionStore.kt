@@ -68,11 +68,6 @@ class SectionStore(context: Context) {
     fun startSection(): Int =
         resolveStart(prefs.getInt(KEY_START, Sections.START_DEFAULT), load().shown)
 
-    fun setStart(id: Int) {
-        prefs.edit().putInt(KEY_START, id).apply()
-        mirror()
-    }
-
     private fun defaults() =
         EditorState(
             Sections.DEFAULT_SHOWN, Sections.HIDDEN_ADDABLE, emptySet(), Sections.LIMIT

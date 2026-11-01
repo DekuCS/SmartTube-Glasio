@@ -8,12 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -27,8 +25,6 @@ import androidx.tv.material3.Text
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.browse.BrowseState
-import io.github.ivanosh.stmaterial.browse.FocusKey
-import kotlinx.coroutines.delay
 
 /** What a screen of cards does with them, the long press included. */
 interface FeedPageActions : FeedActions {

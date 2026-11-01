@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.runtime.Composable
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
 import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.data.SectionStore

@@ -18,13 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.tv.material3.Text
 import io.github.ivanosh.stmaterial.ui.ContextMenu
 import io.github.ivanosh.stmaterial.ui.MenuItem
 import androidx.compose.ui.focus.FocusRequester
@@ -40,7 +33,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
-import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.logic.BackStep
 import io.github.ivanosh.stmaterial.logic.Sections
