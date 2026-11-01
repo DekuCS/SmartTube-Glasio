@@ -36,6 +36,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Sync logic tests
+        run: python3 -B -m unittest discover -s scripts/sync
+
       - name: Unit tests
         run: ./gradlew --no-daemon :smarttubetv:testStmaterialDebugUnitTest :common:testStfdroidDebugUnitTest
 
@@ -73,105 +76,20 @@ jobs:
       - name: Assemble the release variant
         run: ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
 
-  # Tags only. The only job that sees the signing key.
+  # Tags only. The key stays in material-release.yml.
   release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/material-v')
     needs: test
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
     permissions:
       contents: write      # create the GitHub Release
       id-token: write      # sign the provenance attestation
       attestations: write  # store the attestation
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: recursive
-          persist-credentials: false
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Tag must match versionName
-        shell: bash
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          VERSION=$(sed -n 's/^ *versionName "\(.*\)"$/\1/p' smarttubetv/build.gradle | head -n 1)
-          if [ "$TAG" != "material-v$VERSION" ]; then
-            echo "::error::Tag $TAG does not match versionName $VERSION (expected material-v$VERSION)."
-            exit 1
-          fi
-
-      - name: Install the SDK parts the build pins
-        shell: bash
-        run: |
-          set -euo pipefail
-          SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
-          yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" "ndk;21.0.6113669" "build-tools;36.0.0" "platforms;android-36"
-
-      - name: Require the signing secrets
-        env:
-          KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.MATERIAL_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.MATERIAL_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.MATERIAL_KEY_PASSWORD }}
-        run: |
-          for name in KEYSTORE_B64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Secret MATERIAL_${name} is missing. Refusing to release a debug-signed APK."
-              exit 1
-            fi
-          done
-
-      - name: Build the signed release APKs
-        env:
-          KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
-          MATERIAL_KEYSTORE_PASSWORD: ${{ secrets.MATERIAL_KEYSTORE_PASSWORD }}
-          MATERIAL_KEY_ALIAS: ${{ secrets.MATERIAL_KEY_ALIAS }}
-          MATERIAL_KEY_PASSWORD: ${{ secrets.MATERIAL_KEY_PASSWORD }}
-          MATERIAL_REQUIRE_RELEASE_SIGNING: 'true'
-        run: |
-          umask 077
-          export MATERIAL_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
-          printf '%s' "$KEYSTORE_B64" | base64 -d > "$MATERIAL_KEYSTORE_FILE"
-          ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
-
-      - name: Verify the signature
-        shell: bash
-        run: |
-          set -euo pipefail
-          EXPECTED=8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
-          for apk in smarttubetv/build/outputs/apk/stmaterial/release/*.apk; do
-            ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
-            echo "$apk $ACTUAL"
-            if [ "$ACTUAL" != "$EXPECTED" ]; then
-              echo "::error::$apk is not signed with the expected certificate"
-              exit 1
-            fi
-          done
-
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: smarttubetv/build/outputs/apk/stmaterial/release/*.apk
-
-      - name: Publish the GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          gh release create "$TAG" smarttubetv/build/outputs/apk/stmaterial/release/*.apk \
-            --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes \
-            --notes "Version ${TAG#material-v}. Signing certificate SHA-256 8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c."
-
-      - name: Remove the signing material
-        if: always()
-        run: rm -f "$RUNNER_TEMP/release.jks"
+    uses: ./.github/workflows/material-release.yml
+    with:
+      tag: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets:
+      MATERIAL_KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
+      MATERIAL_KEYSTORE_PASSWORD: ${{ secrets.MATERIAL_KEYSTORE_PASSWORD }}
+      MATERIAL_KEY_ALIAS: ${{ secrets.MATERIAL_KEY_ALIAS }}
+      MATERIAL_KEY_PASSWORD: ${{ secrets.MATERIAL_KEY_PASSWORD }}

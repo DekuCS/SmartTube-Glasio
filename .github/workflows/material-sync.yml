@@ -1,0 +1,208 @@
+name: SmartTube Material upstream sync
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report what would happen. Push, release and issues stay untouched.
+        type: boolean
+        default: true
+
+permissions: {}
+
+# One sync at a time: two runs must not both file an issue or push.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  # Picks the tag, runs the gate, merges locally. Upstream's commits are read here, never run: no submodules, no JDK,
+  # no Gradle. The merge commit leaves this job as a bundle, pinned by its SHA in the outputs.
+  decide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      action: ${{ steps.decide.outputs.action }}
+      tag: ${{ steps.decide.outputs.tag }}
+      base_sha: ${{ steps.base.outputs.sha }}
+      merge_sha: ${{ steps.decide.outputs.merge_sha }}
+      release_tag: ${{ steps.decide.outputs.release_tag }}
+      dry_run: ${{ steps.decide.outputs.dry_run }}
+    steps:
+      - name: Check out material
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: material
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Remember the commit this run starts from
+        id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Sync logic tests
+        run: python3 -B -m unittest discover -s scripts/sync
+
+      - name: Read the upstream releases and our open issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api 'repos/yuliskov/SmartTube/releases?per_page=100' > "$RUNNER_TEMP/releases.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" > "$RUNNER_TEMP/issues.json"
+
+      - name: Pick the tag, gate it, merge it
+        id: decide
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          python3 scripts/sync/sync.py decide --releases "$RUNNER_TEMP/releases.json" \
+            --issues "$RUNNER_TEMP/issues.json" --out "$RUNNER_TEMP/sync-out" --dry-run "$DRY_RUN"
+
+      - name: Hand the merge and the issue text to the next jobs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sync-out
+          path: ${{ runner.temp }}/sync-out
+          retention-days: 3
+          if-no-files-found: ignore
+
+  # First job where upstream's code runs: the gate has passed. No secrets, nothing writable, and no Gradle cache that
+  # a later job could inherit.
+  verify:
+    needs: decide
+    if: needs.decide.outputs.action == 'proceed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the starting commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decide.outputs.base_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Take the merge commit
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sync-out
+          path: ${{ runner.temp }}/sync-out
+
+      - name: Switch to it
+        env:
+          MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
+        run: |
+          python3 scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA"
+          git submodule update --init --recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install the SDK parts the build pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "ndk;21.0.6113669" "build-tools;36.0.0" "platforms;android-36"
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon :smarttubetv:testStmaterialDebugUnitTest :common:testStfdroidDebugUnitTest
+
+      - name: Assemble the release variant
+        run: ./gradlew --no-daemon :smarttubetv:assembleStmaterialRelease
+
+  # Runs only git, from the starting commit's tree. No force: if material moved, the push fails and the issue says so.
+  publish:
+    needs: [decide, verify]
+    if: needs.decide.outputs.action == 'proceed' && needs.decide.outputs.dry_run == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the starting commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decide.outputs.base_sha }}
+          fetch-depth: 0
+
+      - name: Take the merge commit
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sync-out
+          path: ${{ runner.temp }}/sync-out
+
+      - name: Push exactly that commit to material
+        env:
+          MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
+        run: |
+          python3 scripts/sync/sync.py apply-bundle --bundle "$RUNNER_TEMP/sync-out/merge.bundle" --sha "$MERGE_SHA" --no-checkout
+          git push origin "$MERGE_SHA:refs/heads/material"
+
+  # The same commit, rebuilt with the signing key. Same job as a tagged release.
+  release:
+    needs: [decide, publish]
+    permissions:
+      contents: write      # create the GitHub Release
+      id-token: write      # sign the provenance attestation
+      attestations: write  # store the attestation
+    uses: ./.github/workflows/material-release.yml
+    with:
+      tag: ${{ needs.decide.outputs.release_tag }}
+      sha: ${{ needs.decide.outputs.merge_sha }}
+    secrets:
+      MATERIAL_KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
+      MATERIAL_KEYSTORE_PASSWORD: ${{ secrets.MATERIAL_KEYSTORE_PASSWORD }}
+      MATERIAL_KEY_ALIAS: ${{ secrets.MATERIAL_KEY_ALIAS }}
+      MATERIAL_KEY_PASSWORD: ${{ secrets.MATERIAL_KEY_PASSWORD }}
+
+  # A stop or a failure leaves one issue per upstream tag. While it is open, decide skips the tag.
+  report:
+    needs: [decide, verify, publish, release]
+    if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out the starting commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.decide.outputs.base_sha || 'material' }}
+          persist-credentials: false
+
+      - name: Take the issue text
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sync-out
+          path: ${{ runner.temp }}/sync-out
+
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTION: ${{ needs.decide.outputs.action }}
+          TAG: ${{ needs.decide.outputs.tag }}
+          MERGE_SHA: ${{ needs.decide.outputs.merge_sha }}
+          RELEASE_TAG: ${{ needs.decide.outputs.release_tag }}
+          DECIDE: ${{ needs.decide.result }}
+          VERIFY: ${{ needs.verify.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          RELEASE: ${{ needs.release.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 scripts/sync/sync.py report --repo "$GITHUB_REPOSITORY" --tag "$TAG" --action "$ACTION" \
+            --body-file "$RUNNER_TEMP/sync-out/issue-body.md" --run-url "$RUN_URL" --merge-sha "$MERGE_SHA" --release-tag "$RELEASE_TAG" \
+            --results "decide=$DECIDE" "verify=$VERIFY" "publish=$PUBLISH" "release=$RELEASE"
