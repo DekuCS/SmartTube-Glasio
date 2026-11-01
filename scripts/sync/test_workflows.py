@@ -8,7 +8,8 @@ import tempfile
 import unittest
 
 WORKFLOWS = pathlib.Path(__file__).resolve().parents[2] / ".github" / "workflows"
-HOLD = "vars.MATERIAL_SYNC_HOLD != 'true'"
+LIVE = "vars.MATERIAL_SYNC_ENABLED == 'true'"
+EXACT = "needs.decide.outputs.enabled == 'true'"
 
 
 def jobs_of(name):
@@ -75,14 +76,65 @@ class Isolation(unittest.TestCase):
         self.assertIn("github.token", push)
         self.assertNotIn("python3", push)
 
-    def test_nothing_after_decide_runs_during_a_hold(self):
-        for name, job in jobs_of("material-sync.yml").items():
-            if name != "decide":
-                self.assertIn(HOLD, job, name)
+    def test_no_step_uses_a_local_action(self):
+        for path in WORKFLOWS.glob("*.yml"):
+            for line in path.read_text().splitlines():
+                self.assertIsNone(re.match(r"\s{6,}(- )?uses:\s*['\"]?\.", line), path.name + ": " + line)
 
-    def test_a_hold_shows_in_the_run(self):
-        decide = jobs_of("material-sync.yml")["decide"]
-        self.assertIn("::notice::", step_of(decide, "Say that the sync is on hold"))
+    def test_the_only_local_reference_is_the_release_workflow_at_job_level(self):
+        for name in ("material.yml", "material-sync.yml"):
+            self.assertEqual(re.findall(r"^( *)uses: *\./(.*)$", (WORKFLOWS / name).read_text(), flags=re.M),
+                             [("    ", ".github/workflows/material-release.yml")], name)
+
+
+@unittest.skipUnless(WORKFLOWS.is_dir(), "the workflows are not checked out here")
+class Enabled(unittest.TestCase):
+    def setUp(self):
+        self.jobs = jobs_of("material-sync.yml")
+
+    def test_nothing_is_written_unless_enabled(self):
+        for name in ("publish", "release", "report"):
+            self.assertIn(EXACT, self.jobs[name], name)
+            self.assertIn(LIVE, self.jobs[name], name)
+
+    def test_the_old_variable_is_gone(self):
+        for path in WORKFLOWS.glob("*.yml"):
+            self.assertNotIn("MATERIAL_SYNC_HOLD", path.read_text(), path.name)
+
+    def test_a_dry_run_still_verifies_when_unset(self):
+        condition = re.search(r"^    if: (.*)$", self.jobs["verify"], flags=re.M).group(1)
+        self.assertIn("needs.decide.outputs.dry_run == 'true' || ", condition)
+        self.assertIn(EXACT, condition)
+
+    def test_the_sign_job_checks_the_variable_for_the_sync(self):
+        release = jobs_of("material-release.yml")
+        condition = re.search(r"^    if: (.*)$", release["sign"], flags=re.M).group(1)
+        self.assertIn("!inputs.unattended", condition)
+        self.assertIn(LIVE, condition)
+        self.assertIn("::notice::", release["sign-skipped"])
+        self.assertIn("unattended: true", self.jobs["release"])
+
+    def test_a_pushed_tag_needs_no_variable(self):
+        self.assertNotIn("unattended", jobs_of("material.yml")["release"])
+
+    def read(self, value):
+        with tempfile.TemporaryDirectory() as temp:
+            output, summary = pathlib.Path(temp, "output"), pathlib.Path(temp, "summary")
+            env = dict(os.environ, GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary), ENABLED=value)
+            script = run_block(step_of(self.jobs["decide"], "Read whether the sync may publish"))
+            result = subprocess.run(("bash", "-c", script), env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return output.read_text(), result.stdout, summary.read_text() if summary.exists() else ""
+
+    def test_only_the_exact_value_enables(self):
+        self.assertEqual(self.read("true"), ("enabled=true\n", "", ""))
+
+    def test_anything_else_is_off_with_a_notice(self):
+        for value in ("", "TRUE", "True", "yes", "1", "true ", "false"):
+            output, printed, summary = self.read(value)
+            self.assertEqual(output, "enabled=false\n", repr(value))
+            self.assertIn("::notice::", printed, repr(value))
+            self.assertIn("MATERIAL_SYNC_ENABLED", summary, repr(value))
 
 
 @unittest.skipUnless(WORKFLOWS.is_dir(), "the workflows are not checked out here")

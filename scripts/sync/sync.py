@@ -113,6 +113,7 @@ class Sync:
         self.root = root
         self.out = pathlib.Path(out)
         self.published = set(published)
+        self.pushed_merge = None  # (commit, release tag) while checking a merge that is already on the branch
 
     def known_releases(self):
         """Every release name that exists or existed: a tag is only ever made by a successful release."""
@@ -161,6 +162,7 @@ class Sync:
     def checked_release(self, pending):
         """Signs nothing on trust: the merge must be the one the sync would make today from the same parents."""
         tag, sha = pending["tag"], pending["merge_sha"]
+        self.pushed_merge = (sha, pending["release_tag"])
         head = text_of(self.root, "rev-parse", "HEAD")
         plan = {"tag": tag, "base_sha": head}
         tag_commit = text_of(self.root, "rev-parse", TAG_REF + "^{commit}")
@@ -289,7 +291,7 @@ class Sync:
 
     def stop(self, plan, reason, findings, urls):
         self.out.mkdir(parents=True, exist_ok=True)
-        (self.out / "issue-body.md").write_text(logic.stop_body(plan["tag"], findings, urls))
+        (self.out / "issue-body.md").write_text(logic.stop_body(plan["tag"], findings, urls, self.pushed_merge))
         return dict(plan, action="stop", reason=reason, findings=findings)
 
 

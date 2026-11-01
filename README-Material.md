@@ -114,36 +114,49 @@ What stops it, with nothing pushed:
   `material-v*` tag or release
 - failed tests or a failed build
 
-These rules prefer a false stop, which costs a look, to a false pass. Four of the last nine upstream stable steps would
-have stopped.
+These rules prefer a false stop, which costs a look, to a false pass. Five of the last nine upstream stable steps would
+have stopped (measured from 31.57s to 32.68s), so expect to look at about half of them.
 
 A stop or a failure turns the run red, so GitHub sends its failure email, and opens or updates one issue per upstream
 tag. Dry runs only report a stop. The issue names the files and links the compare view. The sync does not retry that
-tag while the issue is open: deal with it (usually a manual merge), then close the issue. If Issues is off, the run says
-why in its log and tries the tag again every 6 hours.
+tag while the issue is open. To clear a stop, merge the tag into `material` by hand after looking at it, or fix what
+stopped it, then close the issue; closing it without that only makes the next run stop again. If Issues is off, the run
+says why in its log and tries the tag again every 6 hours.
 
 If a merge reached `material` and its version was never published, the next run makes the release, unless that tag's
 issue is open or a newer version exists. Nothing else is synced until then. It first rebuilds that merge from its two
 parents, the second of which must be the upstream tag's commit, with the gate; a different tree or a stop means no
-release.
+release. To clear that stop, push the release tag at the merge if it is good, or raise `materialPatch` and push a newer
+tag if it is not, then close the issue. Later syncs wait until then.
 
-### Holding the sync and withdrawing a release
+### Turning the sync on and off
 
-Set the repository variable `MATERIAL_SYNC_HOLD` to `true` (Settings, Secrets and variables, Actions, Variables). Every
-job after `decide` is skipped and the run shows a notice. It needs no commit and works with Issues off. Jobs that have
-already started finish, so cancel a run in progress as well. Remove the variable to resume.
+The sync publishes only while the repository variable `MATERIAL_SYNC_ENABLED` is exactly `true` (Settings, Secrets and
+variables, Actions, Variables). Unset or any other value, `TRUE` included, is off: changing the default branch arms
+nothing by itself. While off, `decide` still runs and shows a notice, and dry runs still build and test. Non-dry runs skip
+verify, push, release and issue, so a stop shows only in that run's summary and does not turn it red. A tag you push by
+hand needs no variable.
+
+`decide` checks the exact value in shell, because GitHub's `==` ignores case. Each later job checks the variable in its
+own `if`, and so does the signing job when the sync calls it. GitHub's documentation says an `if` is processed before the
+job is sent to a runner, and that an unset variable reads as an empty string. It does not say whether a job sees a value
+changed after the run started, and this has not been tested here. So treat removing the variable as applying to the next
+run, and cancel any run in progress to stop it for certain.
+
+### Withdrawing a release
 
 A tag only ever comes from a successful release, so an existing tag means that version is done:
 
 - To withdraw a release, delete it on the Releases page and keep the tag. It is not published again.
 - To publish that version again, delete both the release and the tag (`git push origin :refs/tags/material-v32.68-1`).
-  The next run rebuilds it, so set the hold first if you do not want that yet.
+  The next run rebuilds it, so remove `MATERIAL_SYNC_ENABLED` first if you do not want that yet.
 - A version lower than the newest tag is never published by the sync. After raising `materialPatch` and tagging by hand,
   the older merge stays unpublished.
 
 ### What the schedule needs
 
-GitHub fires a schedule only under these conditions, and nothing reports it when one is missing:
+GitHub fires a schedule only under these conditions, and nothing reports it when one is missing. A run that fires still
+publishes only if `MATERIAL_SYNC_ENABLED` is `true`.
 
 - The workflow is on the repository's default branch. That is `master` today, so `material` must become the default
   branch. Every run warns in its log while it is not.

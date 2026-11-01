@@ -33,13 +33,22 @@ jobs:
       merge_sha: ${{ steps.decide.outputs.merge_sha }}
       release_tag: ${{ steps.decide.outputs.release_tag }}
       dry_run: ${{ steps.decide.outputs.dry_run }}
+      enabled: ${{ steps.enabled.outputs.enabled }}
     steps:
-      - name: Say that the sync is on hold
-        if: vars.MATERIAL_SYNC_HOLD == 'true'
+      - name: Read whether the sync may publish
+        id: enabled
+        env:
+          ENABLED: ${{ vars.MATERIAL_SYNC_ENABLED }}
         run: |
-          MESSAGE="MATERIAL_SYNC_HOLD is true: this run only reports. Verify, push, release and issue are skipped."
-          echo "::notice::$MESSAGE"
-          echo "$MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+          # Here and not only in the job conditions: == in a workflow expression ignores case.
+          if [ "$ENABLED" = true ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            MESSAGE="MATERIAL_SYNC_ENABLED is not true: this run only reports. Push, release and issue are skipped."
+            echo "::notice::$MESSAGE"
+            echo "$MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Check out material
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -100,7 +109,7 @@ jobs:
   # a later job could inherit.
   verify:
     needs: decide
-    if: needs.decide.outputs.action == 'proceed' && vars.MATERIAL_SYNC_HOLD != 'true'
+    if: needs.decide.outputs.action == 'proceed' && (needs.decide.outputs.dry_run == 'true' || (needs.decide.outputs.enabled == 'true' && vars.MATERIAL_SYNC_ENABLED == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -150,7 +159,7 @@ jobs:
   # if material moved, the push fails and the issue says so.
   publish:
     needs: [decide, verify]
-    if: needs.decide.outputs.action == 'proceed' && needs.decide.outputs.dry_run == 'false' && vars.MATERIAL_SYNC_HOLD != 'true'
+    if: needs.decide.outputs.action == 'proceed' && needs.decide.outputs.dry_run == 'false' && needs.decide.outputs.enabled == 'true' && vars.MATERIAL_SYNC_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -202,7 +211,7 @@ jobs:
     needs: [decide, publish]
     if: >-
       ${{ !cancelled() && needs.decide.result == 'success' && needs.decide.outputs.dry_run == 'false' &&
-      vars.MATERIAL_SYNC_HOLD != 'true' && (needs.publish.result == 'success' || needs.decide.outputs.action == 'release-only') }}
+      needs.decide.outputs.enabled == 'true' && vars.MATERIAL_SYNC_ENABLED == 'true' && (needs.publish.result == 'success' || needs.decide.outputs.action == 'release-only') }}
     permissions:
       contents: write      # create the GitHub Release
       id-token: write      # sign the provenance attestation
@@ -211,6 +220,7 @@ jobs:
     with:
       tag: ${{ needs.decide.outputs.release_tag }}
       sha: ${{ needs.decide.outputs.merge_sha }}
+      unattended: true
     secrets:
       MATERIAL_KEYSTORE_B64: ${{ secrets.MATERIAL_KEYSTORE_B64 }}
       MATERIAL_KEYSTORE_PASSWORD: ${{ secrets.MATERIAL_KEYSTORE_PASSWORD }}
@@ -221,7 +231,7 @@ jobs:
   # GitHub's failure email is what reaches the owner. While the issue is open, decide skips the tag.
   report:
     needs: [decide, verify, publish, release]
-    if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' && needs.decide.outputs.action != 'noop' && vars.MATERIAL_SYNC_HOLD != 'true' }}
+    if: ${{ !cancelled() && needs.decide.outputs.dry_run != 'true' && needs.decide.outputs.action != 'noop' && needs.decide.outputs.enabled == 'true' && vars.MATERIAL_SYNC_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

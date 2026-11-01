@@ -345,6 +345,21 @@ class Issues(unittest.TestCase):
         self.assertIn("https://github.com/x/y/compare/a...b", body)
         self.assertIn("32.75s", body)
 
+    def test_stop_body_says_how_to_clear_it(self):
+        body = logic.stop_body("32.75s", ["x"], [])
+        self.assertIn("Nothing was pushed or released", body)
+        self.assertIn("merge", body.split("To clear it:")[1])
+        self.assertIn("stop again", body)
+
+    def test_stop_body_after_a_pushed_merge_tells_the_truth(self):
+        body = logic.stop_body("32.75s", ["x"], [], merged=("abc123", "material-v32.75-1"))
+        self.assertNotIn("Nothing was pushed", body)
+        self.assertIn("`abc123` is already on `material`", body)
+        self.assertIn("`material-v32.75-1`", body.split("To clear it:")[1])
+        self.assertIn("materialPatch", body)
+        self.assertIn("wait", body)
+        self.assertIn("stop again", body)
+
     def test_failure_body_before_and_after_the_push(self):
         run = "https://github.com/x/y/actions/runs/1"
         before = logic.failure_body("32.75s", ["verify"], run, "", "")

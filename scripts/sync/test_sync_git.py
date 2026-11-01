@@ -478,13 +478,22 @@ class PendingRelease(Fixture):
         plan = self.next_run()
         self.assertEqual((plan["action"], plan["reason"]), ("stop", "gate"))
         self.assertIn("SignInPresenter", pathlib.Path(self.out, "issue-body.md").read_text())
+        self.assert_says_the_merge_is_pushed(run(self.clone, "git", "rev-parse", "HEAD"))
 
     def test_a_tag_that_moved_since_the_merge_stops(self):
         self.merged()
         write(self.upstream, "app/Main.java", "class Main { int moved; }\n")
         self.upstream_commit("moved")
         run(self.upstream, "git", "tag", "-f", "32.75s")
+        merged = run(self.clone, "git", "rev-parse", "HEAD")
         self.assertEqual(self.next_run()["reason"], "release-check")
+        self.assert_says_the_merge_is_pushed(merged)
+
+    def assert_says_the_merge_is_pushed(self, sha):
+        body = pathlib.Path(self.out, "issue-body.md").read_text()
+        self.assertNotIn("Nothing was pushed", body)
+        self.assertIn(sha, body)
+        self.assertIn("material-v32.75-1", body)
 
 
 class Bundle(Fixture):

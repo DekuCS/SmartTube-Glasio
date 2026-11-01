@@ -223,15 +223,30 @@ def failed_jobs(results):
     return [job for job, result in results.items() if result in ("failure", "cancelled")]
 
 
-_CLOSING = "Close this issue once it is dealt with: the sync does not retry this tag while it is open."
+_CLOSING = "The sync does not retry this tag while this issue is open."
 
 
-def stop_body(tag, findings, compare_urls):
-    lines = ["The upstream sync stopped at `%s`. Nothing was pushed or released." % tag, "", "```"]
+def stop_body(tag, findings, compare_urls, merged=None):
+    """`merged` is (commit, release tag) when the merge reached material earlier and only its release is missing."""
+    if merged:
+        lines = ["The upstream sync stopped at `%s`. Its merge `%s` is already on `material`, but `%s` was never "
+                 "released. This run pushed and released nothing, and later syncs wait on this." % (tag, *merged)]
+    else:
+        lines = ["The upstream sync stopped at `%s`. Nothing was pushed or released." % tag]
+    lines += ["", "```"]
     lines += findings
     lines += ["```", ""]
     lines += ["Compare: " + url for url in compare_urls]
-    lines += ["", _CLOSING]
+    if compare_urls:
+        lines += [""]
+    if merged:
+        lines += ["To clear it: if the merge is good, push the tag `%s` at that commit and `material.yml` releases it. "
+                  "If not, fix `material`, raise `materialPatch` and push the newer tag; the older merge then stays "
+                  "unreleased." % merged[1]]
+    else:
+        lines += ["To clear it: merge this tag into `material` by hand after looking at the above, or fix what stopped "
+                  "it."]
+    lines += ["", "Then close this issue. Closing it without that makes the next run stop again.", "", _CLOSING]
     return "\n".join(lines) + "\n"
 
 

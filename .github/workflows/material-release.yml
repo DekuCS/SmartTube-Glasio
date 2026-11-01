@@ -16,6 +16,11 @@ on:
         description: Full commit to build. The GitHub Release creates the tag here if it does not exist.
         required: true
         type: string
+      unattended:
+        description: The sync is calling, not a person who pushed a tag. Signing then needs MATERIAL_SYNC_ENABLED.
+        required: false
+        type: boolean
+        default: false
     secrets:
       MATERIAL_KEYSTORE_B64:
         required: true
@@ -78,8 +83,19 @@ jobs:
           if-no-files-found: error
 
   # The only job that sees the signing key. Add no checkout here and run nothing that came from the artifact.
+  sign-skipped:
+    needs: build
+    if: inputs.unattended && vars.MATERIAL_SYNC_ENABLED != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Say why nothing is signed
+        run: echo "::notice::MATERIAL_SYNC_ENABLED is not true, so the sync signs and publishes nothing."
+
   sign:
     needs: build
+    if: "!inputs.unattended || vars.MATERIAL_SYNC_ENABLED == 'true'"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
