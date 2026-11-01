@@ -102,7 +102,30 @@ class PlayerButtonsTest {
 
     @Test
     fun theOldDefaultSavedAsItWasBecomesTheNewDefault() {
-        assertEquals(DEFAULT_BUTTONS, resolveButtons(listOf("PlayPause", "Next", "Quality", "Subtitles", "Speed")))
+        assertEquals(DEFAULT_BUTTONS, parseSavedButtons("PlayPause,Next,Quality,Subtitles,Speed", marked = false))
+    }
+
+    @Test
+    fun theOldFiveSavedAfterTheMarkerStaysFive() {
+        assertEquals(LEGACY_DEFAULT_BUTTONS, parseSavedButtons("PlayPause,Next,Quality,Subtitles,Speed", marked = true))
+    }
+
+    @Test
+    fun anEmptyListSavedWithTheMarkerStaysEmptyAndWithoutItToo() {
+        assertEquals(emptyList<PlayerButton>(), parseSavedButtons("", marked = true))
+        assertEquals(emptyList<PlayerButton>(), parseSavedButtons("", marked = false))
+    }
+
+    @Test
+    fun nothingSavedGivesTheDefaultWhateverTheMarker() {
+        assertEquals(DEFAULT_BUTTONS, parseSavedButtons(null, marked = false))
+        assertEquals(DEFAULT_BUTTONS, parseSavedButtons(null, marked = true))
+    }
+
+    @Test
+    fun otherListsAreKeptWithOrWithoutTheMarker() {
+        assertEquals(listOf(Like, Next), parseSavedButtons("Like, Next", marked = false))
+        assertEquals(listOf(Like, Next), parseSavedButtons("Like,Next", marked = true))
     }
 
     @Test
@@ -113,6 +136,7 @@ class PlayerButtonsTest {
         assertEquals(listOf(PlayPause, Next, Quality, Subtitles, Speed, Like), resolveButtons(listOf("PlayPause", "Next", "Quality", "Subtitles", "Speed", "Like")))
         assertEquals(listOf(PlayPause, Next, Quality, Subtitles), resolveButtons(listOf("PlayPause", "Next", "Quality", "Subtitles")))
         assertEquals(DEFAULT_BUTTONS, resolveButtons(DEFAULT_BUTTONS.map { it.name }))
+        assertEquals(LEGACY_DEFAULT_BUTTONS, resolveButtons(LEGACY_DEFAULT_BUTTONS.map { it.name }))
     }
 
     @Test

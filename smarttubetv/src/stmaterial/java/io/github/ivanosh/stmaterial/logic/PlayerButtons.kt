@@ -43,7 +43,7 @@ fun moreGroups(shown: List<PlayerButton>): List<ButtonGroup> =
  * Saved names to buttons: unknown names and repeats are skipped and the limit holds.
  * [names] null means nothing was ever saved, which gives the default; a saved empty list stays empty, since
  * the owner may switch every button off. A list with names but none of them known is damaged and gives the default.
- * The first version's default is migrated to the new one.
+ * The migration of the first version's default is not here: see [parseSavedButtons].
  */
 fun resolveButtons(names: List<String>?): List<PlayerButton> {
     if (names == null) return DEFAULT_BUTTONS
@@ -51,9 +51,20 @@ fun resolveButtons(names: List<String>?): List<PlayerButton> {
     val buttons = names.mapNotNull { name -> PlayerButton.values().firstOrNull { it.name == name } }.distinct().take(PANEL_LIMIT)
     return when {
         buttons.isEmpty() -> DEFAULT_BUTTONS
-        buttons == LEGACY_DEFAULT_BUTTONS -> DEFAULT_BUTTONS
         else -> buttons
     }
+}
+
+/**
+ * What the store gives for [raw], the saved string (null when never saved). [marked] says the list was saved by
+ * a version that has the marker. A list without the marker that equals the first version's default was never
+ * chosen by the owner, so it becomes the new default, once: the next save writes the marker, and from then on
+ * the old five is a choice and stays five.
+ */
+fun parseSavedButtons(raw: String?, marked: Boolean): List<PlayerButton> {
+    if (raw == null) return DEFAULT_BUTTONS
+    val buttons = resolveButtons(if (raw.isBlank()) emptyList() else raw.split(',').map { it.trim() })
+    return if (!marked && buttons == LEGACY_DEFAULT_BUTTONS) DEFAULT_BUTTONS else buttons
 }
 
 fun buttonsEditorState(shown: List<PlayerButton>): EditorState<PlayerButton> =
