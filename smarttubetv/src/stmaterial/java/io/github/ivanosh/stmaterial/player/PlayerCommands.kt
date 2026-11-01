@@ -57,7 +57,7 @@ fun buttonIcon(button: PlayerButton): String = when (button) {
     PlayerButton.Subscribe -> "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 21h4"
     PlayerButton.Channel -> "M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21c1-4 4-6 8-6s7 2 8 6"
     PlayerButton.AddToPlaylist -> "M4 6h12M4 11h12M4 16h7M17 14v6M14 17h6"
-    PlayerButton.Queue -> "M4 6h12M4 11h12M4 16h7M15 15l6 3.5-6 3.5z"
+    PlayerButton.Queue -> "M6 4h12M8 8h8M4 12h16v8H4zM10.5 14.5v3l3-1.5z"
     PlayerButton.Repeat -> "M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4"
     PlayerButton.Search -> "M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM16 16l5 5"
     PlayerButton.VideoInfo -> "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.5"

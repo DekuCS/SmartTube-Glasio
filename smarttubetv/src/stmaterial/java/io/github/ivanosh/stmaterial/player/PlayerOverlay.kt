@@ -221,56 +221,85 @@ private fun Legend(entries: List<LegendEntry>) {
     }
 }
 
+/** The panel's buttons are icon-only circles: nine of them (eight and More) fit the 844dp inside the panel's padding. */
+internal val CompactButtonSize = 76.dp
+internal val CompactButtonGap = 14.dp
+private val LabelLineHeight = 36.dp
+private val LabelTopGap = 10.dp
+
+/**
+ * The row of icon-only circles, with one label line under it for the focused button. The line is always there,
+ * so the row neither changes height nor shifts when focus moves; it is empty while the buttons do not have focus.
+ */
 @Composable
 private fun Buttons(state: PlayerOverlayState) {
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
-        state.buttons.forEachIndexed { index, button ->
-            val paused = button == PlayerButton.PlayPause && !state.playing
-            PanelButton(
-                label = when {
+    val focused = if (state.focus == PanelFocus.BUTTONS) state.buttonIndex else -1
+    var focusedLabel = ""
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(CompactButtonGap), verticalAlignment = Alignment.Top) {
+            state.buttons.forEachIndexed { index, button ->
+                val paused = button == PlayerButton.PlayPause && !state.playing
+                val label = when {
                     button != PlayerButton.PlayPause -> stringResource(buttonLabel(button))
                     paused -> stringResource(R.string.material_player_play)
                     else -> stringResource(R.string.material_player_pause)
+                }
+                if (index == focused) focusedLabel = label
+                CompactButton(
+                    iconPath = if (paused) PLAY_ICON_PATH else buttonIcon(button),
+                    focused = index == focused,
+                    on = button in STATEFUL_BUTTONS && buttonIsOn(button, viewId(button)?.let { state.buttonStates[it] }),
+                )
+            }
+            val more = stringResource(R.string.material_player_more)
+            if (focused == state.buttons.size) focusedLabel = more
+            CompactButton(MORE_ICON_PATH, focused = focused == state.buttons.size, on = false)
+        }
+        FocusLabel(focusedLabel, focused)
+    }
+}
+
+/**
+ * The label of button [index], centred under it and kept inside the row's width, which is the panel's inside.
+ * The line has its height whether there is text or not.
+ */
+@Composable
+private fun FocusLabel(text: String, index: Int) {
+    Box(Modifier.fillMaxWidth().height(LabelTopGap + LabelLineHeight)) {
+        if (index >= 0) {
+            Text(
+                text,
+                style = buttonLabelStyle,
+                maxLines = 1,
+                modifier = Modifier.layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                    val center = index * (CompactButtonSize + CompactButtonGap).toPx() + CompactButtonSize.toPx() / 2
+                    val x = (center - placeable.width / 2f).coerceIn(0f, maxOf(0, constraints.maxWidth - placeable.width).toFloat())
+                    layout(constraints.maxWidth, placeable.height) { placeable.place(x.toInt(), LabelTopGap.roundToPx()) }
                 },
-                iconPath = if (paused) PLAY_ICON_PATH else buttonIcon(button),
-                focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == index,
-                on = button in STATEFUL_BUTTONS && buttonIsOn(button, viewId(button)?.let { state.buttonStates[it] }),
             )
         }
-        PanelButton(
-            label = stringResource(R.string.material_player_more),
-            iconPath = MORE_ICON_PATH,
-            focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == state.buttons.size,
-            on = false,
-        )
     }
 }
 
-/** A button of the panel: [on] marks a switched-on state with the accent colour. */
+/** An icon-only circle with the focus ring; [on] marks a switched-on state with the accent colour. */
 @Composable
-internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: Boolean, size: Dp = 84.dp, labelStyle: TextStyle = buttonLabelStyle) {
-    Column(
-        Modifier.width(150.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+internal fun CompactButton(iconPath: String, focused: Boolean, on: Boolean, size: Dp = CompactButtonSize, iconSize: Dp = 44.dp) {
+    Box(
+        Modifier
+            .size(size)
+            .focusRing(focused, corner = size / 2, gap = 3.dp)
+            .background(if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            Modifier
-                .size(size)
-                .focusRing(focused, corner = size / 2, gap = 3.dp)
-                .background(if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            PanelIcon(iconPath, if (focused || on) Palette.Background else Palette.OnBackground)
-        }
-        Text(label, style = labelStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        PanelIcon(iconPath, if (focused || on) Palette.Background else Palette.OnBackground, iconSize)
     }
 }
 
 @Composable
-private fun PanelIcon(iconPath: String, color: Color) {
+private fun PanelIcon(iconPath: String, color: Color, iconSize: Dp = 40.dp) {
     val path = remember(iconPath) { PathParser().parsePathString(iconPath).toPath() }
-    Canvas(Modifier.size(40.dp)) {
+    Canvas(Modifier.size(iconSize)) {
         // The paths are drawn on a 24 by 24 grid.
         scale(size.width / 24f, pivot = Offset.Zero) {
             drawPath(path, color, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
