@@ -308,7 +308,7 @@ class SubscriptionsFeedTest {
         val state = stateOnSubs()
         state.updateHistory(historyGroup("h1" to 50f), state.epoch)
         assertNull(state.takeMoreRequest(state.rows[0]))
-        assertEquals(1, loads.size + 1)
+        assertTrue(loads.isEmpty())
         val feed = subsGroup(VideoGroup.ACTION_APPEND, "h1", "s9")
         state.updateSection(feed)
         state.updateSection(VideoGroup.from(listOf(video("s9"))).apply { setAction(VideoGroup.ACTION_REMOVE) })
