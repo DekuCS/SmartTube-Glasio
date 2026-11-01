@@ -25,6 +25,14 @@ _BUILD_LOGIC_PATH = re.compile(
 _CODE_SOURCE_LINE = re.compile(
     r"(?i)\bapply\b.*\bfrom\b|\b(?:get)?repositories\b|://|\burl\b|\buri\s*\(|\bmaven\b|\bivy\b|\bflatDir\b"
     r"|\bjcenter\b|\bmavenLocal\b")
+# What this fork ships and keeps its account data out of. A change from upstream here is read by the owner first: the
+# flavor holds the updater and its pinned certificate, a manifest decides what is exported, backup code decides what
+# leaves the device, and a signing or update-feed line decides who can install what.
+_FLAVOR_PATH = re.compile(r"(?i)(?:^|/)src/(?:test)?stmaterial|^(?:material-[^/]*|README-Material\.md)$")
+_MANIFEST_PATH = re.compile(r"(?:^|/)AndroidManifest\.xml$")
+_BACKUP_PATH = re.compile(r"(?i)backup")
+_UPDATER_PATH = re.compile(r"(?i)appupdate|update_urls")
+_RELEASE_LINE = re.compile(r"(?i)signingConfig|update_urls")
 # What runs the sync itself, in this repository only. Stopped rather than dropped: code here runs with write access.
 _SYNC_MACHINERY_PATH = re.compile(r"(?i)(?:scripts/sync|\.github)/")
 _RELEASE_TAG = re.compile(r"material-v([0-9]+)\.([0-9]+)-([0-9]+)")
@@ -138,6 +146,23 @@ def is_code_source_line(line):
     return _CODE_SOURCE_LINE.search(line) is not None
 
 
+def release_path_finding(path, in_this_repository):
+    """Why a path touches the flavor, a manifest, backup code or the updater, or None."""
+    if in_this_repository and _FLAVOR_PATH.search(path):
+        return "flavor path changed"
+    if _MANIFEST_PATH.search(path):
+        return "manifest changed"
+    if _BACKUP_PATH.search(path):
+        return "backup path changed"
+    if _UPDATER_PATH.search(path):
+        return "update path changed"
+    return None
+
+
+def is_release_line(line):
+    return _RELEASE_LINE.search(line) is not None
+
+
 def is_gradle_file(path):
     return path.endswith((".gradle", ".kts", ".groovy"))
 
@@ -196,6 +221,11 @@ def gate_findings(diffs):
                 findings.append("token handling changed: " + shown)
             if is_build_logic_path(path):
                 findings.append("build logic changed: " + shown)
+            reason = release_path_finding(path, not diff.label)
+            if reason:
+                findings.append(reason + ": " + shown)
+            if any(is_release_line(line) for line in diff.lines.get(path, [])):
+                findings.append("signing or update line changed: " + shown)
             if path.rsplit("/", 1)[-1] == ".gitmodules":
                 old, new = diff.texts.get(path, ("", ""))
                 if old != new:

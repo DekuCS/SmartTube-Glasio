@@ -299,6 +299,71 @@ class Gate(unittest.TestCase):
         for path in ("app/scripts/sync/x.py", "scripts/syncer.py", "app/.github/x"):
             self.assertEqual(logic.gate_findings([diff(paths=[path])]), [], path)
 
+    def test_the_flavor_and_its_tests_stop_when_upstream_changes_them(self):
+        for path in ("smarttubetv/src/stmaterial/java/x/logic/AppUpdate.kt",
+                     "smarttubetv/src/stmaterial/AndroidManifest.xml",
+                     "smarttubetv/src/stmaterialRelease/res/values/x.xml",
+                     "smarttubetv/src/stmaterialDebug/java/x/UpdateDebug.kt",
+                     "smarttubetv/src/testStmaterial/java/x/Y.kt",
+                     "material-version.properties", "README-Material.md"):
+            findings = logic.gate_findings([diff(paths=[path])])
+            self.assertEqual(len(findings), 1, path)
+            self.assertIn("flavor", findings[0])
+
+    def test_our_gradle_constants_stop_as_a_flavor_path_too(self):
+        findings = logic.gate_findings([diff(paths=["material-constants.gradle"],
+                                             texts={"material-constants.gradle": ("", "")},
+                                             lines={"material-constants.gradle": ["x = 1"]})])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("flavor", findings[0])
+
+    def test_flavor_names_inside_a_submodule_or_another_flavor_are_ordinary(self):
+        self.assertEqual(logic.gate_findings([diff("MediaServiceCore", ["src/stmaterial/X.java"])]), [])
+        for path in ("smarttubetv/src/ststable/java/X.java", "smarttubetv/src/main/java/Materialize.java",
+                     "docs/material-design.md"):
+            self.assertEqual(logic.gate_findings([diff(paths=[path])]), [], path)
+
+    def test_any_manifest_stops_in_any_repository(self):
+        for label in ("", "MediaServiceCore"):
+            for path in ("smarttubetv/src/main/AndroidManifest.xml", "common/src/main/AndroidManifest.xml",
+                         "AndroidManifest.xml"):
+                findings = logic.gate_findings([diff(label, [path])])
+                self.assertEqual(len(findings), 1, (label, path))
+                self.assertIn("manifest", findings[0])
+
+    def test_a_manifest_lookalike_passes(self):
+        self.assertEqual(logic.gate_findings([diff(paths=["docs/AndroidManifest.xml.md", "a/MyAndroidManifest.xml"])]),
+                         [])
+
+    def test_backup_code_stops_in_any_repository(self):
+        for label in ("", "MediaServiceCore"):
+            for path in ("common/src/main/java/x/misc/BackupAndRestoreManager.java",
+                         "common/src/main/java/x/misc/GDriveBackupWorker.java",
+                         "common/src/main/res/xml/backup_rules.xml"):
+                findings = logic.gate_findings([diff(label, [path])])
+                self.assertEqual(len(findings), 1, (label, path))
+                self.assertIn("backup", findings[0])
+
+    def test_the_updater_and_the_update_feed_stop(self):
+        for path in ("smarttubetv/src/main/res/xml/update_urls.xml", "common/src/main/java/x/AppUpdateManager.java",
+                     "a/update_urls.json"):
+            findings = logic.gate_findings([diff(paths=[path])])
+            self.assertEqual(len(findings), 1, path)
+            self.assertIn("update", findings[0])
+
+    def test_a_changed_signing_or_update_url_line_stops_in_any_file(self):
+        for path, line in (("smarttubetv/build.gradle", "signingConfig signingConfigs.release"),
+                           ("smarttubetv/build.gradle", "    signingConfig = null"),
+                           ("app/Release.kt", "val update_urls = listOf(x)"),
+                           ("common/build.gradle", "buildConfigField 'String', 'update_urls', '\"x\"'")):
+            findings = logic.gate_findings([diff(paths=[path], texts={path: ("", "")}, lines={path: [line]})])
+            self.assertTrue(any("signing or update" in f for f in findings), (path, line))
+
+    def test_gradle_lines_without_those_terms_still_pass(self):
+        path = "smarttubetv/build.gradle"
+        self.assertEqual(logic.gate_findings([diff(paths=[path], texts={path: ("", "")},
+                                                   lines={path: ["minifyEnabled false", "versionCode 2"]})]), [])
+
     def test_build_logic_path_stops(self):
         self.assertEqual(len(logic.gate_findings([diff(paths=["gradle/wrapper/gradle-wrapper.jar"])])), 1)
 

@@ -144,6 +144,12 @@ What stops it, with nothing pushed:
 - a change to `gradle/wrapper/`, `gradlew`, `buildSrc/`, `settings*.gradle*`, `gradle.properties` or a version catalog
 - a changed line in Gradle code with `repositories`, `getRepositories`, `apply from`, `maven`, `url`, `uri(` or `://`,
   here or in a submodule
+- a change under `smarttubetv/src/stmaterial*` or `testStmaterial`, or to `material-*` files and `README-Material.md`:
+  the flavor holds the updater and its pinned certificate
+- any `AndroidManifest.xml`, here or behind a submodule pin, since a manifest decides what is exported
+- any path with `backup` in it, here or behind a submodule pin, since backup code decides what leaves the device
+- any path with `appupdate` or `update_urls` in it
+- a changed line with `signingConfig` or `update_urls` in any file
 - a changed URL or path in `.gitmodules`, as `git config` reads it
 - a pin that cannot be fetched, or a history with no single merge base
 - a merge conflict
@@ -152,7 +158,8 @@ What stops it, with nothing pushed:
 - failed tests or a failed build
 
 These rules prefer a false stop, which costs a look, to a false pass. Five of the last nine upstream stable steps would
-have stopped (measured from 31.57s to 32.68s), so expect to look at about half of them.
+have stopped under these rules (measured from 31.57s to 32.68s, the same five as before the flavor, manifest, backup and
+updater rules were added, which only add reasons to them), so expect to look at about half of them.
 
 A stop or a failure turns the run red, so GitHub sends its failure email, and opens or updates one issue per upstream
 tag. Dry runs only report a stop. The issue names the files and links the compare view. The sync does not retry that
