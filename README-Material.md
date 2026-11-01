@@ -150,6 +150,8 @@ What stops it, with nothing pushed:
 - any path with `backup` in it, here or behind a submodule pin, since backup code decides what leaves the device
 - any path with `appupdate` or `update_urls` in it
 - a changed line with `signingConfig` or `update_urls` in any file
+- a changed line in a `build.gradle` or other Gradle file with `sourceSets`, `srcDir`, `srcFile`, `applicationId` or
+  `stmaterial` in it
 - a changed URL or path in `.gitmodules`, as `git config` reads it
 - a pin that cannot be fetched, or a history with no single merge base
 - a merge conflict
@@ -221,8 +223,9 @@ services", find YouTube TV and choose "Remove access".
 ## Known limits
 
 - Performance numbers, from an emulator and from a Chromecast with Google TV and a 4K stick, are in [docs/perf.md](docs/perf.md).
-- On a signed-out Chromecast, videos stayed on a spinner with "Fixing stalled client" (the SABR streaming stall). That is in
-  the playback engine, not the new interface, and is not fixed here.
+- One video, at one saved resume position, stayed on a spinner with "Fixing stalled client" before it recovered by itself
+  (the engine's own error fixer). It is not related to signing in, it is in the playback engine rather than the new
+  interface, and it is not fixed here.
 - The release APK is not minified, so it is large (see docs/perf.md).
 - Not included: casting, voice search, several accounts, comments, Shorts, live chat, home screen channels, data
   transfer.

@@ -81,3 +81,5 @@ keystore.properties
 *.p12
 *.pfx
 *.pkcs12
+
+scripts/sync/__pycache__/
