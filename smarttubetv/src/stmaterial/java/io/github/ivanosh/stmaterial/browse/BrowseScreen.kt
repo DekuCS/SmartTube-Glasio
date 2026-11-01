@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -118,7 +119,9 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
             if (barFocused) focusTabs()
         }
 
-        val tabsAway = animateFloatAsState(if (state.tabsVisible) 0f else 1f, tween(TABS_ANIMATION_MS), label = "tabsAway")
+        // Derived, so that focus moving between rows below the first does not recompose this screen and every tab.
+        val tabsVisible by remember(state) { derivedStateOf { state.tabsVisible } }
+        val tabsAway = animateFloatAsState(if (tabsVisible) 0f else 1f, tween(TABS_ANIMATION_MS), label = "tabsAway")
         val searchTitle = stringResource(R.string.material_search)
         val tabs = state.tabs().map { id ->
             val title = if (id == Sections.SEARCH_SECTION_ID) searchTitle else state.sections.firstOrNull { it.id == id }?.title.orEmpty()
