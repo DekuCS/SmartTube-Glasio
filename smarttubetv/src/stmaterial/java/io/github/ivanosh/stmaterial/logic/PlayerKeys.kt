@@ -85,3 +85,34 @@ fun formatPlayerTime(ms: Long): String {
     val rest = seconds % 60
     return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, rest) else "%d:%02d".format(minutes, rest)
 }
+
+enum class OkAction {
+    /** Not a held-capable press: [playerKey] decides, as it always did. */
+    Normal,
+    /** The key does nothing here: a repeat, or the release of a press that has been dealt with. */
+    Swallow,
+    /** A short press of a button with a hold action, now that the key is released. Presses the tracked button. */
+    Press,
+    /** OK is held on a button with a hold action. */
+    Hold,
+}
+
+/**
+ * OK on a button that has a hold action, such as Subscribe (short press subscribes, hold opens the channel).
+ * Such a press cannot act when the key goes down, since it is not known yet which one it is. So it is
+ * followed from its first down event: a repeat is the hold, which fires once; a release before any repeat is the short press.
+ * A press that began anywhere else, such as the OK that opened the panel, is never tracked and so never acts on release.
+ * Every fresh down event (repeat count 0) starts over, so a release that was never seen cannot leave the state stuck.
+ */
+data class OkHold(val index: Int? = null, val fired: Boolean = false) {
+    fun down(ui: PlayerUi, holdable: Boolean, repeating: Boolean): Pair<OkHold, OkAction> = when {
+        !repeating ->
+            if (ui.focus == PanelFocus.BUTTONS && ui.buttonIndex < ui.buttonCount - 1 && holdable) OkHold(ui.buttonIndex) to OkAction.Swallow
+            else OkHold() to OkAction.Normal
+        index != null && !fired -> OkHold(index, fired = true) to OkAction.Hold
+        else -> this to OkAction.Swallow
+    }
+
+    fun up(): Pair<OkHold, OkAction> =
+        OkHold() to if (index != null && !fired) OkAction.Press else OkAction.Swallow
+}

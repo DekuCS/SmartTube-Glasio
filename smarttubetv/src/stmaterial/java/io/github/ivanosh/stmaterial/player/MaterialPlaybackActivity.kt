@@ -19,6 +19,8 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.SponsorBlockData
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity
 import io.github.ivanosh.stmaterial.browse.KeyRepeatGuard
 import io.github.ivanosh.stmaterial.data.ButtonStore
+import io.github.ivanosh.stmaterial.logic.OkAction
+import io.github.ivanosh.stmaterial.logic.OkHold
 import io.github.ivanosh.stmaterial.logic.PanelFocus
 import io.github.ivanosh.stmaterial.logic.PlayerButton
 import io.github.ivanosh.stmaterial.logic.PlayerCommand
@@ -50,6 +52,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private val store by lazy { ButtonStore(this) }
     private var ui = PlayerUi(PanelFocus.HIDDEN, 0, panel.buttons.size + 1)
     private var seek = SeekDebounce()
+    private var okHold = OkHold()
     private var lastKeyMs = 0L
     private var seekPreviewUntilMs = 0L
     private var backPassedOn = false
@@ -144,9 +147,33 @@ class MaterialPlaybackActivity : PlaybackActivity() {
                 backPassedOn = false
                 return false
             }
+            if (key == PlayerKey.Ok) {
+                val pressed = okHold.index
+                val (next, action) = okHold.up()
+                okHold = next
+                // A short press of Subscribe (or any button with a hold action) acts now that it is known not to be a hold.
+                if (action == OkAction.Press && pressed != null) {
+                    lastKeyMs = SystemClock.uptimeMillis()
+                    panel.buttons.getOrNull(pressed)?.let(commands::run)
+                    refresh()
+                    startTicking()
+                }
+            }
             return true
         }
         val sheet = isSheetOpen
+        if (key == PlayerKey.Ok && !sheet) {
+            val onHoldButton = ui.focus == PanelFocus.BUTTONS && panel.buttons.getOrNull(ui.buttonIndex) == PlayerButton.Subscribe
+            val (next, action) = okHold.down(ui, onHoldButton, event.repeatCount > 0 || event.isLongPress)
+            okHold = next
+            if (action != OkAction.Normal) {
+                if (event.repeatCount == 0) presenter.onKeyDown(NO_KEY)
+                lastKeyMs = SystemClock.uptimeMillis()
+                // Hold OK on Subscribe does what the Channel button does and does not subscribe.
+                if (action == OkAction.Hold) commands.run(PlayerButton.Channel)
+                return true
+            }
+        }
         val moves = if (sheet) key == PlayerKey.Up || key == PlayerKey.Down else key == PlayerKey.Left || key == PlayerKey.Right
         if (event.repeatCount > 0) {
             // Only a held seek key (or, in More, up or down) repeats, and what waited in the queue is dropped, so nothing moves after release.
