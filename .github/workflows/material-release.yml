@@ -228,7 +228,7 @@ jobs:
           SHA: ${{ inputs.sha }}
         run: |
           gh release create "$TAG" "$RUNNER_TEMP"/signed/*.apk \
-            --repo "$GITHUB_REPOSITORY" --title "$TAG" --prerelease --target "$SHA" --generate-notes \
+            --repo "$GITHUB_REPOSITORY" --title "$TAG" --prerelease --target "$SHA" \
             --notes "Version ${TAG#material-v}. Signing certificate SHA-256 8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c."
 
       - name: Remove the signing material

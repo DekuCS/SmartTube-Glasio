@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Superseded in part:** where this plan and the spec (`docs/superpowers/specs/2026-10-31-tv-client-design.md`, as amended) disagree, the spec wins. It was written before the player panel's slot count became configurable and before the built-in updater was added.
+
 **Goal:** Лёгкий интерфейс Android TV на Material 3 поверх движка SmartTube: вкладки сверху, быстрая настройка разделов и кнопок плеера.
 
 **Architecture:** Форк `yuliskov/SmartTube` с новым flavor `stmaterial` в модуле `smarttubetv`. Новые Activity на Compose реализуют существующие интерфейсы `*View` из `common` и регистрируются в `ViewManager`; презентеры и движок не меняются. Правила поведения живут в чистых классах Kotlin без Android и покрыты JVM-тестами, экраны проверяются на эмуляторе скриптами `adb`.

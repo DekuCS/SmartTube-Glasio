@@ -52,7 +52,7 @@ Pick `arm64-v8a` or `armeabi-v7a` to match the device (`adb shell getprop ro.pro
 
 Without adb: install the Downloader app on the TV, open it, and enter the URL of the APK on the newest entry of the
 [GitHub releases](https://github.com/ivanosh/SmartTube-Material/releases), then allow Downloader to install unknown apps.
-Every release is marked as a prerelease, so GitHub's "latest" link does not reach them.
+A release starts as a prerelease, so GitHub's "latest" link does not reach it until it is promoted; use the newest entry of the list.
 
 ## Updates
 
@@ -157,6 +157,8 @@ What stops it, with nothing pushed:
   `material-v*` tag or release
 - failed tests or a failed build
 
+A new Gradle dependency or plugin from an allowed repository does not stop the sync; it is only in what a prerelease signs, which the owner has accepted.
+
 These rules prefer a false stop, which costs a look, to a false pass. Five of the last nine upstream stable steps would
 have stopped under these rules (measured from 31.57s to 32.68s, the same five as before the flavor, manifest, backup and
 updater rules were added, which only add reasons to them), so expect to look at about half of them.
@@ -202,8 +204,7 @@ A tag only ever comes from a successful release, so an existing tag means that v
 GitHub fires a schedule only under these conditions, and nothing reports it when one is missing. A run that fires still
 publishes only if `MATERIAL_SYNC_ENABLED` is `true`.
 
-- The workflow is on the repository's default branch. That is `master` today, so `material` must become the default
-  branch. Every run warns in its log while it is not.
+- The workflow is on the repository's default branch. That is `material`; every run warns in its log if it is not.
 - Actions and scheduled workflows are enabled in the Actions tab. GitHub turns them off in a fork until they are
   enabled by hand, and this repository is a fork.
 - The repository saw activity in the last 60 days; otherwise GitHub pauses the schedule.
@@ -219,7 +220,9 @@ services", find YouTube TV and choose "Remove access".
 
 ## Known limits
 
-- Performance on a Chromecast is not measured yet. Emulator numbers are in [docs/perf.md](docs/perf.md).
+- Performance numbers, from an emulator and from a Chromecast with Google TV and a 4K stick, are in [docs/perf.md](docs/perf.md).
+- On a signed-out Chromecast, videos stayed on a spinner with "Fixing stalled client" (the SABR streaming stall). That is in
+  the playback engine, not the new interface, and is not fixed here.
 - The release APK is not minified, so it is large (see docs/perf.md).
 - Not included: casting, voice search, several accounts, comments, Shorts, live chat, home screen channels, data
   transfer.
