@@ -23,6 +23,9 @@ data class ProgressMark(val start: Float, val end: Float, val isChapter: Boolean
  */
 data class SkipChipUi(val id: Long, val undo: Boolean, val name: String, val argb: Int, val notice: Boolean = false)
 
+/** A chapter of the video. [thumbUrl] is the engine's, null when it has none. */
+data class ChapterUi(val title: String, val startMs: Long, val thumbUrl: String?)
+
 /** What the overlay draws. Only [MaterialPlaybackActivity] writes it, and only while something is on screen. */
 class PlayerOverlayState {
     var focus by mutableStateOf(PanelFocus.HIDDEN)
@@ -35,6 +38,8 @@ class PlayerOverlayState {
     var positionMs by mutableLongStateOf(0)
     var durationMs by mutableLongStateOf(0)
     var playing by mutableStateOf(true)
+    /** Empty when the video has no chapters; then the panel is as it is without them. */
+    var chapters by mutableStateOf(emptyList<ChapterUi>())
     var marks by mutableStateOf(emptyList<ProgressMark>())
     /** One entry per SponsorBlock category on the bar, set with [marks]. */
     var legend by mutableStateOf(emptyList<LegendEntry>())

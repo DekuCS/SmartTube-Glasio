@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.widget.ProgressBar
 import com.liskovsoft.mediaserviceinterfaces.data.SponsorSegment
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackFragment
 import io.github.ivanosh.stmaterial.logic.SkipSpan
@@ -84,6 +85,23 @@ class MaterialPlaybackFragment : PlaybackFragment() {
      * inside [answeringAsShownControls]: the presenter gives the chapter title only to shown controls.
      */
     override fun isControlsShown(): Boolean = controlsShownAnswer
+
+    /**
+     * The presenter hands the chapters over as a suggestions row of chapter videos (`VideoGroup.fromChapters`), with the
+     * engine's thumbnail URL and the start time of each. Leanback's row keeps getting it, as the presenter reads it back.
+     */
+    override fun updateSuggestions(group: VideoGroup?) {
+        if (group != null && group.isChapters) {
+            val chapters = group.videos.map { ChapterUi(it.title.orEmpty(), it.startTimeMs, it.cardImageUrl?.ifBlank { null }) }
+            activity?.runOnUiThread { host?.setChapters(chapters) }
+        }
+        super.updateSuggestions(group)
+    }
+
+    override fun clearSuggestions() {
+        super.clearSuggestions()
+        activity?.runOnUiThread { host?.setChapters(emptyList()) }
+    }
 
     override fun setSeekBarSegments(segments: List<SeekBarSegment>?) {
         host?.setMarks(segments)

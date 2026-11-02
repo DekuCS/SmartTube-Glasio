@@ -46,7 +46,9 @@ import io.github.ivanosh.stmaterial.logic.chipKeyMayAct
 import io.github.ivanosh.stmaterial.logic.SheetCommand
 import io.github.ivanosh.stmaterial.logic.moreGroups
 import io.github.ivanosh.stmaterial.logic.moreSheetKey
+import io.github.ivanosh.stmaterial.logic.chapterIndexAt
 import io.github.ivanosh.stmaterial.logic.playerKey
+import io.github.ivanosh.stmaterial.logic.withChapters
 import io.github.ivanosh.stmaterial.logic.presenterOpenFocus
 import io.github.ivanosh.stmaterial.logic.shouldAutoHide
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
@@ -72,6 +74,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private var seekPreviewUntilMs = 0L
     private var backPassedOn = false
     private var ticking = false
+    /** Ascending, parallel to [PlayerOverlayState.chapters]. */
+    private var chapterStarts = emptyList<Long>()
     private var started = false
     private var lastSeekKeyMs: Long? = null
     private val ledger = SkipLedger()
@@ -241,13 +245,15 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             sheetKey(key)
             return true
         }
-        val (next, keyCommands) = playerKey(ui, key, PlayerData.instance(this).seekIncrementMs.toLong())
+        val view = player
+        val at = seek.targetMs ?: view?.positionMs ?: 0L
+        val (next, keyCommands) = playerKey(ui.copy(currentChapter = chapterIndexAt(chapterStarts, at)), key, PlayerData.instance(this).seekIncrementMs.toLong())
         setUi(next)
         var passBackOn = false
         for (command in keyCommands) {
             when (command) {
                 PlayerCommand.TogglePlay -> commands.togglePlay()
-                is PlayerCommand.Seek -> seekBy(command.deltaMs)
+                is PlayerCommand.Seek -> seekBy(command.deltaMs, event.repeatCount > 0)
                 is PlayerCommand.Press -> panel.buttons.getOrNull(command.index)?.let(commands::run)
                 PlayerCommand.OpenMore -> openSheet()
                 is PlayerCommand.SeekToChapter -> Unit
@@ -308,9 +314,20 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         panel.chapter = title
     }
 
+    /** The chapters of the video, or none; from the fragment, on the main thread. Chapters of the last video go before the next one's arrive. */
+    fun setChapters(list: List<ChapterUi>) {
+        val sorted = list.sortedBy { it.startMs }
+        if (sorted == panel.chapters) return
+        panel.chapters = sorted
+        chapterStarts = sorted.map { it.startMs }
+        val at = seek.targetMs ?: player?.positionMs ?: 0L
+        writeUi(withChapters(ui, sorted.size, chapterIndexAt(chapterStarts, at)))
+    }
+
     fun onVideoChanged() {
         handler.removeCallbacks(applySeek)
         seek = SeekDebounce()
+        setChapters(emptyList())
         ledger.clear()
         watch = RewindWatch()
         notice = null
@@ -498,11 +515,11 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         }
     }
 
-    private fun seekBy(deltaMs: Long) {
+    private fun seekBy(deltaMs: Long, repeating: Boolean) {
         val view = player ?: return
         val now = SystemClock.uptimeMillis()
         lastSeekKeyMs = now
-        seek = seek.onKey(view.positionMs, deltaMs, view.durationMs, now)
+        seek = seek.onKey(view.positionMs, deltaMs, view.durationMs, now, chapterStarts, repeating)
         handler.removeCallbacks(applySeek)
         handler.postDelayed(applySeek, SEEK_DEBOUNCE_MS)
         if (!isPanelOpen) {
