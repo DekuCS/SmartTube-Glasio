@@ -5,6 +5,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.ChatReceiver;
 
+import com.liskovsoft.mediaserviceinterfaces.data.SponsorSegment;
 import java.util.List;
 
 public interface PlayerUI {
@@ -37,6 +38,10 @@ public interface PlayerUI {
     void setTitle(String title);
     void showProgressBar(boolean show);
     void setSeekBarSegments(List<SeekBarSegment> segments);
+    // MATERIAL: SponsorBlock undo. Other flavors keep the defaults: every skip is allowed, and the toast stays.
+    default boolean mayAutoSkip(SponsorSegment first) { return true; }
+    /** Tells the view that these segments were just skipped automatically. True when the view shows its own notice, so no toast is needed. */
+    default boolean onAutoSkip(List<SponsorSegment> skipped) { return false; }
     void updateEndingTime();
     void setChatReceiver(ChatReceiver chatReceiver);
 }

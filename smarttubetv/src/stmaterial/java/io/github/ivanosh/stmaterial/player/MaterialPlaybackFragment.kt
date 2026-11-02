@@ -7,9 +7,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ProgressBar
+import com.liskovsoft.mediaserviceinterfaces.data.SponsorSegment
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackFragment
+import io.github.ivanosh.stmaterial.logic.SkipSpan
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -90,6 +92,12 @@ class MaterialPlaybackFragment : PlaybackFragment() {
     override fun setSeekPreviewTitle(title: String?) {
         host?.setChapter(title)
     }
+
+    override fun mayAutoSkip(first: SponsorSegment): Boolean = host?.mayAutoSkip(first.toSpan()) ?: true
+
+    override fun onAutoSkip(skipped: List<SponsorSegment>): Boolean = host?.onAutoSkip(skipped.map { it.toSpan() }) ?: false
+
+    private fun SponsorSegment.toSpan() = SkipSpan(startMs, endMs, category.orEmpty())
 
     override fun setTitle(title: String?) {
         super.setTitle(title)

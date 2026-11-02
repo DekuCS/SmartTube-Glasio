@@ -26,6 +26,10 @@ import io.github.ivanosh.stmaterial.logic.PlayerButton
 import io.github.ivanosh.stmaterial.logic.PlayerCommand
 import io.github.ivanosh.stmaterial.logic.PlayerKey
 import io.github.ivanosh.stmaterial.logic.PlayerUi
+import io.github.ivanosh.stmaterial.logic.SKIP_CHIP_MS
+import io.github.ivanosh.stmaterial.logic.SkipChip
+import io.github.ivanosh.stmaterial.logic.SkipLedger
+import io.github.ivanosh.stmaterial.logic.SkipSpan
 import io.github.ivanosh.stmaterial.logic.SEEK_DEBOUNCE_MS
 import io.github.ivanosh.stmaterial.logic.SeekDebounce
 import io.github.ivanosh.stmaterial.logic.SheetCommand
@@ -59,6 +63,10 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private var ticking = false
     private var started = false
     private var lastSeekKeyMs: Long? = null
+    private val ledger = SkipLedger()
+    /** LEFT went to the undo, so the repeats of the same press must not seek back. */
+    private var undoKeyHeld = false
+    private val chipExpired = Runnable { panel.chip = null }
 
     val isPanelOpen get() = ui.focus != PanelFocus.HIDDEN
     private val isSheetOpen get() = panel.sheetGroups != null
@@ -125,6 +133,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         okHold = okHold.reset()
         // Before the fragment releases the engine.
         sendSeekNow()
+        hideChip()
+        undoKeyHeld = false
         // Only the state: the presenter would take this for a user closing the controls, with a chapter message to follow.
         writeUi(ui.copy(focus = PanelFocus.HIDDEN))
         panel.seekPreview = false
@@ -150,6 +160,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         if (isInPipMode) return false
         val key = playerKeyOf(event.keyCode) ?: return false
         if (event.action != KeyEvent.ACTION_DOWN) {
+            if (key == PlayerKey.Left) undoKeyHeld = false
             if (key == PlayerKey.Back && backPassedOn) {
                 backPassedOn = false
                 return false
@@ -169,6 +180,11 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             return true
         }
         val sheet = isSheetOpen
+        if (key == PlayerKey.Left && ui.focus == PanelFocus.HIDDEN && !sheet) {
+            // The undo chip: LEFT goes back to the start of the skipped segment, and not a step more.
+            if (event.repeatCount > 0 && undoKeyHeld) return true
+            if (event.repeatCount == 0 && undoSkip()) return true
+        }
         if (key == PlayerKey.Ok && !sheet) {
             val onHoldButton = ui.focus == PanelFocus.BUTTONS && panel.buttons.getOrNull(ui.buttonIndex) == PlayerButton.Subscribe
             val (next, action) = okHold.down(ui, onHoldButton, event.repeatCount > 0 || event.isLongPress)
@@ -262,6 +278,48 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     fun onVideoChanged() {
         handler.removeCallbacks(applySeek)
         seek = SeekDebounce()
+        ledger.clear()
+        hideChip()
+    }
+
+    // Calls from SponsorBlockController through the fragment.
+
+    fun mayAutoSkip(span: SkipSpan): Boolean = ledger.maySkip(span, SystemClock.uptimeMillis())
+
+    /** True when the chip is shown, in place of the toast. The ledger is told whatever the view is doing. */
+    fun onAutoSkip(spans: List<SkipSpan>): Boolean {
+        val chip = ledger.onAutoSkip(spans, SystemClock.uptimeMillis())
+        if (chip == null || !started || isInPipMode) return false
+        showUndoChip(chip)
+        return true
+    }
+
+    private fun showUndoChip(chip: SkipChip) {
+        val category = chip.last.category
+        val data = SponsorBlockData.instance(this)
+        val argb = data.getColorRes(category)?.let { ContextCompat.getColor(this, it) } ?: Color.WHITE
+        val name = SPONSOR_CATEGORY_NAMES[category]?.let(::getString) ?: category
+        panel.chip = SkipChipUi(chip.shownAtMs, true, name, argb)
+        handler.removeCallbacks(chipExpired)
+        handler.postDelayed(chipExpired, SKIP_CHIP_MS)
+    }
+
+    private fun hideChip() {
+        handler.removeCallbacks(chipExpired)
+        panel.chip = null
+    }
+
+    /** True when the key was the undo. */
+    private fun undoSkip(): Boolean {
+        val to = ledger.undo(SystemClock.uptimeMillis()) ?: return false
+        presenter.onKeyDown(NO_KEY)
+        // A seek still waiting would go on after the undo and take the position away.
+        handler.removeCallbacks(applySeek)
+        seek = SeekDebounce()
+        hideChip()
+        player?.seekTo(to)
+        undoKeyHeld = true
+        return true
     }
 
     /** The panel's buttons from the store. The count of keys moves with them, and an open More follows. */

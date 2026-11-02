@@ -257,22 +257,26 @@ public class SponsorBlockController extends BasePlayerController {
         }
     }
 
-    private void simpleSkip(long skipPosMs) {
+    private void simpleSkip(long skipPosMs, List<SponsorSegment> skipped) {
         if (mLastSkipPosMs == skipPosMs) {
             return;
         }
 
         setPositionMs(skipPosMs);
+        getPlayer().onAutoSkip(skipped); // MATERIAL: the undo chip
         closeTransparentDialog();
     }
 
-    private void messageSkip(long skipPosMs, String category) {
+    private void messageSkip(long skipPosMs, String category, List<SponsorSegment> skipped) {
         if (mLastSkipPosMs == skipPosMs) {
             return;
         }
 
-        MessageHelpers.showMessage(getContext(),
-                String.format("%s: %s", getContext().getString(R.string.content_block_provider), getContext().getString(R.string.msg_skipping_segment, category)));
+        // MATERIAL: the undo chip replaces the toast
+        if (!getPlayer().onAutoSkip(skipped)) {
+            MessageHelpers.showMessage(getContext(),
+                    String.format("%s: %s", getContext().getString(R.string.content_block_provider), getContext().getString(R.string.msg_skipping_segment, category)));
+        }
         setPositionMs(skipPosMs);
         closeTransparentDialog();
     }
@@ -398,11 +402,12 @@ public class SponsorBlockController extends BasePlayerController {
         boolean isDurationIgnored = (skipDurationMs < 10_000 && getPlayerTweaksData().isTextureViewEnabled())
                 || (skipDurationMs < getSponsorBlockData().getIgnoredDurationMs());
 
-        if (!isDurationIgnored) {
+        // MATERIAL: a segment the owner undid, or one just skipped, is not skipped again
+        if (!isDurationIgnored && getPlayer().mayAutoSkip(foundSegments.get(0))) {
             if (type == SponsorBlockData.ACTION_SKIP_ONLY || getPlayer().isInPIPMode() || Utils.isScreenOff(getContext()) || isEmbedPlayer()) {
-                simpleSkip(skipPosMs);
+                simpleSkip(skipPosMs, foundSegments);
             } else if (type == SponsorBlockData.ACTION_SKIP_WITH_TOAST) {
-                messageSkip(skipPosMs, skipMessage);
+                messageSkip(skipPosMs, skipMessage, foundSegments);
             } else if (type == SponsorBlockData.ACTION_SHOW_DIALOG) {
                 confirmSkip(skipPosMs, skipMessage);
             }

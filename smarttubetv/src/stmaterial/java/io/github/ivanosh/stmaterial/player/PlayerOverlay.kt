@@ -2,6 +2,10 @@ package io.github.ivanosh.stmaterial.player
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import io.github.ivanosh.stmaterial.logic.SKIP_CHIP_MS
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,27 +75,35 @@ internal val buttonLabelStyle = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, 
  */
 @Composable
 fun PlayerOverlay(state: PlayerOverlayState) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .graphicsLayer { alpha = if (state.focus != PanelFocus.HIDDEN || state.seekPreview) 1f else 0f },
-        contentAlignment = Alignment.BottomStart
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(Palette.Background)
-                .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
-        ) {
-            Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ProgressBar(state)
-                TimeRow(state)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
+        Column(Modifier.fillMaxWidth()) {
+            // The chip sits on the panel's top edge, or, with the panel hidden, on its bottom margin.
+            SkipChipHost(state)
+            Column(
+                Modifier
+                    .collapsedWhenHidden(state)
+                    .graphicsLayer { alpha = if (state.focus != PanelFocus.HIDDEN || state.seekPreview) 1f else 0f }
+                    .fillMaxWidth()
+                    .background(Palette.Background)
+                    .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
+            ) {
+                Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ProgressBar(state)
+                    TimeRow(state)
+                }
+                Box(Modifier.onlyWhenOpen(state).padding(top = 24.dp)) { Buttons(state) }
             }
-            Box(Modifier.onlyWhenOpen(state).padding(top = 24.dp)) { Buttons(state) }
         }
         MoreSheet(state)
     }
+}
+
+/** A hidden panel is invisible, and it leaves only its bottom margin, so that the chip does not float. Read in layout, so no composition follows. */
+private fun Modifier.collapsedWhenHidden(state: PlayerOverlayState): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val shown = state.focus != PanelFocus.HIDDEN || state.seekPreview
+    layout(placeable.width, if (shown) placeable.height else 40.dp.roundToPx()) { placeable.place(0, 0) }
 }
 
 /** Takes no room in the seek preview, which shows the progress bar alone. Read in layout, so no composition follows. */
@@ -290,5 +305,65 @@ private fun PanelIcon(iconPath: String, color: Color, iconSize: Dp = 40.dp) {
         scale(size.width / 24f, pivot = Offset.Zero) {
             drawPath(path, color, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
+    }
+}
+
+private val chipStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp, color = Palette.OnBackground, fontWeight = FontWeight.Medium)
+private val ChipBarHeight = 4.dp
+
+/** Its own scope: the chip appearing or going composes this and nothing else, and no chip composes nothing. */
+@Composable
+private fun SkipChipHost(state: PlayerOverlayState) {
+    val chip = state.chip ?: return
+    Box(Modifier.padding(start = 58.dp, bottom = 16.dp)) { SkipChipView(chip) }
+}
+
+/**
+ * A small opaque chip: it needs no scrim to read over a bright frame. The bar of the undo chip runs down in the
+ * draw phase from one animatable, so no frame composes anything.
+ */
+@Composable
+private fun SkipChipView(chip: SkipChipUi) {
+    val left = remember(chip.id) { Animatable(1f) }
+    if (chip.undo) LaunchedEffect(chip.id) { left.animateTo(0f, tween(SKIP_CHIP_MS.toInt(), easing = LinearEasing)) }
+    val shape = RoundedCornerShape(32.dp)
+    Row(
+        Modifier
+            .clip(shape)
+            .background(Palette.Background)
+            .border(2.dp, Palette.ProgressTrack, shape)
+            .drawWithContent {
+                drawContent()
+                if (chip.undo) {
+                    val barHeight = ChipBarHeight.toPx()
+                    drawRect(Palette.Accent, Offset(0f, size.height - barHeight), Size(size.width * left.value, barHeight))
+                }
+            }
+            .padding(start = 24.dp, end = 28.dp, top = 12.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(Modifier.size(16.dp).background(Color(chip.argb), CircleShape))
+        Text(if (chip.undo) stringResource(R.string.material_skip_skipped, chip.name) else chip.name, style = chipStyle, maxLines = 1)
+        if (chip.undo) {
+            ChipArrow(pointsRight = false)
+            Text(stringResource(R.string.material_skip_undo), style = chipStyle.copy(color = Palette.Accent))
+        } else {
+            Text(stringResource(R.string.material_skip_skip), style = chipStyle.copy(color = Palette.Accent))
+            ChipArrow(pointsRight = true)
+        }
+    }
+}
+
+/** The triangle of the chip, drawn, since the glyph may come out as an emoji. */
+@Composable
+private fun ChipArrow(pointsRight: Boolean) {
+    Canvas(Modifier.size(18.dp, 20.dp)) {
+        val path = Path().apply {
+            if (pointsRight) { moveTo(0f, 0f); lineTo(size.width, size.height / 2); lineTo(0f, size.height) }
+            else { moveTo(size.width, 0f); lineTo(0f, size.height / 2); lineTo(size.width, size.height) }
+            close()
+        }
+        drawPath(path, Palette.Accent)
     }
 }

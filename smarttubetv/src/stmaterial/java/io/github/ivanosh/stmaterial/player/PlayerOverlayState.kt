@@ -17,6 +17,12 @@ import io.github.ivanosh.stmaterial.logic.PlayerButton
  */
 data class ProgressMark(val start: Float, val end: Float, val isChapter: Boolean, val argb: Int = 0)
 
+/**
+ * The chip above the panel. [undo] is the one that follows an automatic skip, with a bar that runs down for
+ * [io.github.ivanosh.stmaterial.logic.SKIP_CHIP_MS]; [id] tells one showing from the next.
+ */
+data class SkipChipUi(val id: Long, val undo: Boolean, val name: String, val argb: Int)
+
 /** What the overlay draws. Only [MaterialPlaybackActivity] writes it, and only while something is on screen. */
 class PlayerOverlayState {
     var focus by mutableStateOf(PanelFocus.HIDDEN)
@@ -39,4 +45,6 @@ class PlayerOverlayState {
     /** What More lists while its sheet is open, else null. */
     var sheetGroups by mutableStateOf<List<ButtonGroup>?>(null)
     var sheetCursor by mutableIntStateOf(0)
+    /** Null when no chip is on screen, and then nothing about it is composed. */
+    var chip by mutableStateOf<SkipChipUi?>(null)
 }

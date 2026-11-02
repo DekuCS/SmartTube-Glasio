@@ -67,6 +67,9 @@
     <string translatable="false" name="material_player_speed">Speed</string>
     <string translatable="false" name="material_player_more">More</string>
     <string translatable="false" name="material_player_marks">Marked by SponsorBlock</string>
+    <string translatable="false" name="material_skip_skipped">Skipped: %1$s</string>
+    <string translatable="false" name="material_skip_undo">Undo</string>
+    <string translatable="false" name="material_skip_skip">Skip</string>
     <string translatable="false" name="material_sb_sponsor">Sponsor</string>
     <string translatable="false" name="material_sb_intro">Intro</string>
     <string translatable="false" name="material_sb_outro">Outro</string>
