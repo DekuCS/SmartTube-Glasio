@@ -435,23 +435,21 @@ private fun SkipChipView(chip: SkipChipUi) {
 private fun ChipArrow(pointsRight: Boolean) {
     Canvas(Modifier.size(DPadSize)) {
         val outer = size.minDimension / 2
-        val band = outer * 0.5f
+        val edge = 2.5.dp.toPx()
+        val band = outer * 0.55f
         val middle = outer - band / 2
-        val edge = Stroke(width = 2.5.dp.toPx())
-        val inset = edge.width / 2
-        // The key to press: a sector of the ring.
+        drawCircle(Palette.OnBackground, radius = outer - edge / 2, style = Stroke(width = edge))
+        // The key to press: a sector of the ring, over its outline.
         drawArc(
             Palette.Accent,
-            startAngle = if (pointsRight) -38f else 142f,
-            sweepAngle = 76f,
+            startAngle = if (pointsRight) -50f else 130f,
+            sweepAngle = 100f,
             useCenter = false,
             topLeft = Offset(outer - middle, outer - middle),
             size = Size(middle * 2, middle * 2),
             style = Stroke(width = band),
         )
-        drawCircle(Palette.OnBackground, radius = outer - inset, style = edge)
-        drawCircle(Palette.OnBackground, radius = outer - band - inset / 2, style = Stroke(width = edge.width * 0.6f))
-        drawCircle(Palette.OnBackground, radius = outer * 0.14f)
+        drawCircle(Palette.OnBackground, radius = outer * 0.16f)
     }
 }
 
