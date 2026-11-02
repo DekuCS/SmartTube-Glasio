@@ -260,6 +260,11 @@ android {
 
 // The ABI splits are shared by all flavors, stmaterial supports only the two ARM ones.
 androidComponents {
+    // A debug build installs next to the release one and never replaces it, so it can be tried on a device that
+    // holds a signed install; the updater also refuses a release for it, since the package names differ.
+    onVariants(selector().withName('stmaterialDebug')) { variant ->
+        variant.applicationId.set('io.github.ivanosh.smarttubematerial.debug')
+    }
     onVariants(selector().withName('stmaterialRelease')) { variant ->
         if (materialSigning != null) {
             variant.signingConfig.setConfig(android.signingConfigs.stmaterialRelease)

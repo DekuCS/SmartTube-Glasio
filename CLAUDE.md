@@ -9,7 +9,7 @@ Refer to devices by kind (emulator, Chromecast with Google TV, Google TV stick).
 
 ## What is ours and what is upstream's
 
-- Ours is the `stmaterial` product flavor (application id `io.github.ivanosh.smarttubematerial`, minSdk 29, ARM ABIs only).
+- Ours is the `stmaterial` product flavor (application id `io.github.ivanosh.smarttubematerial`, `.debug` appended for debug builds, so they install next to a signed release; minSdk 29, ARM ABIs only).
   Code: `smarttubetv/src/stmaterial/java/io/github/ivanosh/stmaterial/`. Tests: `smarttubetv/src/testStmaterial/`.
   Other flavors are upstream's and keep upstream values.
 - Submodules (`MediaServiceCore`, `SharedModules`) stay on upstream URLs and pins. The sync gate stops on any change to them.
