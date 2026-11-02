@@ -66,7 +66,7 @@ scripts/perf.sh <serial> [runs]                                                 
 - Screenshots (`screencap`) do not capture the video layer. A visual bug over video cannot be seen in them; reason from code
   or ask the owner to look.
 - Activities such as browse, dialog and player are `singleInstance` and are reused. Per-screen key state (for example the OK
-  hold in the player) survives into the next showing, so reset it in `onPause` / `onStop` / `onNewIntent`.
+  hold in the player) survives into the next showing, so reset it in `onPause` / `onStop`.
 - A debug build cannot replace a release-signed install (signature mismatch). Use the emulator for debug, or install release.
 - `adb shell input keyevent --longpress` is not a real remote hold (no repeats from the remote). Long-press code fires on key
   repeats or `isLongPress`; test it with `scripts/perf.sh`-style `uinput` or on a real remote.
@@ -81,7 +81,7 @@ scripts/perf.sh <serial> [runs]                                                 
 - Limits: 8 tabs (`Sections.LIMIT`, Settings is outside the count); 8 player buttons plus More (`PANEL_LIMIT`); the default
   eight are the old five plus Like, Dislike, Subscribe.
 - English is the only UI language. All UI text in English.
-- The account token is never in shared storage or backups: `allowBackup="false"`, no export, no logging. The sync gate and
+- The account token is never in shared storage or backups: `allowBackup="false"`, and the token is not exported. The sync gate and
   the updater guard this.
 - DIAL (cast) and `leanbackassistant` (home channels, search provider) are off: components removed in the manifest,
   `Utils.disableChannelsService()` and `disableQrService()` called at startup.
