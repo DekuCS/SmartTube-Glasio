@@ -91,7 +91,8 @@ internal val buttonLabelStyle = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, 
  */
 @Composable
 fun PlayerOverlay(state: PlayerOverlayState) {
-    // Opening fades in over 150 ms and lifts 16 units; closing fades out over 120 ms. Both are drawn through the
+    // Opening fades in over 220 ms and lifts 40 units; closing fades out and sinks over 180 ms. Shorter ones were
+    // invisible on a TV, where a 150 ms change is six or seven frames. Both are drawn through the
     // layer from two animatables, so no frame composes anything: the targets come from a snapshot flow.
     val alpha = remember { Animatable(0f) }
     val lift = remember { Animatable(1f) }
@@ -113,7 +114,10 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                     launch { lift.animateTo(0f, tween(OPEN_MS)) }
                 }
             } else {
-                alpha.animateTo(0f, tween(CLOSE_MS))
+                coroutineScope {
+                    launch { alpha.animateTo(0f, tween(CLOSE_MS)) }
+                    launch { lift.animateTo(1f, tween(CLOSE_MS)) }
+                }
                 state.layoutShown = false
                 state.layoutOpen = false
             }
@@ -162,9 +166,9 @@ fun PlayerOverlay(state: PlayerOverlayState) {
 }
 
 private val DiscOutline = Color.White.copy(alpha = 0.45f)
-private const val OPEN_MS = 150
-private const val CLOSE_MS = 120
-private val LiftDistance = 16.dp
+private const val OPEN_MS = 220
+private const val CLOSE_MS = 180
+private val LiftDistance = 40.dp
 /** The scrim starts this far above the panel's top, fully clear, so that the panel does not read as a block with an edge. */
 private val ScrimFade = 200.dp
 /** The ramp is longer with the chapter row open, which makes the panel taller. */
