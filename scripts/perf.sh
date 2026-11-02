@@ -149,7 +149,7 @@ summary() { # median of the percent and percentile columns over all runs
 # The time of a key is the kernel's (getevent), the time of a frame is FrameCompleted in framestats:
 # the same clock, after an offset if the kernel stamps in real time. Nothing is picked in the dialog, and the player is
 # closed at the end.
-PANEL_VIDEO=https://youtu.be/96CCqa8gj-s
+PANEL_VIDEO=${PANEL_VIDEO:?set PANEL_VIDEO to a video URL; only on a device with no account signed in}
 PANEL_WAIT=${PANEL_WAIT:-60}
 
 # In order, key:seconds to the next: panel, close, panel, close, panel, right, right, OK (Quality), close, then the

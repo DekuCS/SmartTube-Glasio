@@ -45,7 +45,7 @@ Chromecast. Single runs reached 2219 and 3467 ms after compiling. The cause was 
 
 ## First player panel and first dialog
 
-Key press to the frame that shows it, ms, median of 3 runs, one video (`96CCqa8gj-s`). A compiled projector:
+Key press to the frame that shows it, ms, median of 3 runs, one video. A compiled projector:
 
 | | Before | After |
 |---|---|---|
