@@ -427,15 +427,32 @@ private fun SkipChipView(chip: SkipChipUi) {
     }
 }
 
-/** The triangle of the chip, drawn, since the glyph may come out as an emoji. */
+/**
+ * The D-pad of the Chromecast remote, drawn: a ring, a dot in the middle, and the arc of the key to press filled in
+ * the accent colour. One Canvas of paths and arcs, nothing to load, and it only draws when the chip does.
+ */
 @Composable
 private fun ChipArrow(pointsRight: Boolean) {
-    Canvas(Modifier.size(18.dp, 20.dp)) {
-        val path = Path().apply {
-            if (pointsRight) { moveTo(0f, 0f); lineTo(size.width, size.height / 2); lineTo(0f, size.height) }
-            else { moveTo(size.width, 0f); lineTo(0f, size.height / 2); lineTo(size.width, size.height) }
-            close()
-        }
-        drawPath(path, Palette.Accent)
+    Canvas(Modifier.size(DPadSize)) {
+        val outer = size.minDimension / 2
+        val band = outer * 0.5f
+        val middle = outer - band / 2
+        val edge = Stroke(width = 2.5.dp.toPx())
+        val inset = edge.width / 2
+        // The key to press: a sector of the ring.
+        drawArc(
+            Palette.Accent,
+            startAngle = if (pointsRight) -38f else 142f,
+            sweepAngle = 76f,
+            useCenter = false,
+            topLeft = Offset(outer - middle, outer - middle),
+            size = Size(middle * 2, middle * 2),
+            style = Stroke(width = band),
+        )
+        drawCircle(Palette.OnBackground, radius = outer - inset, style = edge)
+        drawCircle(Palette.OnBackground, radius = outer - band - inset / 2, style = Stroke(width = edge.width * 0.6f))
+        drawCircle(Palette.OnBackground, radius = outer * 0.14f)
     }
 }
+
+private val DPadSize = 32.dp
