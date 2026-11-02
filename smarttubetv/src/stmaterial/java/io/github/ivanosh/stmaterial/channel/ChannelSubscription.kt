@@ -36,6 +36,8 @@ class ChannelSubscription(
     private var signedIn by mutableStateOf(isSignedIn())
     private var loading = false
     private var call: Disposable? = null
+    /** The cards last seen, so the state can be asked again after a sign-in without reloading the page. */
+    private var lastVideos: List<Video>? = null
 
     private fun isSignedIn() = YouTubeServiceManager.instance().signInService.isSigned
 
@@ -55,11 +57,13 @@ class ChannelSubscription(
         if (now != signedIn) {
             signedIn = now
             subscribed = null
+            learnFrom(lastVideos)
         }
     }
 
     /** Cards arrived: the first video of any of them tells whether the account follows this channel. */
     fun learnFrom(videos: List<Video>?) {
+        if (videos != null) lastVideos = videos
         val id = channelId()
         if (!signedIn || subscribed != null || loading || id == null) return
         val video = videos?.firstOrNull { it.videoId != null } ?: return
@@ -85,6 +89,7 @@ class ChannelSubscription(
         subscribed = null
         pending = false
         loading = false
+        lastVideos = null
     }
 
     private fun act(action: SubscribeAction) {
@@ -101,11 +106,18 @@ class ChannelSubscription(
         val title = activity.getString(R.string.material_channel_unsubscribe_ask, name)
         val dialog = AppDialogPresenter.instance(activity)
         // Cancel comes first, so it has focus when the dialog opens.
+        // One answer per dialog: a second OK must not close the channel screen behind it.
+        var answered = false
         val options = listOf<OptionItem>(
-            UiOptionItem.from(activity.getString(R.string.cancel)) { dialog.goBack() },
+            UiOptionItem.from(activity.getString(R.string.cancel)) {
+                if (!answered) { answered = true; dialog.goBack() }
+            },
             UiOptionItem.from(activity.getString(R.string.material_channel_unsubscribe)) {
-                dialog.goBack()
-                send(subscribe = false)
+                if (!answered) {
+                    answered = true
+                    dialog.goBack()
+                    send(subscribe = false)
+                }
             },
         )
         dialog.appendStringsCategory(title, options)
