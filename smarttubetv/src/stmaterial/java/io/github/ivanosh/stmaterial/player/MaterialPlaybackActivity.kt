@@ -329,6 +329,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         if (sorted.isEmpty()) panel.chaptersRevealed = false
         chapterStarts = sorted.map { it.startMs }
         val at = seek.targetMs ?: player?.positionMs ?: 0L
+        // The row blocked auto-hide; with it gone the panel gets its full time again instead of closing at once.
+        if (sorted.isEmpty() && ui.focus == PanelFocus.CHAPTERS) lastKeyMs = SystemClock.uptimeMillis()
         writeUi(withChapters(ui, sorted.size, chapterIndexAt(chapterStarts, at)))
     }
 

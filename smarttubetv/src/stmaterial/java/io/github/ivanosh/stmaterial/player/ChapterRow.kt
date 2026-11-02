@@ -91,7 +91,7 @@ fun ChapterRow(state: PlayerOverlayState) {
     }
     Box(
         Modifier.layout { measurable, constraints ->
-            val shown = state.focus != PanelFocus.HIDDEN
+            val shown = state.layoutOpen
             val side = RowSide.roundToPx()
             val width = constraints.maxWidth + 2 * side
             val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width, minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity))

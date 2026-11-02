@@ -49,6 +49,9 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -88,6 +91,15 @@ fun PlayerOverlay(state: PlayerOverlayState) {
     // layer from two animatables, so no frame composes anything: the targets come from a snapshot flow.
     val alpha = remember { Animatable(0f) }
     val lift = remember { Animatable(1f) }
+    // The layout trails the close: it is told to collapse only after the fade has ended.
+    LaunchedEffect(state) {
+        snapshotFlow { (state.focus != PanelFocus.HIDDEN) to (state.focus != PanelFocus.HIDDEN || state.seekPreview) }.collect { (open, shown) ->
+            if (shown) {
+                state.layoutShown = true
+                state.layoutOpen = open
+            }
+        }
+    }
     LaunchedEffect(state) {
         snapshotFlow { state.focus != PanelFocus.HIDDEN || state.seekPreview }.collectLatest { shown ->
             if (shown) {
@@ -98,6 +110,8 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                 }
             } else {
                 alpha.animateTo(0f, tween(CLOSE_MS))
+                state.layoutShown = false
+                state.layoutOpen = false
             }
         }
     }
@@ -113,16 +127,15 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                         translationY = lift.value * LiftDistance.toPx()
                     }
                     .fillMaxWidth()
-                    .drawBehind {
-                        // Clear at the top, 92% of the background at the bottom; it starts above the panel so that the title stands on it.
-                        val fade = ScrimFade.toPx()
-                        drawRect(scrim, Offset(0f, -fade), Size(size.width, size.height + fade))
-                    }
+                    .drawBehind { drawScrim(state.barTopPx, state.focus == PanelFocus.CHAPTERS) }
                     .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
             ) {
                 Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
                 Box(Modifier.onlyWhenPreview(state)) { SeekChapterTitle(state) }
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    Modifier.onGloballyPositioned { state.barTopPx = it.positionInParent().y },
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     ProgressBar(state)
                     TimeRow(state)
                 }
@@ -134,28 +147,49 @@ fun PlayerOverlay(state: PlayerOverlayState) {
     }
 }
 
+private val DiscOutline = Color.White.copy(alpha = 0.45f)
 private const val OPEN_MS = 150
 private const val CLOSE_MS = 120
 private val LiftDistance = 16.dp
-private val ScrimFade = 80.dp
-private val scrim = Brush.verticalGradient(
-    0f to Color.Transparent,
-    0.2f to Palette.Background.copy(alpha = 0.85f),
-    0.5f to Palette.Background.copy(alpha = 0.9f),
-    1f to Palette.Background.copy(alpha = 0.92f),
-)
+/** The scrim starts this far above the panel's top, fully clear, so that the panel does not read as a block with an edge. */
+private val ScrimFade = 200.dp
+/** The ramp is longer with the chapter row open, which makes the panel taller. */
+private val ScrimRowExtra = 60.dp
+private const val ScrimPeak = 0.92f
+private const val ScrimSteps = 10
+
+/** Ease-in-out (smoothstep), so the ramp has no visible start and no visible end. */
+private fun ease(t: Float) = t * t * (3 - 2 * t)
+
+/**
+ * One gradient, from clear [ScrimFade] above the panel to 92% of the background at the top of the seek bar ([barTop], in the
+ * panel), flat below. The stops are one eased curve sampled in steps. Drawn again only when the layout changes.
+ */
+private fun DrawScope.drawScrim(barTop: Float, rowOpen: Boolean) {
+    val fade = ScrimFade.toPx() + (if (rowOpen) ScrimRowExtra.toPx() else 0f)
+    val total = size.height + fade
+    val rampEnd = ((fade + barTop) / total).coerceIn(0.2f, 1f)
+    val stops = Array(ScrimSteps + 2) { i ->
+        if (i > ScrimSteps) 1f to Palette.Background.copy(alpha = ScrimPeak)
+        else {
+            val t = i / ScrimSteps.toFloat()
+            rampEnd * t to Palette.Background.copy(alpha = ScrimPeak * ease(t))
+        }
+    }
+    drawRect(Brush.verticalGradient(colorStops = stops, startY = -fade, endY = size.height), Offset(0f, -fade), Size(size.width, total))
+}
 
 /** A hidden panel is invisible, and it leaves only its bottom margin, so that the chip does not float. Read in layout, so no composition follows. */
 private fun Modifier.collapsedWhenHidden(state: PlayerOverlayState): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    val shown = state.focus != PanelFocus.HIDDEN || state.seekPreview
+    val shown = state.layoutShown
     layout(placeable.width, if (shown) placeable.height else 40.dp.roundToPx()) { placeable.place(0, 0) }
 }
 
 /** Takes no room in the seek preview, which shows the progress bar alone. Read in layout, so no composition follows. */
 private fun Modifier.onlyWhenOpen(state: PlayerOverlayState): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    if (state.focus != PanelFocus.HIDDEN) {
+    if (state.layoutOpen) {
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
     } else {
         layout(0, 0) {}
@@ -165,7 +199,7 @@ private fun Modifier.onlyWhenOpen(state: PlayerOverlayState): Modifier = layout 
 /** The reverse of [onlyWhenOpen]: the open panel has its header, and the title of the chapter is in it. */
 private fun Modifier.onlyWhenPreview(state: PlayerOverlayState): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    if (state.focus == PanelFocus.HIDDEN) {
+    if (!state.layoutOpen) {
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
     } else {
         layout(0, 0) {}
@@ -344,7 +378,9 @@ internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: 
             Modifier
                 .size(size)
                 .focusRing(focused, corner = size / 2, gap = 3.dp)
-                .background(if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape),
+                .background(if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape)
+                // A light outline so that the disc reads on the scrim over a white frame.
+                .then(if (focused || on) Modifier else Modifier.border(2.dp, DiscOutline, CircleShape)),
             contentAlignment = Alignment.Center
         ) {
             PanelIcon(iconPath, if (focused || on) Palette.Background else Palette.OnBackground)
@@ -418,11 +454,11 @@ private fun SkipChipView(chip: SkipChipUi) {
         if (chip.notice) {
             // A line of its own, nothing to press.
         } else if (chip.undo) {
-            ChipArrow(pointsRight = false)
+            ChipDpad(pointsRight = false)
             Text(stringResource(R.string.material_skip_undo), style = chipStyle.copy(color = Palette.Accent))
         } else {
             Text(stringResource(R.string.material_skip_skip), style = chipStyle.copy(color = Palette.Accent))
-            ChipArrow(pointsRight = true)
+            ChipDpad(pointsRight = true)
         }
     }
 }
@@ -432,7 +468,7 @@ private fun SkipChipView(chip: SkipChipUi) {
  * the accent colour. One Canvas of paths and arcs, nothing to load, and it only draws when the chip does.
  */
 @Composable
-private fun ChipArrow(pointsRight: Boolean) {
+private fun ChipDpad(pointsRight: Boolean) {
     Canvas(Modifier.size(DPadSize)) {
         val outer = size.minDimension / 2
         val edge = 2.5.dp.toPx()

@@ -1,6 +1,7 @@
 package io.github.ivanosh.stmaterial.player
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -56,4 +57,13 @@ class PlayerOverlayState {
     var sheetCursor by mutableIntStateOf(0)
     /** Null when no chip is on screen, and then nothing about it is composed. */
     var chip by mutableStateOf<SkipChipUi?>(null)
+
+    /**
+     * What the panel's layout follows. They trail [focus] and [seekPreview] on a close: the layout keeps its shape until the
+     * fade-out has ended, so the bar does not jump down while it fades. Written by the overlay, read in layout and draw only.
+     */
+    var layoutShown by mutableStateOf(false)
+    var layoutOpen by mutableStateOf(false)
+    /** The top of the seek bar in the panel, in pixels, for the scrim to reach full strength there. Read in draw only. */
+    var barTopPx by mutableFloatStateOf(0f)
 }
