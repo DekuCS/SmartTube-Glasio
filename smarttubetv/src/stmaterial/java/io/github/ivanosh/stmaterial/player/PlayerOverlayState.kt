@@ -11,7 +11,9 @@ import io.github.ivanosh.stmaterial.logic.ButtonGroup
 import io.github.ivanosh.stmaterial.logic.ButtonMenu
 import io.github.ivanosh.stmaterial.logic.DEFAULT_BUTTONS
 import io.github.ivanosh.stmaterial.logic.PanelFocus
+import io.github.ivanosh.stmaterial.logic.PickMenu
 import io.github.ivanosh.stmaterial.logic.PlayerButton
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 
 /**
  * A stretch of the progress bar, in fractions of the video. A chapter start is drawn as a gap.
@@ -27,6 +29,9 @@ data class SkipChipUi(val id: Long, val undo: Boolean, val name: String, val arg
 
 /** A chapter of the video. [thumbUrl] is the engine's, null when it has none. */
 data class ChapterUi(val title: String, val startMs: Long, val thumbUrl: String?)
+
+/** The menu of a hold on an Up next card: the lines and the cursor. Drawn by the overlay, driven by the Activity. */
+data class CardMenuUi(val labels: List<String>, val menu: PickMenu)
 
 /** What the overlay draws. Only [MaterialPlaybackActivity] writes it, and only while something is on screen. */
 class PlayerOverlayState {
@@ -46,6 +51,14 @@ class PlayerOverlayState {
     var chaptersRevealed by mutableStateOf(false)
     /** The card in focus while focus is in the chapter row. */
     var chapterIndex by mutableIntStateOf(0)
+    /** The first page of the suggestions' first group; empty when there is none. */
+    var upNext by mutableStateOf(emptyList<Video>())
+    /** The panel has been open for this video, so the Up next row may load its thumbnails. */
+    var upNextRevealed by mutableStateOf(false)
+    /** The card in focus while focus is in the Up next row. */
+    var upNextIndex by mutableIntStateOf(0)
+    /** Null when no card menu is open, and then nothing about it is composed. */
+    var cardMenu by mutableStateOf<CardMenuUi?>(null)
     var marks by mutableStateOf(emptyList<ProgressMark>())
     /** One entry per SponsorBlock category on the bar, set with [marks]. */
     var legend by mutableStateOf(emptyList<LegendEntry>())

@@ -1,6 +1,6 @@
 package io.github.ivanosh.stmaterial.logic
 
-enum class PanelFocus { HIDDEN, PROGRESS, BUTTONS, CHAPTERS }
+enum class PanelFocus { HIDDEN, PROGRESS, BUTTONS, CHAPTERS, UPNEXT }
 
 enum class PlayerKey { Up, Down, Left, Right, Ok, Back }
 
@@ -15,6 +15,9 @@ data class PlayerUi(
     val chapterCount: Int = 0,
     val currentChapter: Int = -1,
     val chapterIndex: Int = 0,
+    /** The length of the Up next row (0: none) and the card in focus. */
+    val upNextCount: Int = 0,
+    val upNextIndex: Int = 0,
 )
 
 sealed interface PlayerCommand {
@@ -24,6 +27,7 @@ sealed interface PlayerCommand {
     object Exit : PlayerCommand
     object OpenMore : PlayerCommand
     data class SeekToChapter(val index: Int) : PlayerCommand
+    data class OpenUpNext(val index: Int) : PlayerCommand
 }
 
 /** The key table of the player. Every key event gives its own result, so a held key never queues anything here. */
@@ -52,6 +56,7 @@ fun playerKey(ui: PlayerUi, key: PlayerKey, seekStepMs: Long): Pair<PlayerUi, Li
             PlayerKey.Up -> ui.copy(focus = PanelFocus.PROGRESS) to emptyList()
             PlayerKey.Down ->
                 if (ui.chapterCount > 0) ui.copy(focus = PanelFocus.CHAPTERS, chapterIndex = ui.currentChapter.coerceIn(0, ui.chapterCount - 1)) to emptyList()
+                else if (ui.upNextCount > 0) ui.copy(focus = PanelFocus.UPNEXT) to emptyList()
                 else ui to emptyList()
             PlayerKey.Left -> ui.copy(buttonIndex = (ui.buttonIndex - 1).coerceAtLeast(0)) to emptyList()
             PlayerKey.Right -> ui.copy(buttonIndex = (ui.buttonIndex + 1).coerceAtMost(ui.buttonCount - 1)) to emptyList()
@@ -60,9 +65,17 @@ fun playerKey(ui: PlayerUi, key: PlayerKey, seekStepMs: Long): Pair<PlayerUi, Li
         PanelFocus.CHAPTERS -> when (key) {
             PlayerKey.Ok -> ui.copy(focus = PanelFocus.BUTTONS) to listOf(PlayerCommand.SeekToChapter(ui.chapterIndex))
             PlayerKey.Up, PlayerKey.Back -> ui.copy(focus = PanelFocus.BUTTONS) to emptyList()
-            PlayerKey.Down -> ui to emptyList()
+            PlayerKey.Down -> (if (ui.upNextCount > 0) ui.copy(focus = PanelFocus.UPNEXT) else ui) to emptyList()
             PlayerKey.Left -> ui.copy(chapterIndex = (ui.chapterIndex - 1).coerceAtLeast(0)) to emptyList()
             PlayerKey.Right -> ui.copy(chapterIndex = (ui.chapterIndex + 1).coerceAtMost((ui.chapterCount - 1).coerceAtLeast(0))) to emptyList()
+        }
+        // Up and Back go up one row, to the chapter card or the button that was left, which the state still holds.
+        PanelFocus.UPNEXT -> when (key) {
+            PlayerKey.Ok -> ui.copy(focus = PanelFocus.HIDDEN) to listOf(PlayerCommand.OpenUpNext(ui.upNextIndex))
+            PlayerKey.Up, PlayerKey.Back -> ui.copy(focus = if (ui.chapterCount > 0) PanelFocus.CHAPTERS else PanelFocus.BUTTONS) to emptyList()
+            PlayerKey.Down -> ui to emptyList()
+            PlayerKey.Left -> ui.copy(upNextIndex = (ui.upNextIndex - 1).coerceAtLeast(0)) to emptyList()
+            PlayerKey.Right -> ui.copy(upNextIndex = (ui.upNextIndex + 1).coerceAtMost((ui.upNextCount - 1).coerceAtLeast(0))) to emptyList()
         }
     }
 
@@ -110,9 +123,9 @@ fun magnet(from: Long, to: Long, chapterStartsMs: List<Long>, stoppedOn: Long? =
     }
 }
 
-/** A paused video keeps the panel open, and so does focus in the chapter row, a button menu or Move ([modal]). */
+/** A paused video keeps the panel open, and so does focus in the chapter row or the Up next row, a button menu or Move ([modal]). */
 fun shouldAutoHide(ui: PlayerUi, playing: Boolean, idleMs: Long, modal: Boolean = false): Boolean =
-    !modal && ui.focus != PanelFocus.HIDDEN && ui.focus != PanelFocus.CHAPTERS && playing && idleMs >= PANEL_AUTO_HIDE_MS
+    !modal && ui.focus != PanelFocus.HIDDEN && ui.focus != PanelFocus.CHAPTERS && ui.focus != PanelFocus.UPNEXT && playing && idleMs >= PANEL_AUTO_HIDE_MS
 
 const val SEEK_KEEPS_FOCUS_MS = 2_000L
 

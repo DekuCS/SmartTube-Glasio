@@ -49,13 +49,14 @@ import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import io.github.ivanosh.stmaterial.logic.PanelFocus
 import io.github.ivanosh.stmaterial.logic.chapterIndexAt
+import io.github.ivanosh.stmaterial.logic.chapterRowShape
 import io.github.ivanosh.stmaterial.logic.formatPlayerTime
 import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.focusRing
 
 private val CardWidth = 240.dp
 private val CardThumbHeight = 135.dp
-private val RowSide = 58.dp
+internal val RowSide = 58.dp
 private val RowGap = 20.dp
 private val RingRoom = 8.dp
 private val RowTop = 16.dp
@@ -69,7 +70,7 @@ private val plateTime = TextStyle(fontSize = 34.sp, lineHeight = 40.sp, color = 
  * in focus (the tops of the cards then hang over the panel's bottom margin and are cut by the screen), the whole row
  * when focus is in it. The content is as wide as the screen so that cards scroll out at its edge.
  */
-private val PeekHeight = 40.dp
+internal val PeekHeight = 40.dp
 
 @Composable
 fun ChapterRow(state: PlayerOverlayState) {
@@ -77,7 +78,7 @@ fun ChapterRow(state: PlayerOverlayState) {
     if (state.chapters.isEmpty() || !state.chaptersRevealed) return
     val chapters = state.chapters
     val inRow by remember { derivedStateOf { state.focus == PanelFocus.CHAPTERS } }
-    val spread = animateFloatAsState(if (inRow) 1f else 0f, tween(150), label = "chapterRow")
+    val level = animateFloatAsState(chapterRowShape(state.focus).level(), tween(150), label = "chapterRow")
     val starts = remember(chapters) { chapters.map { it.startMs } }
     val current by remember(chapters) { derivedStateOf { chapterIndexAt(starts, state.positionMs) } }
     val list = rememberLazyListState()
@@ -89,17 +90,7 @@ fun ChapterRow(state: PlayerOverlayState) {
         val fits = shown != null && shown.offset >= list.layoutInfo.viewportStartOffset && shown.offset + shown.size <= end
         if (!fits) list.animateScrollToItem(focusedIndex)
     }
-    Box(
-        Modifier.layout { measurable, constraints ->
-            val shown = state.layoutOpen
-            val side = RowSide.roundToPx()
-            val width = constraints.maxWidth + 2 * side
-            val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width, minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
-            val peek = PeekHeight.roundToPx()
-            val height = if (shown) (peek + (placeable.height - peek) * spread.value).toInt() else 0
-            layout(constraints.maxWidth, height) { placeable.place(IntOffset(-side, 0)) }
-        }
-    ) {
+    Box(Modifier.rowSlot(state, level, PeekHeight)) {
         Column(Modifier.padding(top = RowTop)) {
             LazyRow(
                 state = list,

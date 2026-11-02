@@ -64,6 +64,17 @@ import io.github.ivanosh.stmaterial.logic.chapterIndexAt
 import io.github.ivanosh.stmaterial.logic.chapterStartAt
 import io.github.ivanosh.stmaterial.logic.playerKey
 import io.github.ivanosh.stmaterial.logic.withChapters
+import io.github.ivanosh.stmaterial.logic.withUpNext
+import io.github.ivanosh.stmaterial.logic.endOfVideoFocus
+import io.github.ivanosh.stmaterial.logic.focusIndexAfterRemoval
+import io.github.ivanosh.stmaterial.logic.PickMenu
+import io.github.ivanosh.stmaterial.logic.PickStep
+import io.github.ivanosh.stmaterial.logic.key
+import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
+import io.github.ivanosh.stmaterial.browse.CardMenu
+import io.github.ivanosh.stmaterial.ui.MenuItem
 import io.github.ivanosh.stmaterial.logic.presenterOpenFocus
 import io.github.ivanosh.stmaterial.logic.shouldAutoHide
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
@@ -82,6 +93,9 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private val presenter get() = PlaybackPresenter.instance(this)
     private val commands by lazy { PlayerCommands(presenter) { player } }
     private val store by lazy { ButtonStore(this) }
+    private val cardMenu = CardMenu(this, onGone = ::cardsGone, onMessage = { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() })
+    /** The lines of the open card menu, in the order the overlay shows them. */
+    private var cardItems = emptyList<MenuItem>()
     private var ui = PlayerUi(PanelFocus.HIDDEN, 0, panel.buttons.size + 1)
     private var seek = SeekDebounce()
     private var okHold = OkHold()
@@ -125,7 +139,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             // A dialog over the panel holds the timer; it starts again when the dialog closes.
             if (!hasWindowFocus()) lastKeyMs = now
             val view = player
-            if (view != null && !isSheetOpen && shouldAutoHide(ui, view.playWhenReady, now - lastKeyMs, modal = menuKeepsPanel(panel.menu != null, panel.moving))) {
+            if (view != null && !isSheetOpen && shouldAutoHide(ui, view.playWhenReady, now - lastKeyMs, modal = menuKeepsPanel(panel.menu != null || panel.cardMenu != null, panel.moving))) {
                 setUi(ui.copy(focus = PanelFocus.HIDDEN))
             }
             if (now >= seekPreviewUntilMs) panel.seekPreview = false
@@ -217,6 +231,11 @@ class MaterialPlaybackActivity : PlaybackActivity() {
                     lastKeyMs = SystemClock.uptimeMillis()
                     when {
                         inSheet -> sheetKey(PlayerKey.Ok)
+                        ui.focus == PanelFocus.UPNEXT -> {
+                            val (next, upCommands) = playerKey(ui, PlayerKey.Ok, 0L)
+                            setUi(next)
+                            runCommands(upCommands, false)
+                        }
                         pressed == panel.buttons.size -> openSheet()
                         else -> panel.buttons.getOrNull(pressed)?.let(commands::run)
                     }
@@ -229,7 +248,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         val sheet = isSheetOpen
         // A dialog is its own activity and window, so its keys never get here; this guards a window that took focus anyway.
         val focused = hasWindowFocus()
-        if (panel.moving || panel.menu != null) return modalKey(key, event)
+        if (panel.moving || panel.menu != null || panel.cardMenu != null) return modalKey(key, event)
         if (key == PlayerKey.Left && ui.focus == PanelFocus.HIDDEN && !sheet && focused) {
             // The undo chip: LEFT goes back to the start of the skipped segment, and not a step more.
             if (event.repeatCount == 0) undoKeyHeld = false
@@ -270,11 +289,21 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         val at = seek.targetMs ?: view?.positionMs ?: 0L
         val (next, keyCommands) = playerKey(ui.copy(currentChapter = chapterIndexAt(chapterStarts, at)), key, PlayerData.instance(this).seekIncrementMs.toLong())
         setUi(next)
+        val passBackOn = runCommands(keyCommands, event.repeatCount > 0)
+        refresh()
+        startTicking()
+        backPassedOn = passBackOn
+        return !passBackOn
+    }
+
+    /** Runs what the key table asked for. True when Back leaves the player, and so goes on to the Activity. */
+    private fun runCommands(keyCommands: List<PlayerCommand>, repeating: Boolean): Boolean {
+        val view = player
         var passBackOn = false
         for (command in keyCommands) {
             when (command) {
                 PlayerCommand.TogglePlay -> commands.togglePlay()
-                is PlayerCommand.Seek -> seekBy(command.deltaMs, event.repeatCount > 0)
+                is PlayerCommand.Seek -> seekBy(command.deltaMs, repeating)
                 is PlayerCommand.Press -> panel.buttons.getOrNull(command.index)?.let(commands::run)
                 PlayerCommand.OpenMore -> openSheet()
                 is PlayerCommand.SeekToChapter -> chapterStartAt(chapterStarts, command.index, view?.durationMs ?: 0)?.let { start ->
@@ -284,16 +313,14 @@ class MaterialPlaybackActivity : PlaybackActivity() {
                     view?.seekTo(start)
                     panel.positionMs = start
                 }
+                is PlayerCommand.OpenUpNext -> panel.upNext.getOrNull(command.index)?.let(presenter::onSuggestionItemClicked)
                 PlayerCommand.Exit -> {
                     sendSeekNow()
                     passBackOn = true
                 }
             }
         }
-        refresh()
-        startTicking()
-        backPassedOn = passBackOn
-        return !passBackOn
+        return passBackOn
     }
 
     // Calls from MaterialPlaybackFragment, which answers for the presenter.
@@ -318,6 +345,50 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         lastKeyMs = now
         refresh()
         startTicking()
+    }
+
+    /**
+     * The end of a video, which upstream signals by asking for the suggestions: the panel opens on the first card of the
+     * Up next row, or on the buttons when there is no row. Nothing is played; what the video does at its end is upstream's.
+     */
+    fun showSuggestionsPanel(show: Boolean) {
+        if (!show) {
+            showPanel(false)
+            return
+        }
+        if (!started || isInPipMode) return
+        lastKeyMs = SystemClock.uptimeMillis()
+        val focus = endOfVideoFocus(panel.upNext.size)
+        setUi(ui.copy(focus = focus, buttonIndex = if (isPanelOpen) ui.buttonIndex else 0, upNextIndex = 0))
+        refresh()
+        startTicking()
+    }
+
+    /** The first page of the related videos, or none; from the fragment, on the main thread. The row of the last video goes before the next one's arrives. */
+    fun setUpNext(list: List<Video>) {
+        if (list == panel.upNext) return
+        panel.upNext = list
+        if (list.isEmpty()) {
+            panel.upNextRevealed = false
+            panel.cardMenu = null
+            if (ui.focus == PanelFocus.UPNEXT) lastKeyMs = SystemClock.uptimeMillis()
+        }
+        writeUi(withUpNext(ui, list.size))
+    }
+
+    /** The presenter says cards are gone: Not interested, or a blocked channel. Focus goes to the neighbour of the card in focus. */
+    private fun cardsGone(group: VideoGroup) {
+        val cards = panel.upNext
+        val gone = cards.indices.filter { i ->
+            group.videos.any { it == cards[i] || (group.action == VideoGroup.ACTION_REMOVE_AUTHOR && it.author != null && it.author == cards[i].author) }
+        }
+        if (gone.isEmpty()) return
+        val ids = cards.indices.map(Int::toString)
+        val index = focusIndexAfterRemoval(ids, ui.upNextIndex, gone.map(Int::toString).toSet())
+        val rest = cards.filterIndexed { i, _ -> i !in gone }
+        panel.upNext = rest
+        if (rest.isEmpty()) panel.upNextRevealed = false
+        writeUi(withUpNext(ui.copy(upNextIndex = index), rest.size))
     }
 
     /** As on the upstream bar, chapters and SponsorBlock add up, and null clears them. */
@@ -358,6 +429,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         handler.removeCallbacks(applySeek)
         seek = SeekDebounce()
         setChapters(emptyList())
+        setUpNext(emptyList())
         ledger.clear()
         watch = RewindWatch()
         notice = null
@@ -365,6 +437,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         target = null
         hideChip()
         panel.menu = null
+        panel.cardMenu = null
         if (panel.moving) endMove()
     }
 
@@ -530,10 +603,20 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private fun okPlace(inSheet: Boolean): Int? = when {
         inSheet -> panel.sheetCursor.takeIf { it < sheetEntries().size }
         ui.focus == PanelFocus.BUTTONS -> ui.buttonIndex
+        ui.focus == PanelFocus.UPNEXT -> ui.upNextIndex.takeIf { it < panel.upNext.size }
         else -> null
     }
 
     private fun openMenu() {
+        if (ui.focus == PanelFocus.UPNEXT) {
+            // The menu of the feed's cards, with the lines that can work for this card and this session.
+            val video = panel.upNext.getOrNull(ui.upNextIndex) ?: return
+            val items = cardMenu.items(video, MediaGroup.TYPE_UNDEFINED)
+            if (items.isEmpty()) return
+            cardItems = items
+            panel.cardMenu = CardMenuUi(items.map { it.label }, PickMenu(items.size))
+            return
+        }
         if (isSheetOpen) {
             val at = panel.sheetCursor
             val button = sheetEntries().getOrNull(at) ?: return
@@ -551,6 +634,22 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         val now = SystemClock.uptimeMillis()
         if (!repeating) presenter.onKeyDown(NO_KEY)
         lastKeyMs = now
+        panel.cardMenu?.let { open ->
+            val steps = key == PlayerKey.Up || key == PlayerKey.Down
+            if (repeating && (!steps || repeatGuard.shouldDrop(event.repeatCount, event.eventTime, now))) return true
+            val (next, step) = open.menu.key(key)
+            panel.cardMenu = open.copy(menu = next)
+            when (step) {
+                PickStep.None -> Unit
+                PickStep.Close -> panel.cardMenu = null
+                is PickStep.Choose -> {
+                    val item = cardItems.getOrNull(step.index)
+                    panel.cardMenu = null
+                    item?.onClick?.invoke()
+                }
+            }
+            return true
+        }
         if (panel.moving) {
             when {
                 key == PlayerKey.Left || key == PlayerKey.Right ->
@@ -623,14 +722,17 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         if (next.focus == PanelFocus.HIDDEN) {
             panel.sheetGroups = null
             panel.menu = null
+            panel.cardMenu = null
             endMove()
             okHold = okHold.reset()
         }
         panel.focus = next.focus
         panel.buttonIndex = next.buttonIndex
         panel.chapterIndex = next.chapterIndex
+        panel.upNextIndex = next.upNextIndex
         // The first opening for this video lets the row load its thumbnails; before it, and with no chapters, nothing does.
         if (next.focus != PanelFocus.HIDDEN && panel.chapters.isNotEmpty()) panel.chaptersRevealed = true
+        if (next.focus != PanelFocus.HIDDEN && panel.upNext.isNotEmpty()) panel.upNextRevealed = true
     }
 
     private fun setUi(next: PlayerUi) {

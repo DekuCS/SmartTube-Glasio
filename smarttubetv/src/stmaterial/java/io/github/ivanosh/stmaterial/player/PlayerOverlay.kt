@@ -129,7 +129,7 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                         translationY = lift.value * LiftDistance.toPx()
                     }
                     .fillMaxWidth()
-                    .drawBehind { drawScrim(state.barTopPx, state.focus == PanelFocus.CHAPTERS) }
+                    .drawBehind { drawScrim(state.barTopPx, state.focus == PanelFocus.CHAPTERS || state.focus == PanelFocus.UPNEXT) }
                     .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
             ) {
                 Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
@@ -143,9 +143,12 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                 }
                 Box(Modifier.onlyWhenOpen(state).padding(top = 24.dp)) { Buttons(state) }
                 ChapterRow(state)
+                UpNextRow(state)
             }
         }
         MoreSheet(state)
+        // A hold on an Up next card: the menu stands over the middle of the screen.
+        state.cardMenu?.let { Box(Modifier.align(Alignment.Center)) { PickMenuCard(it) } }
         // A hold on a line of More: the menu stands to the left of the sheet.
         state.menu?.takeIf { it.inMore }?.let { Box(Modifier.align(Alignment.CenterEnd).padding(end = 800.dp)) { ButtonMenuCard(it) } }
     }

@@ -102,12 +102,15 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     tone: Color = Palette.Tones[0],
     revision: Int = 0,
+    /** False for a card that is only drawn, as in the player's panel, where the Activity holds the keys: then Compose never gives it focus or its own outline. */
+    interactive: Boolean = true,
 ) {
     val scale = animateFloatAsState(if (focused) 1.04f else 1f, tween(FOCUS_ANIMATION_MS), label = "cardScale")
     val image = rememberCardImage(remember(video, revision) { faceOf(video) }, tone)
     Surface(
         onClick = onClick,
         onLongClick = onLongClick,
+        enabled = interactive,
         modifier = modifier
             .size(THUMB_WIDTH.dp, CARD_HEIGHT.dp)
             .graphicsLayer {
@@ -120,7 +123,8 @@ fun VideoCard(
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             focusedContainerColor = Color.Transparent,
-            pressedContainerColor = Color.Transparent
+            pressedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f, pressedScale = 1f),
     ) {

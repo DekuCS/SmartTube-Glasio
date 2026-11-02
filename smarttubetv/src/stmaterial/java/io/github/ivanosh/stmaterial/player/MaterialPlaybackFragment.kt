@@ -73,8 +73,10 @@ class MaterialPlaybackFragment : PlaybackFragment() {
 
     override fun showControls(show: Boolean) = showOverlay(show)
 
-    /** Suggestions have no UI here; a video that stopped at its end still gets the panel. */
-    override fun showSuggestions(show: Boolean) = showOverlay(show)
+    /** Upstream asks for this when a video has stopped at its end: the panel opens on the Up next row, if there is one. */
+    override fun showSuggestions(show: Boolean) {
+        host?.showSuggestionsPanel(show)
+    }
 
     override fun isOverlayShown(): Boolean = host?.isPanelOpen == true
 
@@ -94,13 +96,27 @@ class MaterialPlaybackFragment : PlaybackFragment() {
         if (group != null && group.isChapters) {
             val chapters = group.videos.map { ChapterUi(it.title.orEmpty(), it.startTimeMs, it.cardImageUrl?.ifBlank { null }) }
             activity?.runOnUiThread { host?.setChapters(chapters) }
+        } else if (group != null && !upNextTaken && !group.isEmpty) {
+            // The first group that is not the chapters, in the order the controller sends them: the playback queue when there
+            // is one, then the playlist the video is in, then the related videos. Its first page only; the continuations
+            // of a group that is taken, and the groups after it, are not shown.
+            upNextTaken = true
+            val first = ArrayList(group.videos)
+            activity?.runOnUiThread { host?.setUpNext(first) }
         }
         super.updateSuggestions(group)
     }
 
+    /** A group has been taken for the Up next row of this video. */
+    @Volatile private var upNextTaken = false
+
     override fun clearSuggestions() {
         super.clearSuggestions()
-        activity?.runOnUiThread { host?.setChapters(emptyList()) }
+        upNextTaken = false
+        activity?.runOnUiThread {
+            host?.setChapters(emptyList())
+            host?.setUpNext(emptyList())
+        }
     }
 
     override fun setSeekBarSegments(segments: List<SeekBarSegment>?) {
