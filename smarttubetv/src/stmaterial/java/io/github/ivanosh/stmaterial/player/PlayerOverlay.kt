@@ -25,7 +25,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.coroutineScope
@@ -130,7 +131,12 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                         translationY = lift.value * LiftDistance.toPx()
                     }
                     .fillMaxWidth()
-                    .drawBehind { drawScrim(state.barTopPx, state.focus == PanelFocus.CHAPTERS || state.focus == PanelFocus.UPNEXT) }
+                    .drawWithCache {
+                        // State is read in the cache block: the gradient is built when the layout or the open row changes,
+                        // and the bar's redraw at every tick only draws it.
+                        val brush = scrimBrush(state.barTopPx, state.focus == PanelFocus.CHAPTERS || state.focus == PanelFocus.UPNEXT)
+                        onDrawBehind { drawScrim(brush) }
+                    }
                     .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
             ) {
                 Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
@@ -171,9 +177,9 @@ private fun ease(t: Float) = t * t * (3 - 2 * t)
 
 /**
  * One gradient, from clear [ScrimFade] above the panel to 92% of the background at the top of the seek bar ([barTop], in the
- * panel), flat below. The stops are one eased curve sampled in steps. Drawn again only when the layout changes.
+ * panel), flat below. The stops are one eased curve sampled in steps. Built again only when the layout changes.
  */
-private fun DrawScope.drawScrim(barTop: Float, rowOpen: Boolean) {
+private fun CacheDrawScope.scrimBrush(barTop: Float, rowOpen: Boolean): ScrimBrush {
     val fade = ScrimFade.toPx() + (if (rowOpen) ScrimRowExtra.toPx() else 0f)
     val total = size.height + fade
     val rampEnd = ((fade + barTop) / total).coerceIn(0.2f, 1f)
@@ -184,7 +190,13 @@ private fun DrawScope.drawScrim(barTop: Float, rowOpen: Boolean) {
             rampEnd * t to Palette.Background.copy(alpha = ScrimPeak * ease(t))
         }
     }
-    drawRect(Brush.verticalGradient(colorStops = stops, startY = -fade, endY = size.height), Offset(0f, -fade), Size(size.width, total))
+    return ScrimBrush(Brush.verticalGradient(colorStops = stops, startY = -fade, endY = size.height), fade, total)
+}
+
+private class ScrimBrush(val brush: Brush, val fade: Float, val total: Float)
+
+private fun DrawScope.drawScrim(scrim: ScrimBrush) {
+    drawRect(scrim.brush, Offset(0f, -scrim.fade), Size(size.width, scrim.total))
 }
 
 /** A hidden panel is invisible, and it leaves only its bottom margin, so that the chip does not float. Read in layout, so no composition follows. */
