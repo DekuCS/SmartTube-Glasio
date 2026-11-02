@@ -15,13 +15,27 @@ import io.github.ivanosh.stmaterial.browse.FeedActivity
  */
 class MaterialChannelActivity : FeedActivity<ChannelPresenter>(), ChannelView {
     override val presenter: ChannelPresenter by lazy { ChannelPresenter.instance(this) }
+    private val subscription = ChannelSubscription(
+        activity = this,
+        channelId = { presenter.channelId },
+        channelName = { presenter.channel?.let { it.getAuthor() ?: it.title } },
+        onMessage = { state.message = it },
+    )
 
     override fun connect() {
         presenter.setView(this)
     }
 
+    override fun pill() = subscription.pill()
+
+    override fun onResume() {
+        super.onResume()
+        subscription.refresh()
+    }
+
     override fun update(videoGroup: VideoGroup) {
         updateFeed(videoGroup)
+        subscription.learnFrom(videoGroup.videos)
         presenter.channel?.let { title = it.getAuthor() ?: it.title }
     }
 
@@ -34,6 +48,7 @@ class MaterialChannelActivity : FeedActivity<ChannelPresenter>(), ChannelView {
 
     override fun clear() {
         title = null
+        subscription.reset()
         clearFeed()
     }
 }

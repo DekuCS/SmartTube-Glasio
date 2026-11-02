@@ -188,4 +188,11 @@
     <string translatable="false" name="material_update_download_failed">The download failed. Nothing was installed.</string>
     <string translatable="false" name="material_update_not_installed">Not installed</string>
     <string translatable="false" name="material_update_channel_changed">This update is not offered on the channel chosen now.</string>
+    <string translatable="false" name="material_channel_subscribe">Subscribe</string>
+    <string translatable="false" name="material_channel_subscribed">Subscribed</string>
+    <string translatable="false" name="material_channel_sign_in_to_subscribe">Sign in to subscribe</string>
+    <string translatable="false" name="material_channel_unsubscribe_ask">Unsubscribe from %1$s?</string>
+    <string translatable="false" name="material_channel_unsubscribe">Unsubscribe</string>
+    <string translatable="false" name="material_channel_subscribe_failed">The subscription was not changed</string>
+    <string translatable="false" name="material_channel_this_channel">this channel</string>
 </resources>

@@ -18,6 +18,7 @@ import io.github.ivanosh.stmaterial.dialog.ConfirmKeyGuard
 import io.github.ivanosh.stmaterial.ui.FeedPage
 import io.github.ivanosh.stmaterial.ui.FeedPageActions
 import io.github.ivanosh.stmaterial.ui.MenuItem
+import io.github.ivanosh.stmaterial.ui.PillState
 
 /**
  * The part the screens of cards without tabs share: the presenter feeds [state], [FeedPage] draws it,
@@ -86,7 +87,10 @@ abstract class FeedActivity<P> : LeanbackActivity() where P : BasePresenter<*>, 
     }
 
     @Composable
-    protected open fun Screen() = FeedPage(title, state, feedActions)
+    protected open fun Screen() = FeedPage(title, state, feedActions, pill())
+
+    /** The button beside the title, if the screen has one. */
+    protected open fun pill(): PillState? = null
 
     protected fun updateFeed(group: VideoGroup) = state.updateSection(group)
 
