@@ -21,7 +21,11 @@ import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
 import io.github.ivanosh.stmaterial.data.HistorySource
 import io.github.ivanosh.stmaterial.data.SectionStore
 import io.github.ivanosh.stmaterial.logic.EditorState
+import io.github.ivanosh.stmaterial.logic.QUIET_RELOAD_AGE_MS
 import io.github.ivanosh.stmaterial.logic.Sections
+import io.github.ivanosh.stmaterial.logic.TabClick
+import io.github.ivanosh.stmaterial.logic.shouldQuietReload
+import io.github.ivanosh.stmaterial.logic.tabClick
 import io.github.ivanosh.stmaterial.logic.SignedOutNotice
 import io.github.ivanosh.stmaterial.logic.signedOutNotice
 import io.github.ivanosh.stmaterial.logic.resolveStart
@@ -40,6 +44,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     private val history = HistorySource { YouTubeServiceManager.instance().contentService.historyObserve }
     private val handler = Handler(Looper.getMainLooper())
     private val loadSelected = Runnable { load() }
+    private val endReload = Runnable { state.endReload() }
     private lateinit var presenter: BrowsePresenter
     private lateinit var store: SectionStore
     private var initializing = false
@@ -52,9 +57,11 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
         }
 
         override fun onTabClicked(id: Int) {
-            when (id) {
-                Sections.SEARCH_SECTION_ID -> SearchPresenter.instance(this@MaterialBrowseActivity).startSearch(null)
-                MediaGroup.TYPE_SETTINGS -> startActivity(Intent(this@MaterialBrowseActivity, MaterialSettingsActivity::class.java))
+            when (tabClick(state.selected, id)) {
+                TabClick.OPEN_SEARCH -> SearchPresenter.instance(this@MaterialBrowseActivity).startSearch(null)
+                TabClick.OPEN_SETTINGS -> startActivity(Intent(this@MaterialBrowseActivity, MaterialSettingsActivity::class.java))
+                TabClick.RELOAD -> reloadSelected()
+                TabClick.NONE -> Unit
             }
         }
 
@@ -136,7 +143,28 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
         super.onResume()
         presenter.onViewResumed()
         reloadSections()
+        reloadIfStale()
         UpdateScheduler.onBrowseResumed(this)
+    }
+
+    /**
+     * Coming back to the screen: the tab shown is reloaded without a trace if its content is old. The rows
+     * stay until the new ones arrive, focus stays on its card, and a failure only shows a short message.
+     * A load the presenter has started itself (its 3 h rule for Home) is not asked for twice.
+     */
+    private fun reloadIfStale() {
+        val busy = state.loading || isLoadPending || presenter.hasPendingActions()
+        if (!shouldQuietReload(state.selected, state.loadedAt, state.now(), busy, QUIET_AGE_MS)) return
+        if (state.beginQuietReload()) load()
+    }
+
+    /** OK on the selected tab: the tab empties, shows its loading state and loads again. Focus stays on the tab. */
+    private fun reloadSelected() {
+        handler.removeCallbacks(loadSelected)
+        history.dispose()
+        state.restartTab()
+        state.loading = true
+        load()
     }
 
     /** The editor has stored a new list while this screen was stopped. */
@@ -169,6 +197,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(loadSelected)
+        handler.removeCallbacks(endReload)
         history.dispose()
         presenter.onViewDestroyed()
     }
@@ -239,7 +268,14 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
         select(target, immediately = true)
     }
 
-    override fun updateSection(group: VideoGroup) = state.updateSection(group)
+    override fun updateSection(group: VideoGroup) {
+        state.updateSection(group)
+        // After the rest of the answer, which is handled in the same pass of the main loop.
+        if (state.reloading) {
+            handler.removeCallbacks(endReload)
+            handler.post(endReload)
+        }
+    }
 
     /** The presenter's Settings grid is replaced by the settings screen. */
     override fun updateSection(group: SettingsGroup) = Unit
@@ -255,6 +291,10 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     /** A late error of the section being left must not land on the one being selected. */
     override fun showError(data: ErrorFragmentData) {
         if (isLoadPending) return
+        if (state.failQuietReload()) {
+            state.message = getString(R.string.material_refresh_failed)
+            return
+        }
         val section = state.selectedSection
         val notice = signedOutNotice(data is SignInError, section?.id, section?.isAuthOnly == true)
         if (notice == SignedOutNotice.PUBLIC || notice == SignedOutNotice.HOME) {
@@ -283,7 +323,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     }
 
     override fun showProgressBar(show: Boolean) {
-        if (!isLoadPending) state.loading = show
+        if (!isLoadPending && !state.quiet) state.loading = show
     }
 
     override fun isProgressBarShowing(): Boolean = state.loading
@@ -297,5 +337,6 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
 
     private companion object {
         const val LOAD_DEBOUNCE_MS = 250L
+        const val QUIET_AGE_MS = QUIET_RELOAD_AGE_MS
     }
 }

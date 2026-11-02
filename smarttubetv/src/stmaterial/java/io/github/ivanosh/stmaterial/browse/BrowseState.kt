@@ -94,6 +94,8 @@ class BrowseState(
     /** The feed of Subscriptions starts loading: the screen asks for the history, with this [epoch]. */
     private val onSubscriptionsLoad: (epoch: Int) -> Unit = {},
     private val rowTitle: (Int) -> String = { "" },
+    /** Milliseconds on a clock that only moves forward. */
+    private val clock: () -> Long = { System.nanoTime() / 1_000_000 },
     private val authorOf: (Video) -> String? = { it.getAuthor() }) {
     /** All sections of the presenter, in its order: its selectSection() passes indexes into this list. */
     val sections = mutableStateListOf<BrowseSection>()
@@ -138,9 +140,99 @@ class BrowseState(
 
     fun selectTab(id: Int) {
         selected = id
+        restartTab()
+    }
+
+    /** Empties the tab for a new load, as when it is selected. */
+    fun restartTab() {
         epoch++
         subscriptions.reset()
+        quiet = false
+        swapPending = false
+        reloading = false
+        rowAliases.clear()
+        loadedAt = null
         clearContent()
+    }
+
+    /** When the content of the selected tab arrived, null while it has none. Later pages do not move it. */
+    var loadedAt: Long? = null
+        private set
+
+    fun ageMs(): Long? = loadedAt?.let { clock() - it }
+
+    fun now(): Long = clock()
+
+    /** True while a quiet reload runs: the rows shown stay until the new ones arrive. */
+    var quiet: Boolean = false
+        private set
+    private var swapPending = false
+    private var quietSince = 0L
+
+    /** Row ids of the rows being replaced, handed to the new rows in order so their scroll state stays. */
+    private var reusedRowIds: List<String> = emptyList()
+    private var createdRows = 0
+    private val rowAliases = HashMap<Int, String>()
+
+    /**
+     * Starts a reload that keeps the rows shown. False when there is nothing shown or a reload of this
+     * kind is under way (one that never answered stops counting after [QUIET_TIMEOUT_MS]).
+     */
+    fun beginQuietReload(): Boolean {
+        if (isEmpty || selected == null) return false
+        if (quiet && clock() - quietSince < QUIET_TIMEOUT_MS) return false
+        quiet = true
+        swapPending = false
+        quietSince = clock()
+        return true
+    }
+
+    /** A quiet reload that failed leaves the rows as they are. */
+    fun failQuietReload(): Boolean {
+        if (!quiet) return false
+        quiet = false
+        swapPending = false
+        return true
+    }
+
+    /** The first answer of a quiet reload: the rows shown give way to the new ones. */
+    private fun swapRows() {
+        quiet = false
+        swapPending = false
+        loadedAt = clock()
+        reloading = true
+        reusedRowIds = if (isSubscriptionGrid || rows.any { it.isGrid }) emptyList() else rows.map { it.id }
+        createdRows = 0
+        rowAliases.clear()
+        reloadFrom = rows.map { CardRow(it.id, it.videos.map(::videoKey)) }
+        reloadFocus = focused
+        subscriptions.restart()
+        if (isSubscriptionGrid) onSubscriptionsLoad(epoch)
+        rows.clear()
+    }
+
+    /** True from the swap of a quiet reload until [endReload]. */
+    var reloading = false
+        private set
+    private var reloadFrom: List<CardRow> = emptyList()
+    private var reloadFocus: FocusKey? = null
+
+    /** Keeps the card that had focus through the swap, to the card itself or the nearest one. */
+    private fun restoreAfterSwap() {
+        val before = reloadFocus ?: return
+        val to = focusAfterReload(reloadFrom, before, rows.map { CardRow(it.id, it.videos.map(::videoKey)) })
+        if (to != null) {
+            focused = to
+            pendingFocus = to
+        }
+    }
+
+    /** All groups of the answer have been handled. */
+    fun endReload() {
+        reloading = false
+        reloadFocus = null
+        reloadFrom = emptyList()
+        reusedRowIds = emptyList()
     }
 
     /** Grows with every tab selection, so an answer to a request of an earlier visit can be told apart. */
@@ -176,8 +268,24 @@ class BrowseState(
         if (!acceptsContent(group.section)) return
         val grid = selectedSection?.let { it.type != BrowseSection.TYPE_ROW } ?: false
         val feedRows = isSubscriptionGrid
-        val rowId = if (grid) VideoRow.GRID_ID else group.id.toString()
+        val rowId = if (grid) VideoRow.GRID_ID else rowAliases[group.id] ?: group.id.toString()
         val videos = group.videos.orEmpty()
+        // A quiet reload keeps what is shown until its first videos arrive.
+        var swapped = false
+        if (quiet && group.action != VideoGroup.ACTION_REMOVE && group.action != VideoGroup.ACTION_REMOVE_AUTHOR &&
+            group.action != VideoGroup.ACTION_SYNC
+        ) {
+            val replace = group.action == VideoGroup.ACTION_REPLACE
+            if (replace && videos.isEmpty()) {
+                swapPending = true
+                return
+            }
+            // A page of the rows still shown can arrive meanwhile; only the answer to the reload swaps them.
+            if (videos.isNotEmpty() && (replace || swapPending)) {
+                swapRows()
+                swapped = true
+            }
+        }
 
         when (group.action) {
             VideoGroup.ACTION_REMOVE -> {
@@ -194,7 +302,7 @@ class BrowseState(
                 rows.forEach { it.sync(videos) }
                 return
             }
-            VideoGroup.ACTION_REPLACE -> {
+            VideoGroup.ACTION_REPLACE -> if (!swapped) {
                 if (feedRows) {
                     subscriptions.restart()
                     onSubscriptionsLoad(epoch)
@@ -205,15 +313,22 @@ class BrowseState(
         if (videos.isEmpty()) return
 
         error = null
+        if (loadedAt == null) loadedAt = clock()
         if (feedRows) {
             subscriptions.onFeed(group, videos.toList(), atStart = group.action == VideoGroup.ACTION_PREPEND)
+            if (swapped) restoreAfterSwap()
             return
         }
         val row = rows.firstOrNull { it.id == rowId }
         row?.group = group
         when {
             row == null -> {
-                val created = VideoRow(rowId, if (grid) null else group.title, grid)
+                var id = rowId
+                if (reloading) {
+                    reusedRowIds.getOrNull(createdRows)?.let { id = it; rowAliases[group.id] = it }
+                    createdRows++
+                }
+                val created = VideoRow(id, if (grid) null else group.title, grid)
                 created.group = group
                 created.add(videos)
                 val at = group.position
@@ -222,6 +337,7 @@ class BrowseState(
             group.action == VideoGroup.ACTION_PREPEND -> row.add(videos, atStart = true)
             else -> row.add(videos)
         }
+        if (reloading) restoreAfterSwap()
     }
 
     /** Errors have no section. The Search tab loads nothing, so one arriving there is a late one. */
@@ -287,6 +403,7 @@ class BrowseState(
 
     private companion object {
         const val NO_ROW = -1
+        const val QUIET_TIMEOUT_MS = 60_000L
     }
 }
 
