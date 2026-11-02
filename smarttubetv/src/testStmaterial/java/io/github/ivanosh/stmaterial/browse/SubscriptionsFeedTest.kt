@@ -310,9 +310,13 @@ class SubscriptionsFeedTest {
         state.updateHistory(historyGroup("h1" to 50f), state.epoch)
         assertNull(state.takeMoreRequest(state.rows[0]))
         assertTrue(loads.isEmpty())
+        // Continue is all there is only when no video of the feed's first page is visible: here the one it
+        // brings was removed by the user earlier in this visit, so the group still has it to page from.
+        state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s9"))
+        state.updateSection(VideoGroup.from(listOf(video("s9"))).apply { setAction(VideoGroup.ACTION_REMOVE) })
+        state.updateSection(subsGroup(VideoGroup.ACTION_REPLACE))
         val feed = subsGroup(VideoGroup.ACTION_APPEND, "s9")
         state.updateSection(feed)
-        state.updateSection(VideoGroup.from(listOf(video("s9"))).apply { setAction(VideoGroup.ACTION_REMOVE) })
         assertEquals(listOf("continue"), state.layout())
         assertTrue(state.rows[0].eager)
         val next = state.takeMoreRequest(state.rows[0])
