@@ -1,0 +1,7 @@
+unstable param  io.github.ivanosh.stmaterial.browse.FeedActivity.Screen: <this>: FeedActivity<P>
+unstable param  io.github.ivanosh.stmaterial.search.MaterialSearchActivity.KeyboardScreen: <this>: MaterialSearchActivity
+unstable param  io.github.ivanosh.stmaterial.search.MaterialSearchActivity.Screen: <this>: MaterialSearchActivity
+unstable param  io.github.ivanosh.stmaterial.search.MaterialSearchActivity.Suggestions: <this>: MaterialSearchActivity
+unstable param  io.github.ivanosh.stmaterial.ui.CardFocusEffects: host: CardMenuHost
+unstable param  io.github.ivanosh.stmaterial.ui.FeedCard: video: Video
+unstable param  io.github.ivanosh.stmaterial.ui.VideoCard: video: Video

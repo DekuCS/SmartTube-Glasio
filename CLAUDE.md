@@ -32,6 +32,10 @@ scripts/emulator.sh start | install | shot <file> | key <keycode...>            
 scripts/perf.sh <serial> [runs]                                                       # feed scrolling via gfxinfo; header lists env options
 ```
 
+- Compose stability: `./gradlew :smarttubetv:compileStmaterialReleaseKotlin -PcomposeReports --rerun-tasks`, then `python3 scripts/compose_stability.py` against `smarttubetv/compose-stability-baseline.txt`; run it after touching composables or their parameters, `--update` only for a reviewed change.
+- `smarttubetv/compose-stability.conf` lists immutable types from other modules. Never add `Video` or `VideoGroup` (mutable): they stay unstable and, with strong skipping on, are compared by identity, so a card whose `Video` changed in place needs `VideoRow.revision` bumped.
+- Fix a new baseline entry (stable models, remembered lambdas, reads moved to layout or draw) rather than accepting it: the baseline guards against regressions, it is not a to-do list.
+
 - Release builds without a key use the debug key and warn; never share that APK.
 - `scripts/emulator.sh install` is the way to put a debug build on the emulator. It uses a fixed serial.
 - `actionlint` is not installed here and CI does not run it; `scripts/sync/test_workflows.py` checks the workflows' shape.
