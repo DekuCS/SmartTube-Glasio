@@ -47,6 +47,7 @@ import io.github.ivanosh.stmaterial.logic.SheetCommand
 import io.github.ivanosh.stmaterial.logic.moreGroups
 import io.github.ivanosh.stmaterial.logic.moreSheetKey
 import io.github.ivanosh.stmaterial.logic.chapterIndexAt
+import io.github.ivanosh.stmaterial.logic.chapterStartAt
 import io.github.ivanosh.stmaterial.logic.playerKey
 import io.github.ivanosh.stmaterial.logic.withChapters
 import io.github.ivanosh.stmaterial.logic.presenterOpenFocus
@@ -256,7 +257,13 @@ class MaterialPlaybackActivity : PlaybackActivity() {
                 is PlayerCommand.Seek -> seekBy(command.deltaMs, event.repeatCount > 0)
                 is PlayerCommand.Press -> panel.buttons.getOrNull(command.index)?.let(commands::run)
                 PlayerCommand.OpenMore -> openSheet()
-                is PlayerCommand.SeekToChapter -> Unit
+                is PlayerCommand.SeekToChapter -> chapterStartAt(chapterStarts, command.index, view?.durationMs ?: 0)?.let { start ->
+                    // Now, not after the debounce: this is a jump, and the playing state stays as it is.
+                    handler.removeCallbacks(applySeek)
+                    seek = SeekDebounce()
+                    view?.seekTo(start)
+                    panel.positionMs = start
+                }
                 PlayerCommand.Exit -> {
                     sendSeekNow()
                     passBackOn = true
@@ -319,6 +326,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         val sorted = list.sortedBy { it.startMs }
         if (sorted == panel.chapters) return
         panel.chapters = sorted
+        if (sorted.isEmpty()) panel.chaptersRevealed = false
         chapterStarts = sorted.map { it.startMs }
         val at = seek.targetMs ?: player?.positionMs ?: 0L
         writeUi(withChapters(ui, sorted.size, chapterIndexAt(chapterStarts, at)))
@@ -502,6 +510,9 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         }
         panel.focus = next.focus
         panel.buttonIndex = next.buttonIndex
+        panel.chapterIndex = next.chapterIndex
+        // The first opening for this video lets the row load its thumbnails; before it, and with no chapters, nothing does.
+        if (next.focus != PanelFocus.HIDDEN && panel.chapters.isNotEmpty()) panel.chaptersRevealed = true
     }
 
     private fun setUi(next: PlayerUi) {

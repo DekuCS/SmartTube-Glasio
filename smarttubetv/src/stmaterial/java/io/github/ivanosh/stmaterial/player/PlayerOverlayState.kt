@@ -40,6 +40,10 @@ class PlayerOverlayState {
     var playing by mutableStateOf(true)
     /** Empty when the video has no chapters; then the panel is as it is without them. */
     var chapters by mutableStateOf(emptyList<ChapterUi>())
+    /** The panel has been open for this video, so the chapter row may load its thumbnails. */
+    var chaptersRevealed by mutableStateOf(false)
+    /** The card in focus while focus is in the chapter row. */
+    var chapterIndex by mutableIntStateOf(0)
     var marks by mutableStateOf(emptyList<ProgressMark>())
     /** One entry per SponsorBlock category on the bar, set with [marks]. */
     var legend by mutableStateOf(emptyList<LegendEntry>())

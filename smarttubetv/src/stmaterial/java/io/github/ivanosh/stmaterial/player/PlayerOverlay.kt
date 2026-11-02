@@ -96,6 +96,7 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                     TimeRow(state)
                 }
                 Box(Modifier.onlyWhenOpen(state).padding(top = 24.dp)) { Buttons(state) }
+                ChapterRow(state)
             }
         }
         MoreSheet(state)
