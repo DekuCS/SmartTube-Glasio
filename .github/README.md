@@ -20,9 +20,9 @@ keeps that engine and replaces the interface with a smaller one, built with Jetp
 **Player**
 - You choose which buttons sit on the panel and in what order, up to 8; everything else stays under More.
 - The original audio track plays by default, not an automatic dub. You can still change it for any video.
-- The seek bar shows chapters and SponsorBlock segments in their own colours, with a legend for the ones in that video. When a video has chapters, a row of them sits above the buttons.
-- When a SponsorBlock segment is skipped, a chip says so and offers Undo. A segment that is not skipped on its own gets a
-  Skip chip instead.
+- The seek bar shows chapters and SponsorBlock segments in their own colours, with a legend for the ones in that video. When a video has chapters, a row of them sits below the buttons.
+- When a SponsorBlock segment is skipped, a chip says so and offers Undo. While any segment plays, a Skip
+  chip is there, and auto-skip learns from your choices per channel.
 
 **Sign-in**
 - A QR code opens the activation page with the code already filled in.
