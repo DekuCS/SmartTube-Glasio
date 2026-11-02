@@ -42,6 +42,12 @@ public interface PlayerUI {
     default boolean mayAutoSkip(SponsorSegment first) { return true; }
     /** Tells the view that these segments were just skipped automatically. True when the view shows its own notice, so no toast is needed. */
     default boolean onAutoSkip(List<SponsorSegment> skipped) { return false; }
+    /** True when the view shows a Skip chip over any segment, so that the controller shows no confirm dialog and polls even when no category skips by itself. */
+    default boolean isSkipChipSupported() { return false; }
+    /** The segments of this video, or null when there are none. */
+    default void setSponsorSegments(List<SponsorSegment> segments) {}
+    /** The position at each check of the controller, also while paused. */
+    default void onSponsorPoll(long positionMs) {}
     void updateEndingTime();
     void setChatReceiver(ChatReceiver chatReceiver);
 }

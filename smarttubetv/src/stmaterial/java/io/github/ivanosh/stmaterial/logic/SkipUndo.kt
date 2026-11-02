@@ -63,3 +63,42 @@ class SkipLedger {
         current = null
     }
 }
+
+/** A point, not a stretch: there is nothing to skip. The SponsorBlock id of the Highlight category. */
+const val HIGHLIGHT_CATEGORY = "poi_highlight"
+
+/** The segments under the position, from the one it is in to the end of the chain of adjacent ones. */
+data class SkipTarget(val chain: List<SkipSpan>) {
+    val first get() = chain.first()
+    val endMs get() = chain.last().endMs
+}
+
+/** What the chip slot shows. The undo chip, while it lives, wins. */
+sealed interface ChipChoice {
+    data class Undo(val chip: SkipChip) : ChipChoice
+    data class Skip(val target: SkipTarget) : ChipChoice
+}
+
+/** The segment the position is in, whatever its category or action, but not a Highlight and not an empty one. */
+fun skipTargetAt(positionMs: Long, spans: List<SkipSpan>): SkipTarget? {
+    val sorted = spans.filter { it.category != HIGHLIGHT_CATEGORY && it.endMs > it.startMs }.sortedBy { it.startMs }
+    val at = sorted.indexOfFirst { positionMs >= it.startMs && positionMs < it.endMs }
+    if (at < 0) return null
+    val chain = mutableListOf(sorted[at])
+    for (next in sorted.drop(at + 1)) {
+        val end = chain.last().endMs
+        if (next.startMs > end + CHAIN_GAP_MS) break
+        if (next.endMs > end) chain += next
+    }
+    return SkipTarget(chain)
+}
+
+fun chooseChip(undo: SkipChip?, target: SkipTarget?): ChipChoice? = when {
+    undo != null -> ChipChoice.Undo(undo)
+    target != null -> ChipChoice.Skip(target)
+    else -> null
+}
+
+/** Where RIGHT jumps to, or null when the position is not inside the target (a stale chip). */
+fun skipJumpTo(target: SkipTarget?, positionMs: Long): Long? =
+    target?.takeIf { positionMs >= it.first.startMs && positionMs < it.endMs }?.endMs

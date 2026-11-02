@@ -97,6 +97,16 @@ class MaterialPlaybackFragment : PlaybackFragment() {
 
     override fun onAutoSkip(skipped: List<SponsorSegment>): Boolean = host?.onAutoSkip(skipped.map { it.toSpan() }) ?: false
 
+    override fun isSkipChipSupported(): Boolean = true
+
+    override fun setSponsorSegments(segments: List<SponsorSegment>?) {
+        host?.setSponsorSegments(segments?.map { it.toSpan() }.orEmpty())
+    }
+
+    override fun onSponsorPoll(positionMs: Long) {
+        host?.onSponsorPoll(positionMs)
+    }
+
     private fun SponsorSegment.toSpan() = SkipSpan(startMs, endMs, category.orEmpty())
 
     override fun setTitle(title: String?) {

@@ -196,13 +196,14 @@ public class SponsorBlockController extends BasePlayerController {
         }
 
         mOriginalSegments = segments;
+        getPlayer().setSponsorSegments(segments); // MATERIAL: the Skip chip
 
         mActiveSegments = new ArrayList<>(segments);
 
         if (getSponsorBlockData().isColorMarkersEnabled()) {
             getPlayer().setSeekBarSegments(toSeekBarSegments(segments));
         }
-        if (getSponsorBlockData().isActionsEnabled()) {
+        if (getSponsorBlockData().isActionsEnabled() || getPlayer().isSkipChipSupported()) { // MATERIAL: the Skip chip needs the check too
             // Warn. Try to not access player object here.
             // Or you'll get "Player is accessed on the wrong thread" error.
             return RxHelper.interval(POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
@@ -214,6 +215,11 @@ public class SponsorBlockController extends BasePlayerController {
     private void disposeActions() {
         RxHelper.disposeActions(mSegmentsAction);
 
+        // MATERIAL: no chip for a video that has no segments
+        if (getPlayer() != null) {
+            getPlayer().setSponsorSegments(null);
+        }
+
         // Note, removes all segments at once
         //getPlayer().setSeekBarSegments(null); // reset colors
 
@@ -222,8 +228,18 @@ public class SponsorBlockController extends BasePlayerController {
     }
 
     private void skipSegment(long interval) {
-        if (mActiveSegments == null || mActiveSegments.isEmpty() || getVideo() == null || !Helpers.equals(mVideoId, getVideo().videoId)) {
+        if (mActiveSegments == null || getVideo() == null || !Helpers.equals(mVideoId, getVideo().videoId)) {
             disposeActions();
+            return;
+        }
+
+        // MATERIAL: the Skip chip follows the position, also when paused
+        getPlayer().onSponsorPoll(getPlayer().getPositionMs());
+
+        if (mActiveSegments.isEmpty()) {
+            if (!getPlayer().isSkipChipSupported()) {
+                disposeActions();
+            }
             return;
         }
 
@@ -408,7 +424,7 @@ public class SponsorBlockController extends BasePlayerController {
                 simpleSkip(skipPosMs, foundSegments);
             } else if (type == SponsorBlockData.ACTION_SKIP_WITH_TOAST) {
                 messageSkip(skipPosMs, skipMessage, foundSegments);
-            } else if (type == SponsorBlockData.ACTION_SHOW_DIALOG) {
+            } else if (type == SponsorBlockData.ACTION_SHOW_DIALOG && !getPlayer().isSkipChipSupported()) { // MATERIAL: the Skip chip replaces the dialog
                 confirmSkip(skipPosMs, skipMessage);
             }
         }
