@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -326,12 +327,19 @@ private fun TimeRow(state: PlayerOverlayState) {
     val wraps = remember(legend, widthDp) { !legendFits(legend, widthDp - 2 * 58f - 2 * 110f) }
     Column {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatPlayerTime(state.positionMs), style = timeStyle)
+            PositionText(state)
             if (legend.isNotEmpty() && !wraps) Legend(legend)
             Text(if (state.durationMs > 0) formatPlayerTime(state.durationMs) else "", style = timeStyle)
         }
         if (legend.isNotEmpty() && wraps) Box(Modifier.padding(top = 8.dp)) { Legend(legend) }
     }
+}
+
+/** Its own scope and a derived string: the position ticks twice a second, the text changes once, and nothing else composes. */
+@Composable
+private fun PositionText(state: PlayerOverlayState) {
+    val text by remember(state) { derivedStateOf { formatPlayerTime(state.positionMs) } }
+    Text(text, style = timeStyle)
 }
 
 /** A swatch and a name for each category on the bar. */
