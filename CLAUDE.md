@@ -63,8 +63,7 @@ scripts/perf.sh <serial> [runs]                                                 
 - Layout canvas is 1920 units wide on every device. `MaterialTvTheme` gives Compose a `Density` of widthPixels / 1920, so
   1.dp is 1/1920 of the screen width, not the usual 960dp-wide TV. Leanback Views and `resources.displayMetrics` keep the
   real density: convert when mixing (the spinner does).
-- Screenshots (`screencap`) do not capture the video layer. A visual bug over video cannot be seen in them; reason from code
-  or ask the owner to look.
+- On the emulator `screencap` includes the video; on real TV hardware it does not (hardware video layer), so a visual bug over video seen only on a device cannot be checked in a screenshot there: reason from code or ask the owner.
 - Activities such as browse, dialog and player are `singleInstance` and are reused. Per-screen key state (for example the OK
   hold in the player) survives into the next showing, so reset it in `onPause` / `onStop`.
 - A debug build cannot replace a release-signed install (signature mismatch). Use the emulator for debug, or install release.
@@ -75,7 +74,7 @@ scripts/perf.sh <serial> [runs]                                                 
 
 ## Constraints and anti-goals
 
-- Light UI. No blur, parallax, autoplay previews, scrim over video (one exception, approved by the owner: the player panel's own gradient), or background jobs. The update check runs at most daily
+- Light UI. No blur, parallax, autoplay previews, scrim over video (one exception, owner-approved 2026-11-02: the player panel's own gradient in `PlayerOverlay`), or background jobs. The update check runs at most daily
   from the browse screen and on request; no WorkManager.
 - D-pad only. A gesture that needs a long press must have a visible alternative (the editors are reachable from Settings).
 - Limits: 8 tabs (`Sections.LIMIT`, Settings is outside the count); 8 player buttons plus More (`PANEL_LIMIT`); the default
