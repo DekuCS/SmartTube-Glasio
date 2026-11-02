@@ -1,7 +1,7 @@
 # Performance on real devices
 
 Devices: a 4K Google TV stick ("projector", signed in) and a Chromecast with Google TV `sabrina` (signed out). Both are
-32-bit, 2 GB RAM, Android 14, at 1080p UI. The Material app is the `stmaterialRelease` armeabi-v7a APK with R8 off.
+32-bit, 2 GB RAM, Android 14, at 1080p UI. The Material app is the `stmaterialRelease` armeabi-v7a APK with R8 off (measured before R8 was enabled; see the R8 section for the change).
 
 **Result: scrolling meets the target on both devices once the app's profile is compiled, and is at least as good as the
 old SmartTube on the same screen. Until the system compiles it, about the first 30 s of scrolling after each app start

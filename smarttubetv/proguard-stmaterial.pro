@@ -9,6 +9,7 @@
 # R8 would otherwise treat a field that is only written reflectively as a constant, or drop it.
 -keepclassmembers class androidx.leanback.** { <fields>; }
 -keepclassmembers class androidx.fragment.app.Fragment { <fields>; }
+-keepclassmembers class androidx.preference.** { <fields>; }
 -keepclassmembers class androidx.recyclerview.widget.RecyclerView$ViewHolder { <fields>; }
 -keepclassmembers class com.google.android.exoplayer2.** { <fields>; }
 -keepclassmembers class com.liskovsoft.smartyoutubetv2.tv.ui.** extends androidx.fragment.app.Fragment { <fields>; }
@@ -19,6 +20,8 @@
 # Gson too, and a signed-out run cannot show which of them a signed-in feed needs. This is the YouTube API layer only.
 -keep class com.liskovsoft.youtubeapi.** { *; }
 -keep class com.liskovsoft.googlecommon.** { *; }
+# Google Drive backup and YouTube Data API models: Gson and Retrofit, reached from the backup worker and settings.
+-keep class com.liskovsoft.googleapi.** { *; }
 -keepclasseswithmembers class * { @com.google.gson.annotations.SerializedName <fields>; }
 -keepclasseswithmembers class * { @com.liskovsoft.googlecommon.common.converters.jsonpath.JsonPath <fields>; }
 -keepclasseswithmembers class * { @com.liskovsoft.googlecommon.common.converters.regexp.RegExp <fields>; }

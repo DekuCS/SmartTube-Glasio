@@ -229,7 +229,7 @@ services", find YouTube TV and choose "Remove access".
 - One video, at one saved resume position, stayed on a spinner with "Fixing stalled client" before it recovered by itself
   (the engine's own error fixer). It is not related to signing in, it is in the playback engine rather than the new
   interface, and it is not fixed here.
-- The release APK is not minified, so it is large (see docs/perf.md).
+- The release APK is shrunk by R8 without renaming or optimization; the JavaScript engine alone is about 32 MB of it (see docs/perf.md).
 - Not included: casting, voice search, several accounts, comments, Shorts, live chat, home screen channels, data
   transfer.
 - At most 8 tabs. Settings cannot be hidden or made the start tab.
