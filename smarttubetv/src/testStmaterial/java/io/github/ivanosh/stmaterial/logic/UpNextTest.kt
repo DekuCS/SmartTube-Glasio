@@ -1,6 +1,8 @@
 package io.github.ivanosh.stmaterial.logic
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -199,5 +201,106 @@ class UpNextTest {
         assertEquals(PickStep.Close, PickMenu(3, 1).key(PlayerKey.Back).second)
         assertEquals(PickStep.None, PickMenu(3, 1).key(PlayerKey.Down).second)
         assertEquals(PickStep.None, PickMenu(0).key(PlayerKey.Ok).second)
+    }
+
+    // Auto-hide
+
+    @Test
+    fun theRowKeepsThePanelOpenWhilePlayingAndTheButtonsDoNot() {
+        assertFalse(shouldAutoHide(ui(PanelFocus.UPNEXT), playing = true, idleMs = 60_000))
+        assertTrue(shouldAutoHide(ui(PanelFocus.BUTTONS), playing = true, idleMs = PANEL_AUTO_HIDE_MS))
+    }
+
+    // OK outside the row
+
+    @Test
+    fun okOnACardOutsideTheRowActsOnNothing() {
+        assertEquals(2, okCardPlace(2, 6))
+        assertNull(okCardPlace(6, 6))
+        assertNull(okCardPlace(0, 0))
+        assertNull(okCardPlace(-1, 6))
+    }
+
+    @Test
+    fun okInAnEmptyRowStillClosesThePanelAndTheCommandIsDroppedByTheActivity() {
+        val (next, commands) = press(ui(PanelFocus.UPNEXT, upNext = 0, card = 0), PlayerKey.Ok)
+        assertEquals(PanelFocus.HIDDEN, next.focus)
+        assertEquals(listOf<PlayerCommand>(PlayerCommand.OpenUpNext(0)), commands)
+    }
+
+    // Held seek at the end of a video
+
+    @Test
+    fun aHeldSeekReachingTheEndKeepsFocusOnTheProgressBar() {
+        assertEquals(PanelFocus.PROGRESS, endOfVideoFocus(6, lastSeekKeyMs = 9_900, nowMs = 10_000))
+        assertEquals(PanelFocus.UPNEXT, endOfVideoFocus(6, lastSeekKeyMs = 1_000, nowMs = 10_000))
+        assertEquals(PanelFocus.BUTTONS, endOfVideoFocus(0, lastSeekKeyMs = 1_000, nowMs = 10_000))
+        assertEquals(PanelFocus.PROGRESS, endOfVideoFocus(0, lastSeekKeyMs = 9_900, nowMs = 10_000))
+    }
+
+    // Cards gone
+
+    private data class Card(val id: String, val author: String?)
+
+    private val cards = listOf(Card("a", "x"), Card("b", "y"), Card("c", "x"), Card("d", null))
+
+    @Test
+    fun aRemovedCardGoesAndOthersStay() {
+        assertEquals(listOf(1), goneCards(cards, listOf(Card("b", "y")), false) { it.author })
+        assertEquals(listOf(0, 3), goneCards(cards, listOf(Card("a", "x"), Card("d", null)), false) { it.author })
+        assertEquals(emptyList<Int>(), goneCards(cards, listOf(Card("z", "x")), false) { it.author })
+    }
+
+    @Test
+    fun aBlockedChannelTakesEveryCardOfTheAuthorButNeverThoseWithoutOne() {
+        assertEquals(listOf(0, 2), goneCards(cards, listOf(Card("a", "x")), true) { it.author })
+        assertEquals(listOf(3), goneCards(cards, listOf(Card("d", null)), true) { it.author })
+    }
+
+    // Which group is the row
+
+    private fun isB(s: String) = s == "b"
+
+    @Test
+    fun relatedVideosAreShownWholeAndOnlyTheFirstGroupIsTaken() {
+        val first = chooseUpNext(false, false, listOf("a", "b", "c"), ::isB)
+        assertEquals(UpNextChoice(true, listOf("a", "b", "c")), first)
+        assertEquals(UpNextChoice<String>(true, null), chooseUpNext(true, false, listOf("x"), ::isB))
+        assertEquals(UpNextChoice<String>(false, null), chooseUpNext(false, false, emptyList(), ::isB))
+    }
+
+    @Test
+    fun aPlaylistOrQueueStartsAfterTheCurrentVideo() {
+        assertEquals(UpNextChoice(true, listOf("c", "d")), chooseUpNext(false, true, listOf("a", "b", "c", "d"), ::isB))
+    }
+
+    @Test
+    fun aPlaylistWithNothingLeftShowsNothingAndStillCountsAsTaken() {
+        assertEquals(UpNextChoice<String>(true, null), chooseUpNext(false, true, listOf("a", "b"), ::isB))
+    }
+
+    @Test
+    fun aPlaylistPageWithoutTheCurrentVideoWaitsForTheNextPage() {
+        assertEquals(UpNextChoice<String>(false, null), chooseUpNext(false, true, listOf("p", "q"), ::isB))
+    }
+
+    // The row comes back for the same video
+
+    @Test
+    fun aRowThatRefillsForTheSameVideoTakesFocusBackToItsCard() {
+        val lost = withUpNext(ui(PanelFocus.UPNEXT, card = 4), 0)
+        val back = reopenedRow(withUpNext(lost, 6), lostIndex = 4, count = 6)
+        assertEquals(PanelFocus.UPNEXT, back.focus)
+        assertEquals(4, back.upNextIndex)
+        assertEquals(2, reopenedRow(withUpNext(lost, 3), lostIndex = 4, count = 3).upNextIndex)
+    }
+
+    @Test
+    fun focusElsewhereOrNothingLostIsLeftAlone() {
+        val buttons = ui(PanelFocus.BUTTONS, card = 0)
+        assertEquals(buttons, reopenedRow(buttons, lostIndex = null, count = 6))
+        assertEquals(PanelFocus.HIDDEN, reopenedRow(ui(PanelFocus.HIDDEN), lostIndex = 4, count = 6).focus)
+        assertEquals(PanelFocus.PROGRESS, reopenedRow(ui(PanelFocus.PROGRESS), lostIndex = 4, count = 6).focus)
+        assertEquals(PanelFocus.BUTTONS, reopenedRow(ui(PanelFocus.BUTTONS), lostIndex = 4, count = 0).focus)
     }
 }

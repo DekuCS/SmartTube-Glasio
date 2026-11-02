@@ -49,7 +49,7 @@ import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.VideoCard
 
 private val CardGap = 20.dp
-private val RowTopGap = 16.dp
+private val RowTopGap = 32.dp
 private val LabelHeight = 42.dp
 private val CardRoom = 14.dp
 private val labelStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp, color = Palette.OnBackgroundVariant)
@@ -108,8 +108,11 @@ fun UpNextRow(state: PlayerOverlayState) {
         val fits = shown != null && shown.offset >= list.layoutInfo.viewportStartOffset && shown.offset + shown.size <= end
         if (!fits) list.animateScrollToItem(focusedIndex)
     }
+    // Composed only while the row has room (a peek or all of it) and the panel is open: a hidden row, or a closed panel, holds no
+    // thumbnails. The list state outlives this, so the scroll position stays.
+    val composeCards by remember { derivedStateOf { state.layoutOpen && level.value > 0f } }
     Box(Modifier.rowSlot(state, level, PeekHeight + LabelHeight + RowTopGap)) {
-        Column(Modifier.padding(top = RowTopGap)) {
+        if (composeCards) Column(Modifier.padding(top = RowTopGap)) {
             Text(
                 stringResource(R.string.material_player_up_next),
                 style = labelStyle,

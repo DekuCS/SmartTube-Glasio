@@ -9,10 +9,12 @@ import android.widget.FrameLayout
 import android.widget.ProgressBar
 import com.liskovsoft.mediaserviceinterfaces.data.SponsorSegment
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
+import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackFragment
 import io.github.ivanosh.stmaterial.logic.SkipSpan
+import io.github.ivanosh.stmaterial.logic.chooseUpNext
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -24,6 +26,7 @@ class MaterialPlaybackFragment : PlaybackFragment() {
     private val host get() = activity as? MaterialPlaybackActivity
     private var controlsShownAnswer = false
     private var videoId: String? = null
+    @Volatile private var currentVideo: Video? = null
     private var lastTitle: String? = null
 
     /** The text the presenter puts in place of the title, such as why a video is unplayable. */
@@ -94,26 +97,34 @@ class MaterialPlaybackFragment : PlaybackFragment() {
      */
     override fun updateSuggestions(group: VideoGroup?) {
         if (group != null && group.isChapters) {
-            val chapters = group.videos.map { ChapterUi(it.title.orEmpty(), it.startTimeMs, it.cardImageUrl?.ifBlank { null }) }
-            activity?.runOnUiThread { host?.setChapters(chapters) }
-        } else if (group != null && !upNextTaken && !group.isEmpty) {
+            activity?.runOnUiThread {
+                // The group's list is read here, on the main thread, where the controller also appends to it.
+                val chapters = group.videos.map { ChapterUi(it.title.orEmpty(), it.startTimeMs, it.cardImageUrl?.ifBlank { null }) }
+                host?.setChapters(chapters)
+            }
+        } else if (group != null) {
             // The first group that is not the chapters, in the order the controller sends them: the playback queue when there
             // is one, then the playlist the video is in, then the related videos. Its first page only; the continuations
-            // of a group that is taken, and the groups after it, are not shown.
-            upNextTaken = true
-            val first = ArrayList(group.videos)
-            activity?.runOnUiThread { host?.setUpNext(first) }
+            // of a group that is taken, and the groups after it, are not shown. A queue or playlist starts after the video
+            // that plays. Decided on the main thread, where the flag is written and the group's list is copied.
+            val current = currentVideo
+            val queueLike = group.isQueue || group.type == MediaGroup.TYPE_PLAYBACK_QUEUE || (current != null && group === current.group)
+            activity?.runOnUiThread {
+                val choice = chooseUpNext(upNextTaken, queueLike, ArrayList(group.videos)) { it.videoId == current?.videoId }
+                upNextTaken = choice.taken
+                choice.items?.let { host?.setUpNext(it) }
+            }
         }
         super.updateSuggestions(group)
     }
 
     /** A group has been taken for the Up next row of this video. */
-    @Volatile private var upNextTaken = false
+    private var upNextTaken = false
 
     override fun clearSuggestions() {
         super.clearSuggestions()
-        upNextTaken = false
         activity?.runOnUiThread {
+            upNextTaken = false
             host?.setChapters(emptyList())
             host?.setUpNext(emptyList())
         }
@@ -150,12 +161,14 @@ class MaterialPlaybackFragment : PlaybackFragment() {
 
     override fun setVideo(video: Video?) {
         super.setVideo(video)
+        currentVideo = video
         message = null
         // The presenter also calls this with the same video, to clear a message.
         if (video?.videoId != videoId) {
             videoId = video?.videoId
             lastTitle = null
             host?.onVideoChanged()
+            activity?.runOnUiThread { upNextTaken = false }
         }
         rememberTitle(video)
     }

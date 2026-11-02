@@ -66,6 +66,9 @@ import io.github.ivanosh.stmaterial.logic.playerKey
 import io.github.ivanosh.stmaterial.logic.withChapters
 import io.github.ivanosh.stmaterial.logic.withUpNext
 import io.github.ivanosh.stmaterial.logic.endOfVideoFocus
+import io.github.ivanosh.stmaterial.logic.goneCards
+import io.github.ivanosh.stmaterial.logic.okCardPlace
+import io.github.ivanosh.stmaterial.logic.reopenedRow
 import io.github.ivanosh.stmaterial.logic.focusIndexAfterRemoval
 import io.github.ivanosh.stmaterial.logic.PickMenu
 import io.github.ivanosh.stmaterial.logic.PickStep
@@ -358,7 +361,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         }
         if (!started || isInPipMode) return
         lastKeyMs = SystemClock.uptimeMillis()
-        val focus = endOfVideoFocus(panel.upNext.size)
+        val focus = endOfVideoFocus(panel.upNext.size, lastSeekKeyMs, SystemClock.uptimeMillis())
         setUi(ui.copy(focus = focus, buttonIndex = if (isPanelOpen) ui.buttonIndex else 0, upNextIndex = 0))
         refresh()
         startTicking()
@@ -367,21 +370,25 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     /** The first page of the related videos, or none; from the fragment, on the main thread. The row of the last video goes before the next one's arrives. */
     fun setUpNext(list: List<Video>) {
         if (list == panel.upNext) return
+        // A reload of the same video clears the row and fills it again: focus in the row goes back to its card.
+        if (list.isEmpty() && ui.focus == PanelFocus.UPNEXT) rowLostIndex = ui.upNextIndex
         panel.upNext = list
         if (list.isEmpty()) {
             panel.upNextRevealed = false
             panel.cardMenu = null
             if (ui.focus == PanelFocus.UPNEXT) lastKeyMs = SystemClock.uptimeMillis()
         }
-        writeUi(withUpNext(ui, list.size))
+        writeUi(reopenedRow(withUpNext(ui, list.size), rowLostIndex, list.size))
+        if (list.isNotEmpty()) rowLostIndex = null
     }
+
+    /** The card that had focus when the row was cleared; null once the row is back or the video has changed. */
+    private var rowLostIndex: Int? = null
 
     /** The presenter says cards are gone: Not interested, or a blocked channel. Focus goes to the neighbour of the card in focus. */
     private fun cardsGone(group: VideoGroup) {
         val cards = panel.upNext
-        val gone = cards.indices.filter { i ->
-            group.videos.any { it == cards[i] || (group.action == VideoGroup.ACTION_REMOVE_AUTHOR && it.author != null && it.author == cards[i].author) }
-        }
+        val gone = goneCards(cards, group.videos, group.action == VideoGroup.ACTION_REMOVE_AUTHOR) { it.author }
         if (gone.isEmpty()) return
         val ids = cards.indices.map(Int::toString)
         val index = focusIndexAfterRemoval(ids, ui.upNextIndex, gone.map(Int::toString).toSet())
@@ -430,6 +437,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         seek = SeekDebounce()
         setChapters(emptyList())
         setUpNext(emptyList())
+        rowLostIndex = null
         ledger.clear()
         watch = RewindWatch()
         notice = null
@@ -603,7 +611,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private fun okPlace(inSheet: Boolean): Int? = when {
         inSheet -> panel.sheetCursor.takeIf { it < sheetEntries().size }
         ui.focus == PanelFocus.BUTTONS -> ui.buttonIndex
-        ui.focus == PanelFocus.UPNEXT -> ui.upNextIndex.takeIf { it < panel.upNext.size }
+        ui.focus == PanelFocus.UPNEXT -> okCardPlace(ui.upNextIndex, panel.upNext.size)
         else -> null
     }
 

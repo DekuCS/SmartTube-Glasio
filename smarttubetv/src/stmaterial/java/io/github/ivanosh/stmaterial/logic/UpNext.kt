@@ -22,7 +22,11 @@ fun upNextRowShape(focus: PanelFocus, chaptersPresent: Boolean): PanelRowShape =
 }
 
 /** At the end of a video the panel opens on the first card of the row, or on the buttons when there is none. */
-fun endOfVideoFocus(upNextCount: Int): PanelFocus = if (upNextCount > 0) PanelFocus.UPNEXT else PanelFocus.BUTTONS
+fun endOfVideoFocus(upNextCount: Int, lastSeekKeyMs: Long? = null, nowMs: Long = 0L): PanelFocus {
+    // A seek key held or just pressed goes on seeking: focus stays on the progress bar, as for any open the presenter asks for.
+    if (presenterOpenFocus(lastSeekKeyMs, nowMs) == PanelFocus.PROGRESS) return PanelFocus.PROGRESS
+    return if (upNextCount > 0) PanelFocus.UPNEXT else PanelFocus.BUTTONS
+}
 
 /** The row changed (a new video, a card gone): the card in focus stays in range, and focus in a row that is gone goes up. */
 fun withUpNext(ui: PlayerUi, count: Int): PlayerUi {
@@ -58,3 +62,34 @@ fun PickMenu.key(key: PlayerKey): Pair<PickMenu, PickStep> = when (key) {
     PlayerKey.Back -> this to PickStep.Close
     PlayerKey.Left, PlayerKey.Right -> this to PickStep.None
 }
+
+/** What the first page of a group does to the row: [taken] afterwards, and the cards to show (null: leave the row as it is). */
+data class UpNextChoice<T>(val taken: Boolean, val items: List<T>?)
+
+fun <T> chooseUpNext(taken: Boolean, queueLike: Boolean, page: List<T>, isCurrent: (T) -> Boolean): UpNextChoice<T> =
+    when {
+        taken || page.isEmpty() -> UpNextChoice(taken, null)
+        !queueLike -> UpNextChoice(true, page)
+        else -> {
+            // A playlist or the queue: the row starts after the video that plays. A page without it may come later.
+            val at = page.indexOfFirst(isCurrent)
+            if (at < 0) UpNextChoice(false, null)
+            else page.drop(at + 1).let { UpNextChoice(true, it.ifEmpty { null }) }
+        }
+    }
+
+/** The card OK or a hold acts on: the focused one, or none when the index is outside the row. */
+fun okCardPlace(index: Int, count: Int): Int? = index.takeIf { it in 0 until count }
+
+/** The indexes of [cards] that [removed] took out: the same card, or any card of the author when the whole channel went. */
+fun <T> goneCards(cards: List<T>, removed: List<T>, byAuthor: Boolean, authorOf: (T) -> String?): List<Int> =
+    cards.indices.filter { i ->
+        val card = cards[i]
+        val author = authorOf(card)
+        removed.any { it == card || (byAuthor && author != null && authorOf(it) == author) }
+    }
+
+/** The panel was open on the row, the row was cleared and refilled for the same video: focus goes back to the card it had. */
+fun reopenedRow(ui: PlayerUi, lostIndex: Int?, count: Int): PlayerUi =
+    if (lostIndex == null || count <= 0 || (ui.focus != PanelFocus.BUTTONS && ui.focus != PanelFocus.CHAPTERS)) ui
+    else ui.copy(focus = PanelFocus.UPNEXT, upNextIndex = lostIndex.coerceIn(0, count - 1))
