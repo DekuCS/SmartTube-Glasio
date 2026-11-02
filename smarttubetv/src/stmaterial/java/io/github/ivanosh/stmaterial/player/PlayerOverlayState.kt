@@ -21,7 +21,7 @@ data class ProgressMark(val start: Float, val end: Float, val isChapter: Boolean
  * The chip above the panel. [undo] is the one that follows an automatic skip, with a bar that runs down for
  * [io.github.ivanosh.stmaterial.logic.SKIP_CHIP_MS]; [id] tells one showing from the next.
  */
-data class SkipChipUi(val id: Long, val undo: Boolean, val name: String, val argb: Int)
+data class SkipChipUi(val id: Long, val undo: Boolean, val name: String, val argb: Int, val notice: Boolean = false)
 
 /** What the overlay draws. Only [MaterialPlaybackActivity] writes it, and only while something is on screen. */
 class PlayerOverlayState {

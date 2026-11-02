@@ -22,6 +22,10 @@ class SkipLedger {
     private var chipSpans = emptyList<SkipSpan>()
     private var current: SkipChip? = null
 
+    /** The segments the last [undo] went back over. */
+    var lastUndone = emptyList<SkipSpan>()
+        private set
+
     /**
      * A segment auto-skips at most once per open of a video, however the position got back before it:
      * by undo, by a rewind or by a seek to any earlier point.
@@ -48,6 +52,7 @@ class SkipLedger {
     /** Where the undo goes, or null when no chip is live. */
     fun undo(nowMs: Long): Long? {
         val live = chip(nowMs) ?: return null
+        lastUndone = chipSpans
         chipSpans = emptyList()
         current = null
         return live.chainStartMs
@@ -75,6 +80,8 @@ data class SkipTarget(val chain: List<SkipSpan>) {
 sealed interface ChipChoice {
     data class Undo(val chip: SkipChip) : ChipChoice
     data class Skip(val target: SkipTarget) : ChipChoice
+    /** A one-off line, such as that auto-skip switched off for the channel. The dot has the colour of [category]. */
+    data class Notice(val text: String, val category: String) : ChipChoice
 }
 
 /** The segment the position is in, whatever its category or action, but not a Highlight and not an empty one. */
@@ -91,7 +98,8 @@ fun skipTargetAt(positionMs: Long, spans: List<SkipSpan>): SkipTarget? {
     return SkipTarget(chain)
 }
 
-fun chooseChip(undo: SkipChip?, target: SkipTarget?): ChipChoice? = when {
+fun chooseChip(undo: SkipChip?, target: SkipTarget?, notice: ChipChoice.Notice? = null): ChipChoice? = when {
+    notice != null -> notice
     undo != null -> ChipChoice.Undo(undo)
     target != null -> ChipChoice.Skip(target)
     else -> null

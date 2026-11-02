@@ -70,6 +70,12 @@
     <string translatable="false" name="material_skip_skipped">Skipped: %1$s</string>
     <string translatable="false" name="material_skip_undo">Undo</string>
     <string translatable="false" name="material_skip_skip">Skip</string>
+    <string translatable="false" name="material_learn_off">Auto-skip off for this channel</string>
+    <string translatable="false" name="material_learn_on">Auto-skip on for this channel</string>
+    <string translatable="false" name="material_learn_row">Learned skip by channel: %1$s</string>
+    <string translatable="false" name="material_learn_reset">Reset learned channels (%1$d)</string>
+    <string translatable="false" name="material_learn_state_on">On</string>
+    <string translatable="false" name="material_learn_state_off">Off</string>
     <string translatable="false" name="material_sb_sponsor">Sponsor</string>
     <string translatable="false" name="material_sb_intro">Intro</string>
     <string translatable="false" name="material_sb_outro">Outro</string>

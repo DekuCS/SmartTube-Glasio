@@ -89,6 +89,7 @@ class SkipUndoTest {
         val chip = ledger.onAutoSkip(listOf(a, b), 0)
         assertEquals(b, chip?.last)
         assertEquals(60_000L, ledger.undo(10))
+        assertEquals(listOf(a, b), ledger.lastUndone)
         assertFalse(ledger.maySkip(a, 20))
         assertFalse(ledger.maySkip(b, 20))
     }

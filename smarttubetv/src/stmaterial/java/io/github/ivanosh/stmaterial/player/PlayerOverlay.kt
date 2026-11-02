@@ -345,7 +345,9 @@ private fun SkipChipView(chip: SkipChipUi) {
     ) {
         Box(Modifier.size(16.dp).background(Color(chip.argb), CircleShape))
         Text(if (chip.undo) stringResource(R.string.material_skip_skipped, chip.name) else chip.name, style = chipStyle, maxLines = 1)
-        if (chip.undo) {
+        if (chip.notice) {
+            // A line of its own, nothing to press.
+        } else if (chip.undo) {
             ChipArrow(pointsRight = false)
             Text(stringResource(R.string.material_skip_undo), style = chipStyle.copy(color = Palette.Accent))
         } else {

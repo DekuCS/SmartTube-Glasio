@@ -16,9 +16,11 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegme
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData
 import com.liskovsoft.smartyoutubetv2.common.prefs.SponsorBlockData
+import com.liskovsoft.smartyoutubetv2.tv.R
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity
 import io.github.ivanosh.stmaterial.browse.KeyRepeatGuard
 import io.github.ivanosh.stmaterial.data.ButtonStore
+import io.github.ivanosh.stmaterial.data.LearnedSkipStore
 import io.github.ivanosh.stmaterial.logic.OkAction
 import io.github.ivanosh.stmaterial.logic.OkHold
 import io.github.ivanosh.stmaterial.logic.PanelFocus
@@ -27,6 +29,9 @@ import io.github.ivanosh.stmaterial.logic.PlayerCommand
 import io.github.ivanosh.stmaterial.logic.PlayerKey
 import io.github.ivanosh.stmaterial.logic.PlayerUi
 import io.github.ivanosh.stmaterial.logic.ChipChoice
+import io.github.ivanosh.stmaterial.logic.LearnedScores
+import io.github.ivanosh.stmaterial.logic.RewindWatch
+import io.github.ivanosh.stmaterial.logic.autoSkipOn
 import io.github.ivanosh.stmaterial.logic.SKIP_CHIP_MS
 import io.github.ivanosh.stmaterial.logic.SkipTarget
 import io.github.ivanosh.stmaterial.logic.chooseChip
@@ -76,6 +81,12 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     /** What the last check of the controller found under the position. */
     private var target: SkipTarget? = null
     private val chipExpired = Runnable { refreshChip() }
+    private val learnedStore by lazy { LearnedSkipStore(this) }
+    /** Loaded once, when the first skip or key needs it. */
+    private val scores: LearnedScores by lazy { learnedStore.load() }
+    private var watch = RewindWatch()
+    private var notice: ChipChoice.Notice? = null
+    private val noticeGone = Runnable { notice = null; refreshChip() }
 
     val isPanelOpen get() = ui.focus != PanelFocus.HIDDEN
     private val isSheetOpen get() = panel.sheetGroups != null
@@ -295,6 +306,9 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         handler.removeCallbacks(applySeek)
         seek = SeekDebounce()
         ledger.clear()
+        watch = RewindWatch()
+        notice = null
+        handler.removeCallbacks(noticeGone)
         target = null
         hideChip()
     }
@@ -308,16 +322,44 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     /** At each check of the controller: the one place the Skip chip learns where the position is. */
     fun onSponsorPoll(positionMs: Long) {
         target = skipTargetAt(positionMs, spans)
+        watch.onPoll(positionMs, SystemClock.uptimeMillis()).forEach { learn(it.category, +1) }
         refreshChip()
     }
 
     // Calls from SponsorBlockController through the fragment.
 
-    fun mayAutoSkip(span: SkipSpan): Boolean = ledger.maySkip(span, SystemClock.uptimeMillis())
+    fun mayAutoSkip(span: SkipSpan): Boolean = ledger.maySkip(span, SystemClock.uptimeMillis()) && learnedAllows(span)
+
+    /** The channel of the video, or null when it is not known: then nothing is learned and the default action applies. */
+    private fun channelId(): String? = player?.video?.channelId?.takeIf { it.isNotBlank() }
+
+    /** What was learned about this channel and category can switch off an automatic skip, and nothing else. */
+    private fun learnedAllows(span: SkipSpan): Boolean {
+        if (!learnedStore.enabled) return true
+        val action = SponsorBlockData.instance(this).getAction(span.category)
+        if (action != SponsorBlockData.ACTION_SKIP_ONLY && action != SponsorBlockData.ACTION_SKIP_WITH_TOAST) return true
+        val channel = channelId() ?: return true
+        return autoSkipOn(scores.score(channel, span.category))
+    }
+
+    /** +1 or -1 for the category of a segment on this channel. When auto-skip flips, a notice shows for 3 s. */
+    private fun learn(category: String, delta: Int) {
+        if (!learnedStore.enabled) return
+        val channel = channelId() ?: return
+        val flipped = scores.add(channel, category, delta)
+        learnedStore.save(scores)
+        if (flipped == null) return
+        notice = ChipChoice.Notice(getString(if (flipped) R.string.material_learn_on else R.string.material_learn_off), category)
+        handler.removeCallbacks(noticeGone)
+        handler.postDelayed(noticeGone, NOTICE_MS)
+        refreshChip()
+    }
 
     /** True when the chip is shown, in place of the toast. The ledger is told whatever the view is doing. */
     fun onAutoSkip(spans: List<SkipSpan>, auto: Boolean = true): Boolean {
-        val chip = ledger.onAutoSkip(spans, SystemClock.uptimeMillis(), auto)
+        val now = SystemClock.uptimeMillis()
+        val chip = ledger.onAutoSkip(spans, now, auto)
+        if (auto) watch.onAutoSkipped(spans, now)
         if (chip == null || !started || isInPipMode) return false
         handler.removeCallbacks(chipExpired)
         handler.postDelayed(chipExpired, SKIP_CHIP_MS)
@@ -330,11 +372,13 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         val view = player
         val choice = if (!started || isInPipMode || view == null) null else chooseChip(
             ledger.chip(SystemClock.uptimeMillis()),
-            target?.takeIf { skipJumpTo(it, view.positionMs) != null }
+            target?.takeIf { skipJumpTo(it, view.positionMs) != null },
+            notice
         )
         panel.chip = when (choice) {
             is ChipChoice.Undo -> chipUi(choice.chip.shownAtMs, true, choice.chip.last.category)
             is ChipChoice.Skip -> chipUi(choice.target.first.startMs, false, choice.target.first.category)
+            is ChipChoice.Notice -> chipUi(0L, false, choice.category).copy(name = choice.text, notice = true)
             null -> null
         }
     }
@@ -362,6 +406,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         view.seekTo(if (view.durationMs > 0) minOf(to, view.durationMs) else to)
         target = null
         skipKeyHeld = true
+        learn(chain.first.category, -1)
         onAutoSkip(chain.chain, auto = false)
         return true
     }
@@ -369,6 +414,9 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     /** True when the key was the undo. */
     private fun undoSkip(): Boolean {
         val to = ledger.undo(SystemClock.uptimeMillis()) ?: return false
+        val undone = ledger.lastUndone
+        watch.forget(undone)
+        undone.map { it.category }.distinct().forEach { learn(it, +1) }
         presenter.onKeyDown(NO_KEY)
         // A seek still waiting would go on after the undo and take the position away.
         handler.removeCallbacks(applySeek)
@@ -497,6 +545,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private companion object {
         const val TICK_MS = 500L
         const val SEEK_PREVIEW_MS = 2_000L
+        const val NOTICE_MS = 3_000L
         const val NO_KEY = -1
     }
 }

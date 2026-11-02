@@ -23,6 +23,7 @@ import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil
 import com.liskovsoft.smartyoutubetv2.tv.R
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
 import io.github.ivanosh.stmaterial.browse.MaterialSectionsEditorActivity
+import io.github.ivanosh.stmaterial.data.LearnedSkipStore
 import io.github.ivanosh.stmaterial.dialog.ButtonRow
 import io.github.ivanosh.stmaterial.dialog.ChoiceRow
 import io.github.ivanosh.stmaterial.dialog.DialogPage
@@ -189,8 +190,29 @@ class MaterialSettingsActivity : ComponentActivity() {
             button(2, R.string.material_adv_subtitles) { SubtitleSettingsPresenter.instance(this).show() },
             button(3, R.string.material_adv_dearrow) { DeArrowSettingsPresenter.instance(this).show() },
             button(4, R.string.material_adv_afr) { AutoFrameRateSettingsPresenter.instance(this).show() },
+            learnedRow(),
+            learnedResetRow(),
         ),
     )
+
+    // Learned skip: whether auto-skip follows what the owner undoes on each channel, and a way to forget it.
+
+    private fun learnedRow(): DialogRow {
+        val store = LearnedSkipStore(this)
+        val label = getString(if (store.enabled) R.string.material_learn_state_on else R.string.material_learn_state_off)
+        return ButtonRow(5, getString(R.string.material_learn_row, label), Runnable {
+            store.enabled = !store.enabled
+            state.replace(advancedPage())
+        })
+    }
+
+    private fun learnedResetRow(): DialogRow {
+        val store = LearnedSkipStore(this)
+        return ButtonRow(6, getString(R.string.material_learn_reset, store.load().channelCount()), Runnable {
+            store.reset()
+            state.replace(advancedPage())
+        })
+    }
 
     // Updates
 
