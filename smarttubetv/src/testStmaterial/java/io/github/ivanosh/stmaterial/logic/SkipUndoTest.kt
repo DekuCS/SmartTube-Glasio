@@ -132,4 +132,19 @@ class SkipUndoTest {
         assertTrue(ledger.maySkip(a, 20))
         assertNull(ledger.chip(20))
     }
+
+    @Test
+    fun undoingASkipMadeByRightPlaysTheSegmentThrough() {
+        val ledger = SkipLedger()
+        ledger.onAutoSkip(listOf(a), 0, auto = false)
+        assertTrue(ledger.maySkip(a, 1))
+        assertEquals(60_000L, ledger.undo(10))
+        assertFalse(ledger.maySkip(a, 20))
+    }
+
+    @Test
+    fun rightIsTheChipOnlyWithNoSeekPending() {
+        assertTrue(chipKeyMayAct(SeekDebounce()))
+        assertFalse(chipKeyMayAct(SeekDebounce().onKey(10_000, 10_000, 100_000, 0)))
+    }
 }

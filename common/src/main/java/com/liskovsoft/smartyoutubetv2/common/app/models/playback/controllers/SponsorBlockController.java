@@ -234,7 +234,9 @@ public class SponsorBlockController extends BasePlayerController {
         }
 
         // MATERIAL: the Skip chip follows the position, also when paused
-        getPlayer().onSponsorPoll(getPlayer().getPositionMs());
+        if (getPlayer().isSkipChipSupported()) {
+            getPlayer().onSponsorPoll(getPlayer().getPositionMs());
+        }
 
         if (mActiveSegments.isEmpty()) {
             if (!getPlayer().isSkipChipSupported()) {
@@ -419,7 +421,8 @@ public class SponsorBlockController extends BasePlayerController {
                 || (skipDurationMs < getSponsorBlockData().getIgnoredDurationMs());
 
         // MATERIAL: a segment the owner undid, or one just skipped, is not skipped again
-        if (!isDurationIgnored && getPlayer().mayAutoSkip(foundSegments.get(0))) {
+        // MATERIAL: a poll that runs only for the Skip chip (all actions "do nothing") never skips by itself, not even in PIP, screen off or embed
+        if (getSponsorBlockData().isActionsEnabled() && !isDurationIgnored && getPlayer().mayAutoSkip(foundSegments.get(0))) {
             if (type == SponsorBlockData.ACTION_SKIP_ONLY || getPlayer().isInPIPMode() || Utils.isScreenOff(getContext()) || isEmbedPlayer()) {
                 simpleSkip(skipPosMs, foundSegments);
             } else if (type == SponsorBlockData.ACTION_SKIP_WITH_TOAST) {

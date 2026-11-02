@@ -42,6 +42,7 @@ import io.github.ivanosh.stmaterial.logic.SkipLedger
 import io.github.ivanosh.stmaterial.logic.SkipSpan
 import io.github.ivanosh.stmaterial.logic.SEEK_DEBOUNCE_MS
 import io.github.ivanosh.stmaterial.logic.SeekDebounce
+import io.github.ivanosh.stmaterial.logic.chipKeyMayAct
 import io.github.ivanosh.stmaterial.logic.SheetCommand
 import io.github.ivanosh.stmaterial.logic.moreGroups
 import io.github.ivanosh.stmaterial.logic.moreSheetKey
@@ -82,8 +83,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private var target: SkipTarget? = null
     private val chipExpired = Runnable { refreshChip() }
     private val learnedStore by lazy { LearnedSkipStore(this) }
-    /** Loaded once, when the first skip or key needs it. */
-    private val scores: LearnedScores by lazy { learnedStore.load() }
+    /** Read from the prefs each time, so a reset in Settings reaches a running player. */
+    private fun loadScores(): LearnedScores = learnedStore.load()
     private var watch = RewindWatch()
     private var notice: ChipChoice.Notice? = null
     private val noticeGone = Runnable { notice = null; refreshChip() }
@@ -202,13 +203,17 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             return true
         }
         val sheet = isSheetOpen
-        if (key == PlayerKey.Left && ui.focus == PanelFocus.HIDDEN && !sheet) {
+        // A dialog is its own activity and window, so its keys never get here; this guards a window that took focus anyway.
+        val focused = hasWindowFocus()
+        if (key == PlayerKey.Left && ui.focus == PanelFocus.HIDDEN && !sheet && focused) {
             // The undo chip: LEFT goes back to the start of the skipped segment, and not a step more.
+            if (event.repeatCount == 0) undoKeyHeld = false
             if (event.repeatCount > 0 && undoKeyHeld) return true
             if (event.repeatCount == 0 && undoSkip()) return true
         }
-        if (key == PlayerKey.Right && ui.focus == PanelFocus.HIDDEN && !sheet) {
+        if (key == PlayerKey.Right && ui.focus == PanelFocus.HIDDEN && !sheet && focused) {
             // The Skip chip: RIGHT jumps to the end of the segment, and not a step more.
+            if (event.repeatCount == 0) skipKeyHeld = false
             if (event.repeatCount > 0 && skipKeyHeld) return true
             if (event.repeatCount == 0 && skipForward()) return true
         }
@@ -339,13 +344,14 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         val action = SponsorBlockData.instance(this).getAction(span.category)
         if (action != SponsorBlockData.ACTION_SKIP_ONLY && action != SponsorBlockData.ACTION_SKIP_WITH_TOAST) return true
         val channel = channelId() ?: return true
-        return autoSkipOn(scores.score(channel, span.category))
+        return autoSkipOn(loadScores().score(channel, span.category))
     }
 
     /** +1 or -1 for the category of a segment on this channel. When auto-skip flips, a notice shows for 3 s. */
     private fun learn(category: String, delta: Int) {
         if (!learnedStore.enabled) return
         val channel = channelId() ?: return
+        val scores = loadScores()
         val flipped = scores.add(channel, category, delta)
         learnedStore.save(scores)
         if (flipped == null) return
@@ -397,7 +403,9 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     /** True when the key was RIGHT on the Skip chip. Counts as a skip made by the owner, so the undo chip follows. */
     private fun skipForward(): Boolean {
         val view = player ?: return false
-        if (panel.chip?.undo != false) return false
+        if (panel.chip?.undo != false || panel.chip?.notice == true) return false
+        // A seek waiting for its debounce is the owner's: RIGHT goes on as a seek step.
+        if (!chipKeyMayAct(seek)) return false
         val chain = target ?: return false
         val to = skipJumpTo(chain, view.positionMs) ?: return false
         presenter.onKeyDown(NO_KEY)

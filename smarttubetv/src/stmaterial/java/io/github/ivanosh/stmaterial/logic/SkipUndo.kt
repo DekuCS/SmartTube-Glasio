@@ -53,6 +53,8 @@ class SkipLedger {
     fun undo(nowMs: Long): Long? {
         val live = chip(nowMs) ?: return null
         lastUndone = chipSpans
+        // Whichever way the skip was made, the segment plays through for this open.
+        chipSpans.forEach { autoSkipped += key(it) }
         chipSpans = emptyList()
         current = null
         return live.chainStartMs
@@ -108,3 +110,6 @@ fun chooseChip(undo: SkipChip?, target: SkipTarget?, notice: ChipChoice.Notice? 
 /** Where RIGHT jumps to, or null when the position is not inside the target (a stale chip). */
 fun skipJumpTo(target: SkipTarget?, positionMs: Long): Long? =
     target?.takeIf { positionMs >= it.first.startMs && positionMs < it.endMs }?.endMs
+
+/** RIGHT acts as the Skip chip only when no debounced seek is waiting; otherwise it is one more seek step. */
+fun chipKeyMayAct(seek: SeekDebounce): Boolean = seek.targetMs == null
