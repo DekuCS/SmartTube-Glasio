@@ -79,7 +79,10 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
         val ordered = models.map { model ->
             rowFor(model, if (model.id == SubscriptionRowIds.CONTINUE) history else feed)
         }.toMutableList()
-        val claimed = ordered.flatMapTo(HashSet()) { row -> row.videos.map(::videoKey) }
+        // Only the feed's own rows claim a video: one that is also in "Continue watching" stays in its place below.
+        val claimed = ordered
+            .filter { it.id != SubscriptionRowIds.CONTINUE }
+            .flatMapTo(HashSet()) { row -> row.videos.map(::videoKey) }
         rows.firstOrNull { it.id == SubscriptionRowIds.EARLIER }?.let { earlier ->
             earlier.drop(claimed)
             if (earlier.videos.isNotEmpty()) ordered.add(earlier)
@@ -100,7 +103,7 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
 
     private fun addLater(videos: List<Video>, atStart: Boolean) {
         val claimed = rows
-            .filter { it.id != SubscriptionRowIds.EARLIER }
+            .filter { it.id != SubscriptionRowIds.EARLIER && it.id != SubscriptionRowIds.CONTINUE }
             .flatMapTo(HashSet()) { row -> row.videos.map(::videoKey) }
         val fresh = visible(videos).filter { videoKey(it) !in claimed }
         val earlier = rows.firstOrNull { it.id == SubscriptionRowIds.EARLIER }

@@ -16,10 +16,11 @@ class SubscriptionRowsTest {
     }
 
     @Test
-    fun aVideoOfContinueIsNotRepeatedInNew() {
+    fun aStartedVideoStaysInNewInItsPlace() {
         val rows = buildRows(listOf(item("x"), item("a"), item("y")), listOf(item("a", 40)))
         assertEquals(listOf("continue", "new"), rows.map { it.id })
-        assertEquals(listOf("x", "y"), rows[1].ids)
+        assertEquals(listOf("a"), rows[0].ids)
+        assertEquals(listOf("x", "a", "y"), rows[1].ids)
     }
 
     @Test
@@ -40,7 +41,7 @@ class SubscriptionRowsTest {
     fun emptyRowsAreNotCreated() {
         assertTrue(buildRows(emptyList(), emptyList()).isEmpty())
         assertEquals(listOf("continue"), buildRows(emptyList(), listOf(item("a", 10))).map { it.id })
-        assertEquals(listOf("continue"), buildRows(listOf(item("a")), listOf(item("a", 10))).map { it.id })
+        assertEquals(listOf("continue", "new"), buildRows(listOf(item("a")), listOf(item("a", 10))).map { it.id })
     }
 
     @Test

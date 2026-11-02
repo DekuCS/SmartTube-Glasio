@@ -45,7 +45,7 @@ class SubscriptionsFeedTest {
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "h1", "s2"))
         assertEquals(listOf("continue", "new"), state.layout())
         assertEquals(listOf("h1"), state.ids("continue"))
-        assertEquals(listOf("s1", "s2"), state.ids("new"))
+        assertEquals(listOf("s1", "h1", "s2"), state.ids("new"))
         assertEquals("t${R.string.material_row_continue}", state.rows[0].title)
         assertEquals("t${R.string.material_row_new}", state.rows[1].title)
         assertFalse(state.rows[0].isGrid)
@@ -53,7 +53,7 @@ class SubscriptionsFeedTest {
     }
 
     @Test
-    fun historyAfterSubscriptionsTakesItsVideosOutOfNew() {
+    fun historyAfterSubscriptionsLeavesNewAsItIs() {
         val state = stateOnSubs()
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "h1", "s2"))
         assertEquals(listOf("new"), state.layout())
@@ -61,7 +61,7 @@ class SubscriptionsFeedTest {
         state.updateHistory(historyGroup("h1" to 50f), state.epoch)
         assertEquals(listOf("continue", "new"), state.layout())
         assertEquals(listOf("h1"), state.ids("continue"))
-        assertEquals(listOf("s1", "s2"), state.ids("new"))
+        assertEquals(listOf("s1", "h1", "s2"), state.ids("new"))
     }
 
     @Test
@@ -88,7 +88,7 @@ class SubscriptionsFeedTest {
     }
 
     @Test
-    fun laterPagesGoToEarlierBelowAndSkipBothRows() {
+    fun laterPagesGoToEarlierBelowAndSkipNewOnly() {
         val state = stateOnSubs()
         state.updateHistory(historyGroup("h1" to 50f), state.epoch)
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "s2"))
@@ -96,7 +96,7 @@ class SubscriptionsFeedTest {
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "s2", "s3", "h1", "s4"))
         assertEquals(listOf("continue", "new", "earlier"), state.layout())
         assertEquals(listOf("s1", "s2"), state.ids("new"))
-        assertEquals(listOf("s3", "s4"), state.ids("earlier"))
+        assertEquals(listOf("s3", "h1", "s4"), state.ids("earlier"))
         assertTrue(state.rows[2].isGrid)
         assertEquals("t${R.string.material_row_earlier}", state.rows[2].title)
     }
@@ -110,24 +110,25 @@ class SubscriptionsFeedTest {
     }
 
     @Test
-    fun historyArrivingAfterPagingAlsoClearsEarlier() {
+    fun historyArrivingAfterPagingLeavesNewAndEarlierAsTheyAre() {
         val state = stateOnSubs()
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1", "s2"))
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s3", "s4"))
         state.updateHistory(historyGroup("s3" to 30f, "s1" to 30f), state.epoch)
         assertEquals(listOf("continue", "new", "earlier"), state.layout())
         assertEquals(listOf("s3", "s1"), state.ids("continue"))
-        assertEquals(listOf("s2"), state.ids("new"))
-        assertEquals(listOf("s4"), state.ids("earlier"))
+        assertEquals(listOf("s1", "s2"), state.ids("new"))
+        assertEquals(listOf("s3", "s4"), state.ids("earlier"))
     }
 
     @Test
-    fun earlierDisappearsIfHistoryTakesAllOfIt() {
+    fun earlierKeepsAVideoThatIsAlsoInContinue() {
         val state = stateOnSubs()
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s1"))
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "s2"))
         state.updateHistory(historyGroup("s2" to 30f), state.epoch)
-        assertEquals(listOf("continue", "new"), state.layout())
+        assertEquals(listOf("continue", "new", "earlier"), state.layout())
+        assertEquals(listOf("s2"), state.ids("earlier"))
     }
 
     @Test
@@ -179,7 +180,7 @@ class SubscriptionsFeedTest {
         assertTrue(state.rows.isEmpty())
         state.updateSection(subsGroup(VideoGroup.ACTION_APPEND, "n1", "h1"))
         assertEquals(listOf("continue", "new"), state.layout())
-        assertEquals(listOf("n1"), state.ids("new"))
+        assertEquals(listOf("n1", "h1"), state.ids("new"))
     }
 
     @Test
@@ -309,7 +310,7 @@ class SubscriptionsFeedTest {
         state.updateHistory(historyGroup("h1" to 50f), state.epoch)
         assertNull(state.takeMoreRequest(state.rows[0]))
         assertTrue(loads.isEmpty())
-        val feed = subsGroup(VideoGroup.ACTION_APPEND, "h1", "s9")
+        val feed = subsGroup(VideoGroup.ACTION_APPEND, "s9")
         state.updateSection(feed)
         state.updateSection(VideoGroup.from(listOf(video("s9"))).apply { setAction(VideoGroup.ACTION_REMOVE) })
         assertEquals(listOf("continue"), state.layout())
