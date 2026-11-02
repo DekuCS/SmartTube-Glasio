@@ -37,6 +37,10 @@ keeps that engine and replaces the interface with a smaller one, built with Jetp
 
 ## Screenshots
 
+![Subscriptions, the start tab: Continue watching and New in subscriptions](/docs/images/subscriptions.jpg)
+
+![Home with a card in focus](/docs/images/home.jpg)
+
 ![Player panel with the chosen buttons, the seek bar and a SponsorBlock segment](/docs/images/player-panel.png)
 
 ![Customize sections: pick up a tab, move it, press Back to save](/docs/images/sections-editor.png)
@@ -47,7 +51,7 @@ keeps that engine and replaces the interface with a smaller one, built with Jetp
 
 ![Settings, Updates page](/docs/images/settings-updates.png)
 
-Video: Big Buck Bunny (c) Blender Foundation, CC BY 3.0. See [peach.blender.org](https://peach.blender.org/).
+Thumbnails on Home and Subscriptions belong to their channels. Player video: Big Buck Bunny (c) Blender Foundation, CC BY 3.0. See [peach.blender.org](https://peach.blender.org/).
 
 ## What comes from SmartTube
 
