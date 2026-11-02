@@ -24,6 +24,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +56,7 @@ import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.logic.PanelFocus
 import io.github.ivanosh.stmaterial.logic.PlayerButton
 import io.github.ivanosh.stmaterial.logic.buttonIsOn
+import io.github.ivanosh.stmaterial.logic.chapterIndexAt
 import io.github.ivanosh.stmaterial.logic.formatPlayerTime
 import io.github.ivanosh.stmaterial.logic.handleCenter
 import io.github.ivanosh.stmaterial.logic.layoutTrack
@@ -88,6 +90,7 @@ fun PlayerOverlay(state: PlayerOverlayState) {
                     .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
             ) {
                 Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
+                Box(Modifier.onlyWhenPreview(state)) { SeekChapterTitle(state) }
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ProgressBar(state)
                     TimeRow(state)
@@ -114,6 +117,30 @@ private fun Modifier.onlyWhenOpen(state: PlayerOverlayState): Modifier = layout 
     } else {
         layout(0, 0) {}
     }
+}
+
+/** The reverse of [onlyWhenOpen]: the open panel has its header, and the title of the chapter is in it. */
+private fun Modifier.onlyWhenPreview(state: PlayerOverlayState): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    if (state.focus == PanelFocus.HIDDEN) {
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    } else {
+        layout(0, 0) {}
+    }
+}
+
+/**
+ * The chapter at the position the seek is going to, above the bar. The position is read inside a derived state, so this
+ * composes again only when the chapter changes, not at every key or tick.
+ */
+@Composable
+private fun SeekChapterTitle(state: PlayerOverlayState) {
+    val chapters = state.chapters
+    if (chapters.isEmpty()) return
+    val starts = remember(chapters) { chapters.map { it.startMs } }
+    val index = remember(chapters) { derivedStateOf { chapterIndexAt(starts, state.positionMs) } }.value
+    val title = chapters.getOrNull(index)?.title?.ifBlank { null } ?: return
+    Text(title, style = subtitleStyle.copy(color = Palette.OnBackground), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 12.dp))
 }
 
 @Composable
