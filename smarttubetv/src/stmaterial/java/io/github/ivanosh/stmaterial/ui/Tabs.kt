@@ -46,7 +46,8 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 
-class TabItem(val id: Int, val title: String, val isStart: Boolean)
+/** A data class: the screen rebuilds the list on every recomposition, and equal items let the tabs that did not change skip. */
+data class TabItem(val id: Int, val title: String, val isStart: Boolean)
 
 private const val HOME_ICON = "M4 11l8-7 8 7M6 10v10h12V10"
 // A gear outline: eight teeth around a hub ring. Drawn with a 2 stroke it still shows teeth at 36 px.
