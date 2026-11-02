@@ -260,6 +260,23 @@ android {
     }
 }
 
+// MATERIAL: Compose compiler settings for the stmaterial flavor only (the others have no Compose code).
+// Stability config: immutable types from other modules that the compiler cannot infer (see the file).
+// Reports for scripts/compose_stability.py: -PcomposeReports, written to smarttubetv/build/compose-reports.
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { task ->
+    if (!task.name.contains('Stmaterial')) {
+        return
+    }
+    def plugin = 'plugin:androidx.compose.compiler.plugins.kotlin'
+    def args = ['-P', "${plugin}:stabilityConfigurationPath=${file('compose-stability.conf').absolutePath}".toString()]
+    if (project.hasProperty('composeReports')) {
+        def reports = layout.buildDirectory.dir('compose-reports').get().asFile.absolutePath
+        args += ['-P', "${plugin}:reportsDestination=${reports}".toString(),
+                 '-P', "${plugin}:metricsDestination=${reports}".toString()]
+    }
+    task.compilerOptions.freeCompilerArgs.addAll(args)
+}
+
 // The ABI splits are shared by all flavors, stmaterial supports only the two ARM ones.
 androidComponents {
     // A debug build installs next to the release one and never replaces it, so it can be tried on a device that
