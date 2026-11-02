@@ -17,28 +17,27 @@ data class SkipChip(val chainStartMs: Long, val last: SkipSpan, val shownAtMs: L
  * [maySkip] before an automatic skip, and tells [onAutoSkip] after it.
  */
 class SkipLedger {
-    private val undone = mutableSetOf<SkipSpan>()
-    private val skippedAt = mutableMapOf<SkipSpan, Long>()
+    /** The segments seen auto-skipped in this open, by start and end only, in memory only. */
+    private val autoSkipped = mutableSetOf<Pair<Long, Long>>()
     private var chipSpans = emptyList<SkipSpan>()
     private var current: SkipChip? = null
 
     /**
-     * False for a segment the owner undid (for good, this video), and for one skipped within the chip window:
-     * a manual rewind into it plays it, so a missed chip costs nothing. Later, a rewind skips again.
+     * A segment auto-skips at most once per open of a video, however the position got back before it:
+     * by undo, by a rewind or by a seek to any earlier point.
      */
-    fun maySkip(span: SkipSpan, nowMs: Long): Boolean {
-        if (span in undone) return false
-        val at = skippedAt[span] ?: return true
-        return nowMs - at >= SKIP_CHIP_MS
-    }
+    fun maySkip(span: SkipSpan, nowMs: Long): Boolean = key(span) !in autoSkipped
 
-    /** [spans] are the segments one skip jumped over, in order. Returns the chip to show. */
-    fun onAutoSkip(spans: List<SkipSpan>, nowMs: Long): SkipChip? {
+    /**
+     * [spans] are the segments one skip jumped over, in order. Returns the chip to show.
+     * [auto] is false for the owner's own skip (RIGHT on the Skip chip), which does not use up the auto-skip.
+     */
+    fun onAutoSkip(spans: List<SkipSpan>, nowMs: Long, auto: Boolean = true): SkipChip? {
         if (spans.isEmpty()) return chip(nowMs)
         val live = chip(nowMs)
         val joins = live != null && spans.first().startMs in live.chainStartMs..(live.last.endMs + CHAIN_GAP_MS)
         chipSpans = if (joins) chipSpans + spans else spans
-        spans.forEach { skippedAt[it] = nowMs }
+        if (auto) spans.forEach { autoSkipped += key(it) }
         val chain = SkipChip(if (joins) live!!.chainStartMs else spans.first().startMs, spans.last(), nowMs)
         current = chain
         return chain
@@ -46,22 +45,21 @@ class SkipLedger {
 
     fun chip(nowMs: Long): SkipChip? = current?.takeIf { nowMs - it.shownAtMs < SKIP_CHIP_MS }
 
-    /** Where the undo goes, or null when no chip is live. The chain is then undone for good. */
+    /** Where the undo goes, or null when no chip is live. */
     fun undo(nowMs: Long): Long? {
         val live = chip(nowMs) ?: return null
-        undone.addAll(chipSpans)
-        chipSpans.forEach { skippedAt.remove(it) }
         chipSpans = emptyList()
         current = null
         return live.chainStartMs
     }
 
     fun clear() {
-        undone.clear()
-        skippedAt.clear()
+        autoSkipped.clear()
         chipSpans = emptyList()
         current = null
     }
+
+    private fun key(span: SkipSpan) = span.startMs to span.endMs
 }
 
 /** A point, not a stretch: there is nothing to skip. The SponsorBlock id of the Highlight category. */

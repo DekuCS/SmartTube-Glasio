@@ -60,9 +60,26 @@ class SkipUndoTest {
     }
 
     @Test
-    fun aLaterRewindSkipsAgainWhenNotUndone() {
+    fun aSegmentAutoSkipsOncePerOpenHoweverTheOwnerGotBackToIt() {
         val ledger = SkipLedger()
         ledger.onAutoSkip(listOf(a), 0)
+        assertFalse(ledger.maySkip(a, SKIP_CHIP_MS))
+        assertFalse(ledger.maySkip(a, 60 * 60_000))
+        assertTrue(ledger.maySkip(far, SKIP_CHIP_MS))
+    }
+
+    @Test
+    fun theCategoryDoesNotTellSegmentsApart() {
+        val ledger = SkipLedger()
+        ledger.onAutoSkip(listOf(SkipSpan(60_000, 90_000, "sponsor")), 0)
+        assertFalse(ledger.maySkip(SkipSpan(60_000, 90_000, "selfpromo"), 10))
+    }
+
+    @Test
+    fun aSkipByTheOwnerDoesNotUseUpTheAutoSkip() {
+        val ledger = SkipLedger()
+        val chip = ledger.onAutoSkip(listOf(a), 0, auto = false)
+        assertEquals(60_000L, chip?.chainStartMs)
         assertTrue(ledger.maySkip(a, SKIP_CHIP_MS))
     }
 
@@ -94,7 +111,7 @@ class SkipUndoTest {
         val chip = ledger.onAutoSkip(listOf(far), 1_000)
         assertEquals(300_000L, chip?.chainStartMs)
         assertEquals(300_000L, ledger.undo(1_200))
-        assertTrue(ledger.maySkip(a, 9_000))
+        assertFalse(ledger.maySkip(far, 9_000))
     }
 
     @Test

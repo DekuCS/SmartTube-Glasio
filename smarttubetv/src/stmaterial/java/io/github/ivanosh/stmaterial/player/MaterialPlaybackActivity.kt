@@ -316,8 +316,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     fun mayAutoSkip(span: SkipSpan): Boolean = ledger.maySkip(span, SystemClock.uptimeMillis())
 
     /** True when the chip is shown, in place of the toast. The ledger is told whatever the view is doing. */
-    fun onAutoSkip(spans: List<SkipSpan>): Boolean {
-        val chip = ledger.onAutoSkip(spans, SystemClock.uptimeMillis())
+    fun onAutoSkip(spans: List<SkipSpan>, auto: Boolean = true): Boolean {
+        val chip = ledger.onAutoSkip(spans, SystemClock.uptimeMillis(), auto)
         if (chip == null || !started || isInPipMode) return false
         handler.removeCallbacks(chipExpired)
         handler.postDelayed(chipExpired, SKIP_CHIP_MS)
@@ -362,7 +362,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         view.seekTo(if (view.durationMs > 0) minOf(to, view.durationMs) else to)
         target = null
         skipKeyHeld = true
-        onAutoSkip(chain.chain)
+        onAutoSkip(chain.chain, auto = false)
         return true
     }
 
