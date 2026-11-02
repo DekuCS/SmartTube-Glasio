@@ -364,6 +364,8 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         handler.removeCallbacks(noticeGone)
         target = null
         hideChip()
+        panel.menu = null
+        if (panel.moving) endMove()
     }
 
     /** From the controller, possibly off the main thread: only the list is kept. A video without segments clears the chip. */
