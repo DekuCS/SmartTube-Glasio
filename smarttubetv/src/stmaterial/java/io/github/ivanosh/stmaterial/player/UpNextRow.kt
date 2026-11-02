@@ -48,7 +48,8 @@ import io.github.ivanosh.stmaterial.ui.MenuShape
 import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.VideoCard
 
-private val CardGap = 20.dp
+// The same gap as the feed: a focused card grows and draws its ring, so less would touch the next card.
+private val CardGap = 32.dp
 private val RowTopGap = 32.dp
 private val LabelHeight = 42.dp
 private val CardRoom = 14.dp
