@@ -163,6 +163,7 @@
     <string translatable="false" name="material_upd_stable_desc">Only releases that were promoted by the owner.</string>
     <string translatable="false" name="material_upd_prerelease">Prerelease</string>
     <string translatable="false" name="material_upd_prerelease_desc">The newest build, published without review.</string>
+    <string translatable="false" name="material_upd_available">Update available: %1$s</string>
     <string translatable="false" name="material_upd_check_now">Check now</string>
     <string translatable="false" name="material_upd_installed">Installed: %1$s</string>
     <string translatable="false" name="material_upd_checking">Checking…</string>

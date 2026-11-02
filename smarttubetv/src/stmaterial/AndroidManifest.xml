@@ -108,13 +108,5 @@
             android:name="io.github.ivanosh.stmaterial.settings.MaterialSettingsActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
             android:screenOrientation="unspecified" />
-
-        <!-- Translucent like the dialogs. Opened only over the browse screen. -->
-        <activity
-            android:name="io.github.ivanosh.stmaterial.update.UpdateActivity"
-            android:excludeFromRecents="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection"
-            android:screenOrientation="unspecified"
-            android:theme="@style/Material.Theme.Dialog" />
     </application>
 </manifest>

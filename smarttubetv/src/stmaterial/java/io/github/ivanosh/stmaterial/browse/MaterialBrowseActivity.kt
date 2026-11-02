@@ -163,7 +163,6 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
 
     override fun onPause() {
         super.onPause()
-        UpdateScheduler.onBrowsePaused(this)
         presenter.onViewPaused()
     }
 

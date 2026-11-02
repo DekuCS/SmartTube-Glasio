@@ -100,9 +100,12 @@ class MaterialSettingsActivity : ComponentActivity() {
 
     private fun button(key: Int, title: Int, action: Runnable) = ButtonRow(key, getString(title), action)
 
+    private fun button(key: Int, title: Int, arg: String, action: Runnable) = ButtonRow(key, getString(title, arg), action)
+
     private fun root(): DialogPage = DialogPage.of(
         getString(R.string.material_settings),
-        listOf(
+        listOfNotNull(
+            updateRow(11),
             EntryRow(1, getString(R.string.material_set_account), 1, ::accountPage),
             button(2, R.string.material_set_sections) { startActivity(Intent(this, MaterialSectionsEditorActivity::class.java)) },
             button(3, R.string.material_set_buttons) { startActivity(Intent(this, MaterialButtonsEditorActivity::class.java)) },
@@ -216,11 +219,19 @@ class MaterialSettingsActivity : ComponentActivity() {
 
     // Updates
 
+    /** The line that opens the update dialog for the stored offer, or null when none is to be shown. */
+    private fun updateRow(key: Int): DialogRow? {
+        val offer = UpdateStore(this).currentOffer(this) ?: return null
+        return button(key, R.string.material_upd_available, offer.versionName) { state.push(updates.offerPage(offer)) }
+    }
+
     private fun updatesPage(status: String? = null): DialogPage {
         val channel = UpdateStore(this).channel
         fun choice(key: Int, value: UpdateChannel, title: Int, description: Int) =
             ChoiceRow(key, getString(title), getString(description), channel == value, false, value)
-        val rows = mutableListOf<DialogRow>(
+        val rows = mutableListOf<DialogRow>()
+        updateRow(7)?.let { rows += it }
+        rows += listOf(
             choice(1, UpdateChannel.OFF, R.string.material_upd_off, R.string.material_upd_off_desc),
             choice(2, UpdateChannel.STABLE, R.string.material_upd_stable, R.string.material_upd_stable_desc),
             choice(3, UpdateChannel.PRERELEASE, R.string.material_upd_prerelease, R.string.material_upd_prerelease_desc),
@@ -242,6 +253,7 @@ class MaterialSettingsActivity : ComponentActivity() {
         state.replace(updatesPage(getString(R.string.material_upd_checking)))
         val shownPage = state.page?.id
         UpdateService.check(this, channel) { result ->
+            UpdateStore(this).recordCheck(this, result)
             if (isDestroyed || state.page?.id != shownPage) return@check
             when (result) {
                 is CheckResult.Offer -> {

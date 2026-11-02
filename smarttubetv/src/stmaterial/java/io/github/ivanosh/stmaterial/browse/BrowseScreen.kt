@@ -48,6 +48,7 @@ import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
 import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.TabItem
 import io.github.ivanosh.stmaterial.ui.Tabs
+import io.github.ivanosh.stmaterial.update.UpdateStore
 
 interface BrowseActions : FeedPageActions {
     fun onTabFocused(id: Int)
@@ -182,6 +183,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                 },
                 onClick = actions::onTabClicked,
                 onLongPress = { menuFor = it },
+                updateAvailable = { UpdateStore.shown != null },
                 modifier = Modifier
                     .onFocusChanged { barFocused = it.hasFocus }
                     .graphicsLayer { translationY = -TabsTravel.toPx() * tabsAway.value },

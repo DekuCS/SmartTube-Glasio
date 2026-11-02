@@ -26,6 +26,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -69,6 +70,8 @@ fun Tabs(
     onFocused: (Int) -> Unit,
     onClick: (Int) -> Unit,
     onLongPress: (Int) -> Unit,
+    /** Read only when the dot is drawn, so a change repaints the dot and does not recompose the bar. */
+    updateAvailable: () -> Boolean = { false },
     modifier: Modifier = Modifier,
 ) {
     // The 8 dp inside the list keeps the focus ring of the first and last tab out of the scroll clip;
@@ -130,6 +133,15 @@ fun Tabs(
         ) {
             StrokeIcon(GEAR_ICON, Palette.OnBackgroundVariant, Modifier.fillMaxSize().padding(14.dp))
         }
+        // The mark of an update that has arrived: a filled dot at the top right of the gear, focused or not.
+        Box(
+            Modifier.align(Alignment.CenterEnd).size(64.dp).drawBehind {
+                if (updateAvailable()) {
+                    val r = 6.dp.toPx()
+                    drawCircle(Palette.Accent, r, Offset(size.width - 14.dp.toPx() - r, 14.dp.toPx() + r))
+                }
+            }
+        )
     }
 }
 

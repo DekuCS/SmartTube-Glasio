@@ -69,8 +69,9 @@ Settings has an "Updates" page with the channel and "Check now":
 
 The app asks `api.github.com/repos/ivanosh/SmartTube-Material/releases` (unauthenticated, HTTPS) once a day at most, when
 the browse screen is shown, and on "Check now". There is no background job. A failed check is silent, except for
-"Check now", which says why. The prompt opens only over the browse screen, never over the player: a result that comes
-while something else is in front waits for the next time the browse screen is shown.
+"Check now", which says why. Nothing opens by itself: a newer release is kept, a small dot shows on the Settings icon,
+and the first row of Settings and of the Updates page reads "Update available: <version>" and opens the update dialog.
+The offer is dropped when it is installed, when the channel no longer allows it, or when a later check finds nothing newer.
 
 Why the GitHub Releases API and not upstream's `appupdatechecker2` manifest: that manifest is a JSON file with no
 checksum, no channel and no signer check, would need a separate file per channel published by the workflow, and takes
