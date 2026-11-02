@@ -542,7 +542,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
     private fun sendSeekNow() {
         handler.removeCallbacks(applySeek)
         val due = seek.targetMs
-        seek = SeekDebounce()
+        seek = SeekDebounce(stoppedOnMs = seek.stoppedOnMs)
         if (due != null) player?.seekTo(due)
     }
 

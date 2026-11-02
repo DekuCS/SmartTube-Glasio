@@ -134,4 +134,9 @@ class ChapterRowTest {
         assertEquals(PanelFocus.BUTTONS, press(ui(PanelFocus.HIDDEN), PlayerKey.Down).first.focus)
         assertEquals(PanelFocus.BUTTONS, press(ui(PanelFocus.PROGRESS), PlayerKey.Down).first.focus)
     }
+
+    @Test
+    fun rightInAnEmptyRowNeverGivesANegativeIndex() {
+        assertEquals(0, press(ui(PanelFocus.CHAPTERS, chapters = 0, chapter = 0), PlayerKey.Right).first.chapterIndex)
+    }
 }

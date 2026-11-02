@@ -62,7 +62,7 @@ fun playerKey(ui: PlayerUi, key: PlayerKey, seekStepMs: Long): Pair<PlayerUi, Li
             PlayerKey.Up, PlayerKey.Back -> ui.copy(focus = PanelFocus.BUTTONS) to emptyList()
             PlayerKey.Down -> ui to emptyList()
             PlayerKey.Left -> ui.copy(chapterIndex = (ui.chapterIndex - 1).coerceAtLeast(0)) to emptyList()
-            PlayerKey.Right -> ui.copy(chapterIndex = (ui.chapterIndex + 1).coerceAtMost(ui.chapterCount - 1)) to emptyList()
+            PlayerKey.Right -> ui.copy(chapterIndex = (ui.chapterIndex + 1).coerceAtMost((ui.chapterCount - 1).coerceAtLeast(0))) to emptyList()
         }
     }
 
@@ -73,33 +73,40 @@ const val PANEL_AUTO_HIDE_MS = 5_000L
  * A seek on its way to the engine. Every key moves [targetMs], which the overlay shows at once; the engine
  * gets one seek when [SEEK_DEBOUNCE_MS] have passed since the last key, so a held key costs it nothing.
  */
-data class SeekDebounce(val targetMs: Long? = null, val lastKeyMs: Long = 0) {
+data class SeekDebounce(val targetMs: Long? = null, val lastKeyMs: Long = 0, val stoppedOnMs: Long? = null) {
     fun onKey(
         positionMs: Long, deltaMs: Long, durationMs: Long, nowMs: Long,
         chapterStartsMs: List<Long> = emptyList(), repeating: Boolean = false,
     ): SeekDebounce {
         val from = targetMs ?: positionMs.coerceAtLeast(0)
-        val moved = if (repeating) from + deltaMs else magnet(from, from + deltaMs, chapterStartsMs)
+        val moved = if (repeating) from + deltaMs else magnet(from, from + deltaMs, chapterStartsMs, stoppedOnMs)
+        // The start this step stopped on is not stopped on again by the next press, whatever the video did meanwhile.
+        val stop = if (!repeating && moved != from + deltaMs && moved in chapterStartsMs) moved else null
         // The duration of a live stream or of a video still loading can be unknown.
         val target = if (durationMs > 0) moved.coerceIn(0, durationMs) else moved.coerceAtLeast(0)
-        return SeekDebounce(target, nowMs)
+        return SeekDebounce(target, nowMs, stop)
     }
 
-    /** The seek to send now, if it is due, and what remains. */
+    /** The seek to send now, if it is due, and what remains. The last stop is kept: the next press may follow the seek. */
     fun takeDue(nowMs: Long): Pair<SeekDebounce, Long?> =
-        if (targetMs != null && nowMs - lastKeyMs >= SEEK_DEBOUNCE_MS) SeekDebounce() to targetMs else this to null
+        if (targetMs != null && nowMs - lastKeyMs >= SEEK_DEBOUNCE_MS) SeekDebounce(stoppedOnMs = stoppedOnMs) to targetMs else this to null
 }
+
+/** A position this near a chapter start counts as standing on it: playback runs on, and a seek lands a little off. */
+const val MAGNET_TOLERANCE_MS = 1_500L
 
 /**
  * A step from [from] to [to] that crosses a chapter start stops on the nearest one on its way; landing on a start,
- * or standing on one, is not crossing it. Only the first step of a press is stopped, so a hold goes through.
+ * or standing on (within [MAGNET_TOLERANCE_MS] of) one, is not crossing it. [stoppedOn], the start the last press
+ * stopped on, is skipped once. Only the first step of a press is stopped, so a hold goes through.
  */
-fun magnet(from: Long, to: Long, chapterStartsMs: List<Long>): Long {
+fun magnet(from: Long, to: Long, chapterStartsMs: List<Long>, stoppedOn: Long? = null): Long {
     if (chapterStartsMs.isEmpty() || to == from) return to
+    val tol = MAGNET_TOLERANCE_MS
     return if (to > from) {
-        chapterStartsMs.filter { it > from && it < to }.minOrNull() ?: to
+        chapterStartsMs.filter { it > from + tol && it < to && it != stoppedOn }.minOrNull() ?: to
     } else {
-        chapterStartsMs.filter { it < from && it > to }.maxOrNull() ?: to
+        chapterStartsMs.filter { it < from - tol && it > to && it != stoppedOn }.maxOrNull() ?: to
     }
 }
 
