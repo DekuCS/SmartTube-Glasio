@@ -10,6 +10,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInstaller
 import android.os.Build
 import androidx.core.content.ContextCompat
+import io.github.ivanosh.stmaterial.logic.PercentGate
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -20,6 +21,8 @@ import java.security.MessageDigest
  *
  * [install] runs on a worker thread. It copies the file into the session while hashing the bytes it copies, so what
  * the installer gets is what the digest of the release names, and deletes the file whatever happens.
+ * [onPercent] is called from that thread for each whole percent copied, [onFinishing] once when the copy is done and the
+ * bytes are being flushed to disk (fsync), which can take a while on slow storage.
  * The result receiver is not exported on any API level, takes only the session it made, and starts only an activity
  * of a system app (the package installer).
  */
@@ -31,7 +34,13 @@ class UpdateInstaller(private val activity: Activity, private val onResult: (Out
     @Volatile private var abandoned = false
 
     /** True when the session is committed. False: nothing was committed and the session is gone. */
-    fun install(apk: File, expectedSha256: String, cancelled: () -> Boolean): Boolean {
+    fun install(
+        apk: File,
+        expectedSha256: String,
+        cancelled: () -> Boolean,
+        onPercent: (Int) -> Unit = {},
+        onFinishing: () -> Unit = {},
+    ): Boolean {
         val installer = activity.packageManager.packageInstaller
         var id = -1
         var committed = false
@@ -43,6 +52,9 @@ class UpdateInstaller(private val activity: Activity, private val onResult: (Out
             abandoned = false
             installer.openSession(id).use { session ->
                 val digest = MessageDigest.getInstance("SHA-256")
+                val total = apk.length()
+                val gate = PercentGate()
+                var copied = 0L
                 apk.inputStream().use { input ->
                     session.openWrite("update.apk", 0, apk.length()).use { out ->
                         val buffer = ByteArray(64 * 1024)
@@ -52,7 +64,10 @@ class UpdateInstaller(private val activity: Activity, private val onResult: (Out
                             if (n < 0) break
                             digest.update(buffer, 0, n)
                             out.write(buffer, 0, n)
+                            copied += n
+                            gate.next(copied, total)?.let(onPercent)
                         }
+                        onFinishing()
                         session.fsync(out)
                     }
                 }

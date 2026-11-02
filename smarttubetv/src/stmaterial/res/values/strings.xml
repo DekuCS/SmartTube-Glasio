@@ -178,7 +178,8 @@
     <string translatable="false" name="material_update_close">Close</string>
     <string translatable="false" name="material_update_cancel">Cancel</string>
     <string translatable="false" name="material_update_downloading">Downloading %1$d%%</string>
-    <string translatable="false" name="material_update_waiting">Checked. Opening the system installer…</string>
+    <string translatable="false" name="material_update_preparing">Preparing the installer… %1$d%%</string>
+    <string translatable="false" name="material_update_finishing">Finishing…</string>
     <string translatable="false" name="material_update_confirming">Confirm the installation in the system screen.</string>
     <string translatable="false" name="material_update_cancelled">Cancelled. Nothing was installed.</string>
     <string translatable="false" name="material_update_install_failed">The system installer did not accept the update.</string>

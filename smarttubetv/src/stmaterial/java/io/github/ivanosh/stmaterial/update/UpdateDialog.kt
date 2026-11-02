@@ -101,9 +101,14 @@ class UpdateDialog(private val activity: Activity, private val state: DialogStat
                 )
                 if (refusal == null && !cancelled.get()) {
                     verified = true
-                    UpdateService.postMain { if (phase == Phase.DOWNLOADING && !cancelled.get()) { phase = Phase.INSTALLING; show(R.string.material_update_waiting, withClose = false) } }
+                    UpdateService.postMain { if (phase == Phase.DOWNLOADING && !cancelled.get()) { phase = Phase.INSTALLING; showText(activity.getString(R.string.material_update_preparing, 0)) } }
                     // The copy into the system's session, off the main thread. install() deletes the file.
-                    committed = installer.install(file, offer.asset.sha256.orEmpty()) { cancelled.get() }
+                    committed = installer.install(
+                        file, offer.asset.sha256.orEmpty(), { cancelled.get() },
+                        // Whole percents only, from the copy loop; a late one after Back or a result changes nothing.
+                        onPercent = { p -> UpdateService.postMain { if (phase == Phase.INSTALLING && !cancelled.get()) showText(activity.getString(R.string.material_update_preparing, p)) } },
+                        onFinishing = { UpdateService.postMain { if (phase == Phase.INSTALLING && !cancelled.get()) showText(activity.getString(R.string.material_update_finishing)) } },
+                    )
                 }
             } catch (e: java.io.IOException) {
                 downloadFailed = true
@@ -149,6 +154,12 @@ class UpdateDialog(private val activity: Activity, private val state: DialogStat
                 listOf(TextRow(1, message), ButtonRow(2, activity.getString(R.string.material_update_close), Runnable { close() })),
             )
         )
+    }
+
+    /** A page with one line and no button: Back cancels. */
+    private fun showText(text: String) {
+        if (!onOwnPage()) return
+        state.replace(DialogPage.of(activity.getString(R.string.material_update_heading), listOf(TextRow(1, text))))
     }
 
     private fun show(text: Int, withClose: Boolean = true) {
