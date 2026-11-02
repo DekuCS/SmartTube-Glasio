@@ -16,6 +16,8 @@
 #   SETTLE seconds to let the feed load after a cold start, default 25
 #   STEP   ms between keys, default 300
 #   SHOT   a local directory: saves a screenshot after every run, to see that the moves reached a feed
+#   MOVES  keys to press, space separated (up down left right), default the mixed sequence below. For one direction:
+#          MOVES="$(printf 'right %.0s' {1..19})" (horizontal), or "down" x10 then "up" x9 (vertical)
 #   MODE   "panel": instead of the feed, the first and second open of the player panel and of the Quality dialog
 #
 # Refuses to run while something is playing. Touches nothing but the focus of the measured app, and ends
@@ -36,7 +38,7 @@ STEP=${STEP:-300}
 SHOT=${SHOT:-}
 
 # right x10, down, right x5, down, up, up: rows move, new cards come in, thumbnails load behind them.
-MOVES="right right right right right right right right right right down right right right right right down up up"
+MOVES=${MOVES:-"right right right right right right right right right right down right right right right right down up up"}
 
 adb_() { adb -s "$SERIAL" "$@"; }
 
