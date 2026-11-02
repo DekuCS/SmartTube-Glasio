@@ -27,9 +27,10 @@ class SubscriptionsFeedTest {
     private fun historyGroup(vararg entries: Pair<String, Float>): VideoGroup =
         VideoGroup.from(entries.map { video(it.first, it.second) }, null, 0)
 
+    private var time = 1_000L
     private val loads = mutableListOf<Int>()
 
-    private fun stateOnSubs() = BrowseState(onSubscriptionsLoad = { loads.add(it) }, rowTitle = { "t$it" }, authorOf = { it.author }).apply {
+    private fun stateOnSubs() = BrowseState(onSubscriptionsLoad = { loads.add(it) }, clock = { time }, rowTitle = { "t$it" }, authorOf = { it.author }).apply {
         sections.addAll(listOf(subs, home, historySection))
         selectTab(subs.id)
     }

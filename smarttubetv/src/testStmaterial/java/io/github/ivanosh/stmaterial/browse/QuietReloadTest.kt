@@ -43,6 +43,15 @@ class QuietReloadTest {
     }
 
     @Test
+    fun ageFollowsTheInjectedClockAcrossALongStandby() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        time += 6 * 3_600_000L
+        assertEquals(6 * 3_600_000L, state.ageMs())
+        assertEquals(time, state.now())
+    }
+
+    @Test
     fun nothingShownMeansNoQuietReload() {
         assertFalse(state(home).beginQuietReload())
     }
@@ -130,14 +139,121 @@ class QuietReloadTest {
     }
 
     @Test
-    fun failureKeepsTheRowsAndAllowsTheNextReload() {
+    fun failureKeepsTheRowsAndTheRetryOfThePresenterStaysQuiet() {
         val state = state(home)
         state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
         state.beginQuietReload()
         assertTrue(state.failQuietReload())
         assertEquals(listOf("a"), state.ids())
-        assertFalse(state.failQuietReload())
+        assertFalse(state.beginQuietReload())
+        // Upstream retries 30 s later as an ordinary load: its REPLACE must not wipe the rows.
+        time += 30_000
+        assertTrue(state.quiet)
+        state.updateSection(group(home, 7, VideoGroup.ACTION_REPLACE))
+        assertEquals(listOf("a"), state.ids())
+        // If that fails too, the message shows again and the rows stay.
+        assertTrue(state.failQuietReload())
+        assertEquals(listOf("a"), state.ids())
+        time += 30_000
+        state.updateSection(group(home, 7, VideoGroup.ACTION_REPLACE))
+        state.updateSection(group(home, 8, VideoGroup.ACTION_APPEND, "n", "a"))
+        assertEquals(listOf("n", "a"), state.ids())
+        assertFalse(state.quiet)
+    }
+
+    @Test
+    fun aRetryThatNeverComesStopsBeingQuietAfterAWhile() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.beginQuietReload()
+        state.failQuietReload()
+        time += 61_000
+        assertFalse(state.quiet)
         assertTrue(state.beginQuietReload())
+    }
+
+    @Test
+    fun anEmptyAnswerThatNeverSwapsDoesNotLeaveTheStateQuietForGood() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.beginQuietReload()
+        time += 61_000
+        assertFalse(state.quiet)
+    }
+
+    @Test
+    fun clearingTheContentEndsTheQuietReload() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.beginQuietReload()
+        state.clearContent()
+        assertFalse(state.quiet)
+    }
+
+    @Test
+    fun restartingTheTabEndsAQuietRetry() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.beginQuietReload()
+        state.failQuietReload()
+        state.restartTab()
+        assertFalse(state.quiet)
+    }
+
+    @Test
+    fun quietReloadRunsOnlyWithFocusOnTheTabsOrTheFirstPage() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a", "b"))
+        state.endReload()
+        state.updateSection(group(home, 2, VideoGroup.ACTION_APPEND, "late").apply { setPosition(1) })
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "c"))
+
+        state.onTabsFocused()
+        assertTrue(state.canQuietReload())
+        state.onCardFocused(FocusKey("1", "b"), 0)
+        assertTrue(state.canQuietReload())
+        state.onCardFocused(FocusKey("1", "c"), 0)
+        assertFalse("a card of a later page", state.canQuietReload())
+        state.onCardFocused(FocusKey("2", "late"), 1)
+        assertFalse("a row that arrived after the first answer", state.canQuietReload())
+        assertFalse(state.beginQuietReload())
+        assertFalse(state.quiet)
+        state.onTabsFocused()
+        assertTrue(state.beginQuietReload())
+    }
+
+    @Test
+    fun rowsOfTheFirstAnswerCountAsTheFirstPageWhenTheyArriveInOnePass() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.updateSection(group(home, 2, VideoGroup.ACTION_APPEND, "b").apply { setPosition(1) })
+        state.onCardFocused(FocusKey("2", "b"), 1)
+        assertTrue(state.canQuietReload())
+    }
+
+    @Test
+    fun gridPagesAfterTheFirstAreDeep() {
+        val state = state(history)
+        state.updateSection(group(history, 1, VideoGroup.ACTION_APPEND, "a", "b"))
+        state.endReload()
+        state.updateSection(group(history, 1, VideoGroup.ACTION_APPEND, "c"))
+        state.onCardFocused(FocusKey(VideoRow.GRID_ID, "b"), 0)
+        assertTrue(state.canQuietReload())
+        state.onCardFocused(FocusKey(VideoRow.GRID_ID, "c"), 0)
+        assertFalse(state.canQuietReload())
+    }
+
+    @Test
+    fun rowsAfterASwapAreNotTheFirstPageEither() {
+        val state = state(home)
+        state.updateSection(group(home, 1, VideoGroup.ACTION_APPEND, "a"))
+        state.beginQuietReload()
+        state.updateSection(group(home, 7, VideoGroup.ACTION_REPLACE))
+        state.updateSection(group(home, 8, VideoGroup.ACTION_APPEND, "n"))
+        state.endReload()
+        state.updateSection(group(home, 9, VideoGroup.ACTION_APPEND, "late").apply { setPosition(1) })
+        state.onCardFocused(FocusKey("9", "late"), 1)
+        assertFalse(state.canQuietReload())
     }
 
     @Test

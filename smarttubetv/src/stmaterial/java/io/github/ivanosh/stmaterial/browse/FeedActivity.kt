@@ -25,7 +25,7 @@ import io.github.ivanosh.stmaterial.ui.PillState
  * and a card does what it does on the home screen. A subclass binds the view interface of its presenter.
  */
 abstract class FeedActivity<P> : LeanbackActivity() where P : BasePresenter<*>, P : VideoGroupPresenter {
-    protected val state = BrowseState(rowTitle = { getString(it) })
+    protected val state = BrowseState(clock = deviceClock(), rowTitle = { getString(it) })
     protected abstract val presenter: P
     protected var title by mutableStateOf<String?>(null)
     private val cardMenu = CardMenu(this, onGone = { state.updateSection(it) }, onMessage = { state.message = it })

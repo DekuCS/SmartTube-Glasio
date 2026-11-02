@@ -28,7 +28,7 @@ class BrowseStateTest {
         }
 
     /** Video.getAuthor() needs TextUtils, which is not on the JVM test path. */
-    private fun stateOnHome() = BrowseState { it.author }.apply {
+    private fun stateOnHome() = BrowseState(clock = { 0L }) { it.author }.apply {
         sections.addAll(listOf(subs, home, settingsSection))
         selectTab(home.id)
     }
@@ -283,7 +283,7 @@ class BrowseStateTest {
     @Test
     fun presenterErrorSectionIsAlwaysATab() {
         val password = BrowseSection(42, "Locked", BrowseSection.TYPE_ERROR, -1)
-        val state = BrowseState().apply {
+        val state = BrowseState(clock = { 0L }).apply {
             sections.add(password)
             shown = listOf(MediaGroup.TYPE_HOME)
         }

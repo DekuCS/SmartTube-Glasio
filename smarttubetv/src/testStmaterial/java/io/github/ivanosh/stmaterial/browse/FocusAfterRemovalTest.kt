@@ -52,7 +52,7 @@ class FocusAfterRemovalTest {
 
     @Test
     fun stateMovesFocusToTheNeighbourCard() {
-        val state = BrowseState { it.author }.apply { sections.add(home); selectTab(home.id) }
+        val state = BrowseState(clock = { 0L }) { it.author }.apply { sections.add(home); selectTab(home.id) }
         state.updateSection(group(1, VideoGroup.ACTION_APPEND, "a", "b", "c"))
         state.onCardFocused(FocusKey("1", "b"), 0)
         state.updateSection(group(1, VideoGroup.ACTION_REMOVE, "b"))
@@ -62,7 +62,7 @@ class FocusAfterRemovalTest {
 
     @Test
     fun stateIgnoresRemovalOfOtherCards() {
-        val state = BrowseState { it.author }.apply { sections.add(home); selectTab(home.id) }
+        val state = BrowseState(clock = { 0L }) { it.author }.apply { sections.add(home); selectTab(home.id) }
         state.updateSection(group(1, VideoGroup.ACTION_APPEND, "a", "b", "c"))
         state.onCardFocused(FocusKey("1", "b"), 0)
         state.updateSection(group(1, VideoGroup.ACTION_REMOVE, "c"))
@@ -72,7 +72,7 @@ class FocusAfterRemovalTest {
     @Test
     fun subscriptionsFeedKeepsFocusOnAnExistingNeighbour() {
         val subs = BrowseSection(MediaGroup.TYPE_SUBSCRIPTIONS, "Subs", BrowseSection.TYPE_GRID, -1)
-        val state = BrowseState { it.author }.apply { sections.add(subs); selectTab(subs.id) }
+        val state = BrowseState(clock = { 0L }) { it.author }.apply { sections.add(subs); selectTab(subs.id) }
         val ids = (1..12).map { "v$it" }.toTypedArray()
         state.updateSection(VideoGroup.from(ids.map { Video().apply { videoId = it } }, subs, 0).apply { setId(1); setAction(VideoGroup.ACTION_APPEND) })
         val row = state.rows.first { it.videos.size > 2 }

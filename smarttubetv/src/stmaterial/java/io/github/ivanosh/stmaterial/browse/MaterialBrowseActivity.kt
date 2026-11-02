@@ -40,7 +40,7 @@ import com.liskovsoft.smartyoutubetv2.tv.R
  * The presenter lifecycle follows NovaBrowseActivity in margantcovka/SmartTube-New (MIT).
  */
 class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
-    private val state = BrowseState(onSubscriptionsLoad = ::loadHistory, rowTitle = { getString(it) })
+    private val state = BrowseState(onSubscriptionsLoad = ::loadHistory, clock = deviceClock(), rowTitle = { getString(it) })
     private val history = HistorySource { YouTubeServiceManager.instance().contentService.historyObserve }
     private val handler = Handler(Looper.getMainLooper())
     private val loadSelected = Runnable { load() }
@@ -160,6 +160,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
 
     /** OK on the selected tab: the tab empties, shows its loading state and loads again. Focus stays on the tab. */
     private fun reloadSelected() {
+        if (state.selectedSection == null) return
         handler.removeCallbacks(loadSelected)
         history.dispose()
         state.restartTab()
@@ -271,7 +272,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     override fun updateSection(group: VideoGroup) {
         state.updateSection(group)
         // After the rest of the answer, which is handled in the same pass of the main loop.
-        if (state.reloading) {
+        if (state.reloading || state.firstPass) {
             handler.removeCallbacks(endReload)
             handler.post(endReload)
         }

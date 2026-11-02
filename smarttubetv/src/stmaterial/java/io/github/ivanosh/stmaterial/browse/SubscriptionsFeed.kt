@@ -129,6 +129,8 @@ internal class SubscriptionsFeed(private val rows: MutableList<VideoRow>, privat
             val asks = if (row.id == SubscriptionRowIds.CONTINUE) lastFeed == null else row === lastFeed
             row.pageable = asks
             row.eager = asks && !row.isGrid
+            // Continue watching and New in subscriptions are the first page, whenever the history arrives.
+            row.firstPage = if (row.id == SubscriptionRowIds.EARLIER) 0 else row.videos.size
             row.group = if (row.id == SubscriptionRowIds.CONTINUE) historyGroup else group
         }
     }
