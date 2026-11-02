@@ -29,12 +29,24 @@ class PlayerKeysTest {
     }
 
     @Test
-    fun hiddenUpDownOpenOnButtonsWithoutCommands() {
-        for (key in listOf(PlayerKey.Up, PlayerKey.Down)) {
-            val (next, commands) = press(ui(PanelFocus.HIDDEN, index = 2), key)
-            assertEquals(ui(PanelFocus.BUTTONS, index = 0), next)
-            assertTrue(commands.isEmpty())
-        }
+    fun hiddenUpOpensOnTheSeekBarWithoutCommands() {
+        val (next, commands) = press(ui(PanelFocus.HIDDEN, index = 2), PlayerKey.Up)
+        assertEquals(ui(PanelFocus.PROGRESS, index = 0), next)
+        assertTrue(commands.isEmpty())
+    }
+
+    @Test
+    fun hiddenDownOpensOnTheButtonsWithoutCommands() {
+        val (next, commands) = press(ui(PanelFocus.HIDDEN, index = 2), PlayerKey.Down)
+        assertEquals(ui(PanelFocus.BUTTONS, index = 0), next)
+        assertTrue(commands.isEmpty())
+    }
+
+    @Test
+    fun openingWithUpOrDownKeepsWhatTheChapterRowKnows() {
+        val hidden = PlayerUi(PanelFocus.HIDDEN, 3, 9, chapterCount = 4, currentChapter = 2, chapterIndex = 1)
+        assertEquals(hidden.copy(focus = PanelFocus.PROGRESS, buttonIndex = 0), press(hidden, PlayerKey.Up).first)
+        assertEquals(hidden.copy(focus = PanelFocus.BUTTONS, buttonIndex = 0), press(hidden, PlayerKey.Down).first)
     }
 
     @Test

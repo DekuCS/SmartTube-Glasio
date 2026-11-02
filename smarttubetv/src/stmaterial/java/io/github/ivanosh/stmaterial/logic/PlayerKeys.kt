@@ -31,7 +31,8 @@ fun playerKey(ui: PlayerUi, key: PlayerKey, seekStepMs: Long): Pair<PlayerUi, Li
     when (ui.focus) {
         PanelFocus.HIDDEN -> when (key) {
             PlayerKey.Ok -> ui.copy(focus = PanelFocus.BUTTONS, buttonIndex = 0) to listOf(PlayerCommand.TogglePlay)
-            PlayerKey.Up, PlayerKey.Down -> ui.copy(focus = PanelFocus.BUTTONS, buttonIndex = 0) to emptyList()
+            PlayerKey.Up -> ui.copy(focus = PanelFocus.PROGRESS, buttonIndex = 0) to emptyList()
+            PlayerKey.Down -> ui.copy(focus = PanelFocus.BUTTONS, buttonIndex = 0) to emptyList()
             PlayerKey.Left -> ui to listOf(PlayerCommand.Seek(-seekStepMs))
             PlayerKey.Right -> ui to listOf(PlayerCommand.Seek(seekStepMs))
             PlayerKey.Back -> ui to listOf(PlayerCommand.Exit)
