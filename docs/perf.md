@@ -1,7 +1,7 @@
 # Performance on real devices
 
 Devices: a 4K Google TV stick ("projector", signed in) and a Chromecast with Google TV `sabrina` (signed out). Both are
-32-bit, 2 GB RAM, Android 14, at 1080p UI. The Material app is the `stmaterialRelease` armeabi-v7a APK with R8 off.
+32-bit, 2 GB RAM, Android 14, at 1080p UI. The Material app is the `stmaterialRelease` armeabi-v7a APK with R8 off (measured before R8 was enabled; see the R8 section for the change).
 
 **Result: scrolling meets the target on both devices once the app's profile is compiled, and is at least as good as the
 old SmartTube on the same screen. Until the system compiles it, about the first 30 s of scrolling after each app start
@@ -170,15 +170,15 @@ GPU emulated and much faster CPU, spent its time on `Slow issue draw commands`. 
 
 ## Release APK size
 
-`assembleStmaterialRelease`, signed with the release key. R8 is off for this variant (`minifyEnabled` is commented out,
-`-dontobfuscate` in `proguard-rules.pro`), so the APKs are large.
+`assembleStmaterialRelease`. R8 shrinks the release (no renaming, no optimization: `-dontobfuscate` and `-dontoptimize`, rules in
+`smarttubetv/proguard-stmaterial.pro`). Optimization was tried and broke video loading on the emulator, see the keep-rule
+notes in the report of task R8; it saves about 5 MB more.
 
-| APK | Bytes | MiB |
-|---|---|---|
-| arm64-v8a | 88,578,327 | 84.5 |
-| armeabi-v7a | 77,957,213 | 74.3 |
-| universal | 117,950,956 | 112.5 |
+| APK | Before (bytes) | After (bytes) | After (MiB) |
+|---|---|---|---|
+| arm64-v8a | 88,842,895 | 60,909,681 | 58.1 |
+| armeabi-v7a | 78,221,781 | 50,288,567 | 48.0 |
+| universal | 118,215,524 | 90,282,310 | 86.1 |
 
-The biggest entries in the arm64 APK are `libj2v8.so` (32.3 MB), five dex files (about 47 MB together) and
-`libcronet` (5.2 MB). Shrinking is a later step: it needs keep rules for the reflective upstream code and a full
-smoke test of a signed-in session, which the emulator cannot give.
+The biggest entries in the arm64 APK are now `libj2v8.so` (32.3 MB), two dex files (15 MB) and `libcronet` (5.2 MB).
+`mapping.txt` of the release build is kept as the `r8-mapping` workflow artifact, not as a release asset.

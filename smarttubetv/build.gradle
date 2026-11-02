@@ -235,6 +235,8 @@ android {
         }
         stmaterial {
             applicationId "io.github.ivanosh.smarttubematerial"
+            // MATERIAL: R8 (shrink, no renaming) for the release build; see beforeVariants below.
+            proguardFile 'proguard-stmaterial.pro'
             versionCode android.defaultConfig.versionCode * 100 + materialPatch
             versionName "${android.defaultConfig.versionName}-${materialPatch}"
             matchingFallbacks = ["stfdroid"]
@@ -264,6 +266,11 @@ androidComponents {
     // holds a signed install; the updater also refuses a release for it, since the package names differ.
     onVariants(selector().withName('stmaterialDebug')) { variant ->
         variant.applicationId.set('io.github.ivanosh.smarttubematerial.debug')
+    }
+    // MATERIAL: only stmaterial is minified; the other flavors keep upstream's setting.
+    beforeVariants(selector().withName('stmaterialRelease')) { variantBuilder ->
+        variantBuilder.minifyEnabled = true
+        variantBuilder.shrinkResources = true
     }
     onVariants(selector().withName('stmaterialRelease')) { variant ->
         if (materialSigning != null) {

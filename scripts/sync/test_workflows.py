@@ -152,6 +152,16 @@ class SignJob(unittest.TestCase):
     def test_no_checkout(self):
         self.assertNotIn("actions/checkout", self.sign)
 
+    def test_the_r8_mapping_stays_with_the_build_job(self):
+        jobs = jobs_of("material-release.yml")
+        keep = step_of(jobs["build"], "Keep the R8 mapping")
+        self.assertIn("name: r8-mapping", keep)
+        self.assertIn("mapping.txt", keep)
+        self.assertNotIn("r8-mapping", self.sign)
+        self.assertNotIn("mapping", step_of(jobs["build"], "Hand the APKs to the signing job"))
+        self.assertIn("name: unsigned-apks", step_of(self.sign, "Take the unsigned APKs"))
+        self.assertNotIn("mapping", step_of(self.sign, "Publish the GitHub Release"))
+
     def check(self, names, symlink=None):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)

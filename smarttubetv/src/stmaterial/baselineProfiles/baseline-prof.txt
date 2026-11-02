@@ -1,5 +1,5 @@
 # Ahead-of-time compiled code for the Material UI, on top of the rules the Compose libraries ship.
-# R8 is off for this app, so these names match the APK. See docs/perf.md for what they are worth.
+# R8 shrinks this app without renaming (-dontobfuscate), so these names match the APK. See docs/perf.md for what they are worth.
 #
 # Our own screens.
 HSPLio/github/ivanosh/stmaterial/**->**(**)**
