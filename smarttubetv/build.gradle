@@ -235,6 +235,8 @@ android {
         }
         stmaterial {
             applicationId "io.github.ivanosh.smarttubematerial"
+            // MATERIAL: R8 (shrink, no renaming) for the release build; see beforeVariants below.
+            proguardFile 'proguard-stmaterial.pro'
             versionCode android.defaultConfig.versionCode * 100 + materialPatch
             versionName "${android.defaultConfig.versionName}-${materialPatch}"
             matchingFallbacks = ["stfdroid"]
@@ -260,6 +262,11 @@ android {
 
 // The ABI splits are shared by all flavors, stmaterial supports only the two ARM ones.
 androidComponents {
+    // MATERIAL: only stmaterial is minified; the other flavors keep upstream's setting.
+    beforeVariants(selector().withName('stmaterialRelease')) { variantBuilder ->
+        variantBuilder.minifyEnabled = true
+        variantBuilder.shrinkResources = true
+    }
     onVariants(selector().withName('stmaterialRelease')) { variant ->
         if (materialSigning != null) {
             variant.signingConfig.setConfig(android.signingConfigs.stmaterialRelease)

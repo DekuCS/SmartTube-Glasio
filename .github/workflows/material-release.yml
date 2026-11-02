@@ -82,6 +82,16 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Keep the R8 mapping
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        # Line numbers for stack traces (names are not renamed). The sign job downloads `unsigned-apks` by name only,
+        # so this never reaches the release assets.
+        with:
+          name: r8-mapping
+          path: smarttubetv/build/outputs/mapping/stmaterialRelease/mapping.txt
+          retention-days: 30
+          if-no-files-found: error
+
   # The only job that sees the signing key. Add no checkout here and run nothing that came from the artifact.
   sign-skipped:
     needs: build
