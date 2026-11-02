@@ -1,11 +1,21 @@
 package io.github.ivanosh.stmaterial.logic
 
-enum class PanelFocus { HIDDEN, PROGRESS, BUTTONS }
+enum class PanelFocus { HIDDEN, PROGRESS, BUTTONS, CHAPTERS }
 
 enum class PlayerKey { Up, Down, Left, Right, Ok, Back }
 
-/** [buttonCount] counts the buttons on the panel and More, which is always the last one. */
-data class PlayerUi(val focus: PanelFocus, val buttonIndex: Int, val buttonCount: Int)
+/**
+ * [buttonCount] counts the buttons on the panel and More, which is always the last one. [chapterCount] is the length
+ * of the chapter row (0: none), [currentChapter] the chapter the position is in (-1: none), [chapterIndex] the card in focus.
+ */
+data class PlayerUi(
+    val focus: PanelFocus,
+    val buttonIndex: Int,
+    val buttonCount: Int,
+    val chapterCount: Int = 0,
+    val currentChapter: Int = -1,
+    val chapterIndex: Int = 0,
+)
 
 sealed interface PlayerCommand {
     object TogglePlay : PlayerCommand
@@ -13,6 +23,7 @@ sealed interface PlayerCommand {
     data class Press(val index: Int) : PlayerCommand
     object Exit : PlayerCommand
     object OpenMore : PlayerCommand
+    data class SeekToChapter(val index: Int) : PlayerCommand
 }
 
 /** The key table of the player. Every key event gives its own result, so a held key never queues anything here. */
@@ -38,10 +49,19 @@ fun playerKey(ui: PlayerUi, key: PlayerKey, seekStepMs: Long): Pair<PlayerUi, Li
                 if (ui.buttonIndex == ui.buttonCount - 1) PlayerCommand.OpenMore else PlayerCommand.Press(ui.buttonIndex)
             )
             PlayerKey.Up -> ui.copy(focus = PanelFocus.PROGRESS) to emptyList()
-            PlayerKey.Down -> ui to emptyList()
+            PlayerKey.Down ->
+                if (ui.chapterCount > 0) ui.copy(focus = PanelFocus.CHAPTERS, chapterIndex = ui.currentChapter.coerceIn(0, ui.chapterCount - 1)) to emptyList()
+                else ui to emptyList()
             PlayerKey.Left -> ui.copy(buttonIndex = (ui.buttonIndex - 1).coerceAtLeast(0)) to emptyList()
             PlayerKey.Right -> ui.copy(buttonIndex = (ui.buttonIndex + 1).coerceAtMost(ui.buttonCount - 1)) to emptyList()
             PlayerKey.Back -> ui.copy(focus = PanelFocus.HIDDEN) to emptyList()
+        }
+        PanelFocus.CHAPTERS -> when (key) {
+            PlayerKey.Ok -> ui.copy(focus = PanelFocus.BUTTONS) to listOf(PlayerCommand.SeekToChapter(ui.chapterIndex))
+            PlayerKey.Up, PlayerKey.Back -> ui.copy(focus = PanelFocus.BUTTONS) to emptyList()
+            PlayerKey.Down -> ui to emptyList()
+            PlayerKey.Left -> ui.copy(chapterIndex = (ui.chapterIndex - 1).coerceAtLeast(0)) to emptyList()
+            PlayerKey.Right -> ui.copy(chapterIndex = (ui.chapterIndex + 1).coerceAtMost(ui.chapterCount - 1)) to emptyList()
         }
     }
 
@@ -53,8 +73,12 @@ const val PANEL_AUTO_HIDE_MS = 5_000L
  * gets one seek when [SEEK_DEBOUNCE_MS] have passed since the last key, so a held key costs it nothing.
  */
 data class SeekDebounce(val targetMs: Long? = null, val lastKeyMs: Long = 0) {
-    fun onKey(positionMs: Long, deltaMs: Long, durationMs: Long, nowMs: Long): SeekDebounce {
-        val moved = (targetMs ?: positionMs.coerceAtLeast(0)) + deltaMs
+    fun onKey(
+        positionMs: Long, deltaMs: Long, durationMs: Long, nowMs: Long,
+        chapterStartsMs: List<Long> = emptyList(), repeating: Boolean = false,
+    ): SeekDebounce {
+        val from = targetMs ?: positionMs.coerceAtLeast(0)
+        val moved = if (repeating) from + deltaMs else magnet(from, from + deltaMs, chapterStartsMs)
         // The duration of a live stream or of a video still loading can be unknown.
         val target = if (durationMs > 0) moved.coerceIn(0, durationMs) else moved.coerceAtLeast(0)
         return SeekDebounce(target, nowMs)
@@ -65,9 +89,22 @@ data class SeekDebounce(val targetMs: Long? = null, val lastKeyMs: Long = 0) {
         if (targetMs != null && nowMs - lastKeyMs >= SEEK_DEBOUNCE_MS) SeekDebounce() to targetMs else this to null
 }
 
-/** A paused video keeps the panel open. */
+/**
+ * A step from [from] to [to] that crosses a chapter start stops on the nearest one on its way; landing on a start,
+ * or standing on one, is not crossing it. Only the first step of a press is stopped, so a hold goes through.
+ */
+fun magnet(from: Long, to: Long, chapterStartsMs: List<Long>): Long {
+    if (chapterStartsMs.isEmpty() || to == from) return to
+    return if (to > from) {
+        chapterStartsMs.filter { it > from && it < to }.minOrNull() ?: to
+    } else {
+        chapterStartsMs.filter { it < from && it > to }.maxOrNull() ?: to
+    }
+}
+
+/** A paused video keeps the panel open, and so does focus in the chapter row. */
 fun shouldAutoHide(ui: PlayerUi, playing: Boolean, idleMs: Long): Boolean =
-    ui.focus != PanelFocus.HIDDEN && playing && idleMs >= PANEL_AUTO_HIDE_MS
+    ui.focus != PanelFocus.HIDDEN && ui.focus != PanelFocus.CHAPTERS && playing && idleMs >= PANEL_AUTO_HIDE_MS
 
 const val SEEK_KEEPS_FOCUS_MS = 2_000L
 
@@ -124,4 +161,28 @@ data class OkHold(val index: Int? = null, val fired: Boolean = false) {
 
     /** Forgets a tracked press, as when the player pauses, the panel hides or the player is left. */
     fun reset() = OkHold()
+}
+
+/** The chapter a position is in: the last start at or before it, or -1 when there is none. [startsMs] is ascending. */
+fun chapterIndexAt(startsMs: List<Long>, positionMs: Long): Int {
+    var low = 0
+    var high = startsMs.size - 1
+    var found = -1
+    while (low <= high) {
+        val mid = (low + high) ushr 1
+        if (startsMs[mid] <= positionMs) { found = mid; low = mid + 1 } else high = mid - 1
+    }
+    return found
+}
+
+/** Where OK on a chapter card seeks to, or null when the card is gone. Never past the end of a known duration. */
+fun chapterStartAt(startsMs: List<Long>, index: Int, durationMs: Long): Long? {
+    val start = startsMs.getOrNull(index) ?: return null
+    return if (durationMs > 0) minOf(start, durationMs) else start
+}
+
+/** The row changed (a new video, or its chapters arrived): focus in a row that is gone goes back to the buttons. */
+fun withChapters(ui: PlayerUi, count: Int, current: Int): PlayerUi {
+    val moved = ui.copy(chapterCount = count, currentChapter = current, chapterIndex = ui.chapterIndex.coerceIn(0, (count - 1).coerceAtLeast(0)))
+    return if (count == 0 && moved.focus == PanelFocus.CHAPTERS) moved.copy(focus = PanelFocus.BUTTONS) else moved
 }

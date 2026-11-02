@@ -250,6 +250,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
                 is PlayerCommand.Seek -> seekBy(command.deltaMs)
                 is PlayerCommand.Press -> panel.buttons.getOrNull(command.index)?.let(commands::run)
                 PlayerCommand.OpenMore -> openSheet()
+                is PlayerCommand.SeekToChapter -> Unit
                 PlayerCommand.Exit -> {
                     sendSeekNow()
                     passBackOn = true
