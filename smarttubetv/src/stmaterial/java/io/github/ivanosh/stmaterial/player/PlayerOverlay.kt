@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -144,6 +146,8 @@ fun PlayerOverlay(state: PlayerOverlayState) {
             }
         }
         MoreSheet(state)
+        // A hold on a line of More: the menu stands to the left of the sheet.
+        state.menu?.takeIf { it.inMore }?.let { Box(Modifier.align(Alignment.CenterEnd).padding(end = 800.dp)) { ButtonMenuCard(it) } }
     }
 }
 
@@ -343,6 +347,7 @@ private fun Legend(entries: List<LegendEntry>) {
 /** Nine items (eight buttons and More) take 9 x 150 + 8 x 20 = 1510 of the 1804 units inside the panel's padding. */
 @Composable
 private fun Buttons(state: PlayerOverlayState) {
+    Box {
     Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
         state.buttons.forEachIndexed { index, button ->
             val paused = button == PlayerButton.PlayPause && !state.playing
@@ -355,6 +360,7 @@ private fun Buttons(state: PlayerOverlayState) {
                 iconPath = if (paused) PLAY_ICON_PATH else buttonIcon(button),
                 focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == index,
                 on = button in STATEFUL_BUTTONS && buttonIsOn(button, viewId(button)?.let { state.buttonStates[it] }),
+                lifted = state.moving && state.buttonIndex == index,
             )
         }
         PanelButton(
@@ -364,13 +370,23 @@ private fun Buttons(state: PlayerOverlayState) {
             on = false,
         )
     }
+    // Only while open: a hold on a button puts the menu above it.
+    state.menu?.takeIf { !it.inMore }?.let { menu ->
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity))
+                layout(0, 0) { placeable.place((menu.anchor * (150 + 20)).dp.roundToPx(), -placeable.height - 20.dp.roundToPx()) }
+            }
+        ) { ButtonMenuCard(menu) }
+    }
+    }
 }
 
 /** A button of the panel: [on] marks a switched-on state with the accent colour. */
 @Composable
-internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: Boolean, size: Dp = 84.dp, labelStyle: TextStyle = buttonLabelStyle) {
+internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: Boolean, size: Dp = 84.dp, labelStyle: TextStyle = buttonLabelStyle, lifted: Boolean = false) {
     Column(
-        Modifier.width(150.dp),
+        Modifier.width(150.dp).then(if (lifted) Modifier.offset(y = (-14).dp) else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -378,12 +394,12 @@ internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: 
             Modifier
                 .size(size)
                 .focusRing(focused, corner = size / 2, gap = 3.dp)
-                .background(if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape)
+                .background(if (lifted) Palette.Accent else if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape)
                 // A light outline so that the disc reads on the scrim over a white frame.
-                .then(if (focused || on) Modifier else Modifier.border(2.dp, DiscOutline, CircleShape)),
+                .then(if (focused || on || lifted) Modifier else Modifier.border(2.dp, DiscOutline, CircleShape)),
             contentAlignment = Alignment.Center
         ) {
-            PanelIcon(iconPath, if (focused || on) Palette.Background else Palette.OnBackground)
+            PanelIcon(iconPath, if (focused || on || lifted) Palette.Background else Palette.OnBackground)
         }
         Text(label, style = labelStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

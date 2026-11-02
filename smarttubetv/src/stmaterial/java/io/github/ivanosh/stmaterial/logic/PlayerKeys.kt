@@ -110,9 +110,9 @@ fun magnet(from: Long, to: Long, chapterStartsMs: List<Long>, stoppedOn: Long? =
     }
 }
 
-/** A paused video keeps the panel open, and so does focus in the chapter row. */
-fun shouldAutoHide(ui: PlayerUi, playing: Boolean, idleMs: Long): Boolean =
-    ui.focus != PanelFocus.HIDDEN && ui.focus != PanelFocus.CHAPTERS && playing && idleMs >= PANEL_AUTO_HIDE_MS
+/** A paused video keeps the panel open, and so does focus in the chapter row, a button menu or Move ([modal]). */
+fun shouldAutoHide(ui: PlayerUi, playing: Boolean, idleMs: Long, modal: Boolean = false): Boolean =
+    !modal && ui.focus != PanelFocus.HIDDEN && ui.focus != PanelFocus.CHAPTERS && playing && idleMs >= PANEL_AUTO_HIDE_MS
 
 const val SEEK_KEEPS_FOCUS_MS = 2_000L
 
@@ -150,20 +150,29 @@ enum class OkAction {
  * Every fresh down event (repeat count 0) starts over, so a release that was never seen cannot leave the state stuck.
  */
 data class OkHold(val index: Int? = null, val fired: Boolean = false) {
-    fun down(ui: PlayerUi, holdable: Boolean, repeating: Boolean): Pair<OkHold, OkAction> = when {
-        !repeating ->
-            if (ui.focus == PanelFocus.BUTTONS && ui.buttonIndex < ui.buttonCount - 1 && holdable) OkHold(ui.buttonIndex) to OkAction.Swallow
-            else OkHold() to OkAction.Normal
-        index != null && !fired -> OkHold(index, fired = true) to OkAction.Hold
-        else -> this to OkAction.Swallow
-    }
+    fun down(ui: PlayerUi, holdable: Boolean, repeating: Boolean): Pair<OkHold, OkAction> =
+        downAt(if (ui.focus == PanelFocus.BUTTONS && ui.buttonIndex < ui.buttonCount - 1 && holdable) ui.buttonIndex else null, repeating)
 
     /**
      * The release of OK. A short press acts only if this press is still the tracked one: not cancelled (the window
      * lost focus mid-press), the panel still open on the same button, and the press not already dealt with.
      */
-    fun up(ui: PlayerUi, cancelled: Boolean = false): Pair<OkHold, OkAction> {
-        val pressed = index != null && !fired && !cancelled && ui.focus == PanelFocus.BUTTONS && ui.buttonIndex == index
+    fun up(ui: PlayerUi, cancelled: Boolean = false): Pair<OkHold, OkAction> =
+        upAt(if (ui.focus == PanelFocus.BUTTONS) ui.buttonIndex else null, cancelled)
+
+    /**
+     * The same follow for a place that is not the panel's button row, or for More on the panel: [index] is the place
+     * under OK (null: nothing there holds). The panel's own [down] decides its place and calls this.
+     */
+    fun downAt(index: Int?, repeating: Boolean): Pair<OkHold, OkAction> = when {
+        !repeating -> if (index != null) OkHold(index) to OkAction.Swallow else OkHold() to OkAction.Normal
+        this.index != null && !fired -> OkHold(this.index, fired = true) to OkAction.Hold
+        else -> this to OkAction.Swallow
+    }
+
+    /** The release for [downAt]: [current] is the place under OK now, null when there is none. */
+    fun upAt(current: Int?, cancelled: Boolean = false): Pair<OkHold, OkAction> {
+        val pressed = index != null && !fired && !cancelled && current == index
         return OkHold() to if (pressed) OkAction.Press else OkAction.Swallow
     }
 

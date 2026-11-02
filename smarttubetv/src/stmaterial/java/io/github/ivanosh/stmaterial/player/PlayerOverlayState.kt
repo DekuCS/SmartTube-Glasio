@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.ivanosh.stmaterial.logic.ButtonGroup
+import io.github.ivanosh.stmaterial.logic.ButtonMenu
 import io.github.ivanosh.stmaterial.logic.DEFAULT_BUTTONS
 import io.github.ivanosh.stmaterial.logic.PanelFocus
 import io.github.ivanosh.stmaterial.logic.PlayerButton
@@ -55,6 +56,10 @@ class PlayerOverlayState {
     /** What More lists while its sheet is open, else null. */
     var sheetGroups by mutableStateOf<List<ButtonGroup>?>(null)
     var sheetCursor by mutableIntStateOf(0)
+    /** The menu of a hold on a button; null when none is open, and then nothing about it is composed. */
+    var menu by mutableStateOf<ButtonMenu?>(null)
+    /** The button at [buttonIndex] is lifted and LEFT and RIGHT move it. */
+    var moving by mutableStateOf(false)
     /** Null when no chip is on screen, and then nothing about it is composed. */
     var chip by mutableStateOf<SkipChipUi?>(null)
 

@@ -44,10 +44,10 @@ import androidx.tv.material3.Text
 
 data class MenuItem(val label: String, val onClick: () -> Unit)
 
-private val ItemStyle = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Medium)
-private val MenuShape = RoundedCornerShape(28.dp)
-private val ItemShape = RoundedCornerShape(20.dp)
-private val MenuFill = Palette.Tile
+internal val ItemStyle = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Medium)
+internal val MenuShape = RoundedCornerShape(28.dp)
+internal val ItemShape = RoundedCornerShape(20.dp)
+internal val MenuFill = Palette.Tile
 private const val SCRIM_ALPHA = 0.62f
 
 private fun isOk(code: Int) = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER

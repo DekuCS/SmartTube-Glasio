@@ -100,4 +100,35 @@ class OkHoldTest {
         assertEquals(OkAction.Press, first)
         assertEquals(OkAction.Swallow, after.up(onSubscribe).second)
     }
+
+    @Test
+    fun aPlaceCanBeHeldAnywhereIncludingMore() {
+        val (held, down) = OkHold().downAt(8, repeating = false)
+        assertEquals(OkAction.Swallow, down)
+        assertEquals(OkAction.Hold, held.downAt(8, repeating = true).second)
+        assertEquals(OkAction.Press, held.upAt(8).second)
+    }
+
+    @Test
+    fun noPlaceIsAPlainPress() {
+        val (state, down) = OkHold().downAt(null, repeating = false)
+        assertEquals(OkAction.Normal, down)
+        assertEquals(OkAction.Swallow, state.downAt(null, repeating = true).second)
+        assertEquals(OkAction.Swallow, state.upAt(null).second)
+    }
+
+    @Test
+    fun aReleaseOnAnotherPlaceOrCancelledDoesNothing() {
+        val held = OkHold().downAt(3, repeating = false).first
+        assertEquals(OkAction.Swallow, held.upAt(4).second)
+        assertEquals(OkAction.Swallow, held.upAt(null).second)
+        assertEquals(OkAction.Swallow, held.upAt(3, cancelled = true).second)
+    }
+
+    @Test
+    fun aHoldIsNotAPressOnRelease() {
+        val fired = OkHold().downAt(3, false).first.downAt(3, true).first
+        assertEquals(OkAction.Swallow, fired.upAt(3).second)
+        assertEquals(OkHold(), fired.upAt(3).first)
+    }
 }

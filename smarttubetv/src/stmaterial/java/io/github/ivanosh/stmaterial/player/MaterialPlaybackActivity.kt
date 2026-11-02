@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.ContextCompat
 import com.liskovsoft.sharedutils.helpers.KeyHelpers
@@ -21,6 +22,19 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackActivity
 import io.github.ivanosh.stmaterial.browse.KeyRepeatGuard
 import io.github.ivanosh.stmaterial.data.ButtonStore
 import io.github.ivanosh.stmaterial.data.LearnedSkipStore
+import io.github.ivanosh.stmaterial.logic.ButtonMenu
+import io.github.ivanosh.stmaterial.logic.MenuAction
+import io.github.ivanosh.stmaterial.logic.MenuStep
+import io.github.ivanosh.stmaterial.logic.PANEL_LIMIT
+import io.github.ivanosh.stmaterial.logic.PanelEdit
+import io.github.ivanosh.stmaterial.logic.addButton
+import io.github.ivanosh.stmaterial.logic.buttonsEditorState
+import io.github.ivanosh.stmaterial.logic.key
+import io.github.ivanosh.stmaterial.logic.menuKeepsPanel
+import io.github.ivanosh.stmaterial.logic.moreMenuActions
+import io.github.ivanosh.stmaterial.logic.moveButton
+import io.github.ivanosh.stmaterial.logic.panelMenuActions
+import io.github.ivanosh.stmaterial.logic.removeButton
 import io.github.ivanosh.stmaterial.logic.OkAction
 import io.github.ivanosh.stmaterial.logic.OkHold
 import io.github.ivanosh.stmaterial.logic.PanelFocus
@@ -111,7 +125,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             // A dialog over the panel holds the timer; it starts again when the dialog closes.
             if (!hasWindowFocus()) lastKeyMs = now
             val view = player
-            if (view != null && !isSheetOpen && shouldAutoHide(ui, view.playWhenReady, now - lastKeyMs)) {
+            if (view != null && !isSheetOpen && shouldAutoHide(ui, view.playWhenReady, now - lastKeyMs, modal = menuKeepsPanel(panel.menu != null, panel.moving))) {
                 setUi(ui.copy(focus = PanelFocus.HIDDEN))
             }
             if (now >= seekPreviewUntilMs) panel.seekPreview = false
@@ -195,12 +209,17 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             }
             if (key == PlayerKey.Ok) {
                 val pressed = okHold.index
-                val (next, action) = okHold.up(ui, event.isCanceled)
+                val inSheet = isSheetOpen
+                val (next, action) = okHold.upAt(okPlace(inSheet), event.isCanceled)
                 okHold = next
-                // A short press of Subscribe (or any button with a hold action) acts now that it is known not to be a hold.
+                // A short press acts now that it is known not to be a hold.
                 if (action == OkAction.Press && pressed != null) {
                     lastKeyMs = SystemClock.uptimeMillis()
-                    panel.buttons.getOrNull(pressed)?.let(commands::run)
+                    when {
+                        inSheet -> sheetKey(PlayerKey.Ok)
+                        pressed == panel.buttons.size -> openSheet()
+                        else -> panel.buttons.getOrNull(pressed)?.let(commands::run)
+                    }
                     refresh()
                     startTicking()
                 }
@@ -210,6 +229,7 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         val sheet = isSheetOpen
         // A dialog is its own activity and window, so its keys never get here; this guards a window that took focus anyway.
         val focused = hasWindowFocus()
+        if (panel.moving || panel.menu != null) return modalKey(key, event)
         if (key == PlayerKey.Left && ui.focus == PanelFocus.HIDDEN && !sheet && focused) {
             // The undo chip: LEFT goes back to the start of the skipped segment, and not a step more.
             if (event.repeatCount == 0) undoKeyHeld = false
@@ -222,15 +242,15 @@ class MaterialPlaybackActivity : PlaybackActivity() {
             if (event.repeatCount > 0 && skipKeyHeld) return true
             if (event.repeatCount == 0 && skipForward()) return true
         }
-        if (key == PlayerKey.Ok && !sheet) {
-            val onHoldButton = ui.focus == PanelFocus.BUTTONS && panel.buttons.getOrNull(ui.buttonIndex) == PlayerButton.Subscribe
-            val (next, action) = okHold.down(ui, onHoldButton, event.repeatCount > 0 || event.isLongPress)
+        if (key == PlayerKey.Ok) {
+            // Every button on the panel, More and the lines of More can be held; a short press acts on release.
+            val (next, action) = okHold.downAt(okPlace(sheet), event.repeatCount > 0 || event.isLongPress)
             okHold = next
             if (action != OkAction.Normal) {
                 if (event.repeatCount == 0) presenter.onKeyDown(NO_KEY)
                 lastKeyMs = SystemClock.uptimeMillis()
-                // Hold OK on Subscribe does what the Channel button does and does not subscribe.
-                if (action == OkAction.Hold) commands.run(PlayerButton.Channel)
+                // A hold only opens a menu; nothing in it acts until a line is chosen, so a hold never writes to the account.
+                if (action == OkAction.Hold) openMenu()
                 return true
             }
         }
@@ -504,10 +524,104 @@ class MaterialPlaybackActivity : PlaybackActivity() {
         }
     }
 
+    /** The place under OK that can be held: a button of the panel (More included), a line of More that is a button, else none. */
+    private fun okPlace(inSheet: Boolean): Int? = when {
+        inSheet -> panel.sheetCursor.takeIf { it < sheetEntries().size }
+        ui.focus == PanelFocus.BUTTONS -> ui.buttonIndex
+        else -> null
+    }
+
+    private fun openMenu() {
+        if (isSheetOpen) {
+            val at = panel.sheetCursor
+            val button = sheetEntries().getOrNull(at) ?: return
+            panel.menu = ButtonMenu(moreMenuActions(), 0, at, button, inMore = true)
+        } else {
+            val at = ui.buttonIndex
+            val button = panel.buttons.getOrNull(at)
+            panel.menu = ButtonMenu(panelMenuActions(button), 0, at, button)
+        }
+    }
+
+    /** Keys while the menu or Move is open: nothing else on the panel hears them. */
+    private fun modalKey(key: PlayerKey, event: KeyEvent): Boolean {
+        val repeating = event.repeatCount > 0
+        val now = SystemClock.uptimeMillis()
+        if (!repeating) presenter.onKeyDown(NO_KEY)
+        lastKeyMs = now
+        if (panel.moving) {
+            when {
+                key == PlayerKey.Left || key == PlayerKey.Right ->
+                    if (!(repeating && repeatGuard.shouldDrop(event.repeatCount, event.eventTime, now))) moveSelected(if (key == PlayerKey.Left) -1 else 1)
+                // OK or Back ends and saves; a repeat of the key that chose Move does not.
+                (key == PlayerKey.Ok || key == PlayerKey.Back) && !repeating -> endMove()
+            }
+            return true
+        }
+        val menu = panel.menu ?: return true
+        val steps = key == PlayerKey.Up || key == PlayerKey.Down
+        if (repeating && (!steps || repeatGuard.shouldDrop(event.repeatCount, event.eventTime, now))) return true
+        val (next, step) = menu.key(key)
+        panel.menu = next
+        when (step) {
+            MenuStep.None -> Unit
+            MenuStep.Close -> panel.menu = null
+            is MenuStep.Choose -> choose(menu, step.action)
+        }
+        return true
+    }
+
+    private fun choose(menu: ButtonMenu, action: MenuAction) {
+        panel.menu = null
+        when (action) {
+            MenuAction.OpenChannel -> commands.run(PlayerButton.Channel)
+            MenuAction.Move -> panel.moving = true
+            MenuAction.Remove -> {
+                val edit = removeButton(panel.buttons, menu.anchor)
+                saveButtons(edit)
+                writeUi(ui.copy(buttonIndex = edit.focusIndex.coerceIn(0, edit.buttons.size)))
+            }
+            MenuAction.Customize -> {
+                panel.sheetGroups = null
+                startActivity(Intent(this, MaterialButtonsEditorActivity::class.java))
+            }
+            MenuAction.AddToPanel -> menu.button?.let { button ->
+                val edit = addButton(panel.buttons, button)
+                saveButtons(edit)
+                edit.displaced?.let {
+                    Toast.makeText(this, getString(R.string.material_buttons_displaced, getString(buttonLabel(it)), PANEL_LIMIT), Toast.LENGTH_SHORT).show()
+                }
+                // Focus on the panel stays on More, which has moved.
+                writeUi(ui.copy(buttonIndex = edit.buttons.size))
+            }
+        }
+    }
+
+    private fun saveButtons(edit: PanelEdit) {
+        store.save(buttonsEditorState(edit.buttons))
+        applyButtons(edit.buttons)
+    }
+
+    private fun moveSelected(delta: Int) {
+        val edit = moveButton(panel.buttons, ui.buttonIndex, delta)
+        if (edit.buttons == panel.buttons) return
+        panel.buttons = edit.buttons
+        writeUi(ui.copy(buttonIndex = edit.focusIndex))
+    }
+
+    /** Ends Move and saves the order, whichever way it ends (OK, Back, the panel closing). */
+    private fun endMove() {
+        if (!panel.moving) return
+        panel.moving = false
+        store.save(buttonsEditorState(panel.buttons))
+    }
+
     private fun writeUi(next: PlayerUi) {
         ui = next
         if (next.focus == PanelFocus.HIDDEN) {
             panel.sheetGroups = null
+            panel.menu = null
+            endMove()
             okHold = okHold.reset()
         }
         panel.focus = next.focus

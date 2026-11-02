@@ -5,6 +5,9 @@ with Jetpack Compose for TV: a top tab bar (no drawer), a player panel with up t
 parallax, auto-preview or background jobs. The playback and YouTube code is still upstream's. The English UI is the
 only language.
 
+Holding OK on a panel button opens a small menu: Open channel (Subscribe only; the hold never subscribes), Move,
+Remove from panel and Customize buttons. Holding OK on a line of More offers Add to panel. A short press acts as before.
+
 Application id: `io.github.ivanosh.smarttubematerial`. It installs next to the original app.
 
 ## Credits and license
