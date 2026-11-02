@@ -23,6 +23,13 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
@@ -77,16 +84,40 @@ internal val buttonLabelStyle = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, 
  */
 @Composable
 fun PlayerOverlay(state: PlayerOverlayState) {
+    // Opening fades in over 150 ms and lifts 16 units; closing fades out over 120 ms. Both are drawn through the
+    // layer from two animatables, so no frame composes anything: the targets come from a snapshot flow.
+    val alpha = remember { Animatable(0f) }
+    val lift = remember { Animatable(1f) }
+    LaunchedEffect(state) {
+        snapshotFlow { state.focus != PanelFocus.HIDDEN || state.seekPreview }.collectLatest { shown ->
+            if (shown) {
+                lift.snapTo(if (alpha.value < 1f) 1f else 0f)
+                coroutineScope {
+                    launch { alpha.animateTo(1f, tween(OPEN_MS)) }
+                    launch { lift.animateTo(0f, tween(OPEN_MS)) }
+                }
+            } else {
+                alpha.animateTo(0f, tween(CLOSE_MS))
+            }
+        }
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
         Column(Modifier.fillMaxWidth()) {
-            // The chip sits on the panel's top edge, or, with the panel hidden, on its bottom margin.
-            SkipChipHost(state)
+            // The chip sits on the panel's top edge, or, with the panel hidden, on its bottom margin. Above the scrim.
+            Box(Modifier.zIndex(1f)) { SkipChipHost(state) }
             Column(
                 Modifier
                     .collapsedWhenHidden(state)
-                    .graphicsLayer { alpha = if (state.focus != PanelFocus.HIDDEN || state.seekPreview) 1f else 0f }
+                    .graphicsLayer {
+                        this.alpha = alpha.value
+                        translationY = lift.value * LiftDistance.toPx()
+                    }
                     .fillMaxWidth()
-                    .background(Palette.Background)
+                    .drawBehind {
+                        // Clear at the top, 92% of the background at the bottom; it starts above the panel so that the title stands on it.
+                        val fade = ScrimFade.toPx()
+                        drawRect(scrim, Offset(0f, -fade), Size(size.width, size.height + fade))
+                    }
                     .padding(start = 58.dp, end = 58.dp, top = 36.dp, bottom = 40.dp)
             ) {
                 Box(Modifier.onlyWhenOpen(state).padding(bottom = 24.dp)) { Header(state) }
@@ -102,6 +133,17 @@ fun PlayerOverlay(state: PlayerOverlayState) {
         MoreSheet(state)
     }
 }
+
+private const val OPEN_MS = 150
+private const val CLOSE_MS = 120
+private val LiftDistance = 16.dp
+private val ScrimFade = 80.dp
+private val scrim = Brush.verticalGradient(
+    0f to Color.Transparent,
+    0.2f to Palette.Background.copy(alpha = 0.85f),
+    0.5f to Palette.Background.copy(alpha = 0.9f),
+    1f to Palette.Background.copy(alpha = 0.92f),
+)
 
 /** A hidden panel is invisible, and it leaves only its bottom margin, so that the chip does not float. Read in layout, so no composition follows. */
 private fun Modifier.collapsedWhenHidden(state: PlayerOverlayState): Modifier = layout { measurable, constraints ->

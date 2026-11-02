@@ -75,7 +75,7 @@ scripts/perf.sh <serial> [runs]                                                 
 
 ## Constraints and anti-goals
 
-- Light UI. No blur, parallax, autoplay previews, scrim over video, or background jobs. The update check runs at most daily
+- Light UI. No blur, parallax, autoplay previews, scrim over video (one exception, approved by the owner: the player panel's own gradient), or background jobs. The update check runs at most daily
   from the browse screen and on request; no WorkManager.
 - D-pad only. A gesture that needs a long press must have a visible alternative (the editors are reachable from Settings).
 - Limits: 8 tabs (`Sections.LIMIT`, Settings is outside the count); 8 player buttons plus More (`PANEL_LIMIT`); the default
