@@ -1,6 +1,7 @@
 ﻿package io.github.ivanosh.stmaterial.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -49,6 +51,7 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import com.liskovsoft.smartyoutubetv2.tv.R
 
 /** A data class: the screen rebuilds the list on every recomposition, and equal items let the tabs that did not change skip. */
 data class TabItem(val id: Int, val title: String, val icon: String?)
@@ -96,6 +99,12 @@ fun Tabs(
                 }
             },
     ) {
+        // The mark on the left, the same size as the gear it mirrors on the right.
+        Image(
+            painter = painterResource(R.drawable.ic_material_logo),
+            contentDescription = null,
+            modifier = Modifier.align(Alignment.CenterStart).size(GearSize),
+        )
         // The pill hugs its tabs and only scrolls when they stop fitting, so it stays a floating dock.
         // The focus group is the pill alone: with the gear inside it, Down from a tab landed on the gear.
         Box(Modifier.fillMaxWidth().padding(horizontal = DockGutter).focusGroup()) {

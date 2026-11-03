@@ -18,7 +18,10 @@
         android:name="io.github.ivanosh.stmaterial.MaterialApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/material_data_extraction_rules"
-        tools:replace="android:name,android:allowBackup">
+        android:icon="@drawable/ic_material_logo"
+        android:roundIcon="@drawable/ic_material_logo"
+        android:banner="@drawable/app_banner"
+        tools:replace="android:name,android:allowBackup,android:icon,android:roundIcon,android:banner">
 
         <!-- MATERIAL: no external zip import -->
         <activity android:name="com.liskovsoft.smartyoutubetv2.common.misc.BackupReceiverActivity"

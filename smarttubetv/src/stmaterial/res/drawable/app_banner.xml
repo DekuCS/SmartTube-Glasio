@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MATERIAL: the Fire TV launcher banner, 16:9 and transparent around the tile so no bars show. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="320dp"
+        android:height="180dp"
+        android:viewportWidth="1024"
+        android:viewportHeight="576">
+    <group
+        android:translateX="232"
+        android:translateY="8"
+        android:scaleX="0.546875"
+        android:scaleY="0.546875">
+        <clip-path
+            android:pathData="M230,0 H794 A230,230 0 0 1 1024,230 V794 A230,230 0 0 1 794,1024 H230 A230,230 0 0 1 0,794 V230 A230,230 0 0 1 230,0 Z" />
+        <path android:fillColor="#7B2FF7" android:pathData="M0,0 H1024 V1024 H0 Z" />
+        <path android:strokeColor="#6A2CE0" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,1270 C240,1160 560,1380 1284,1210" />
+        <path android:strokeColor="#3A7BF5" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,1140 C240,1030 560,1250 1284,1080" />
+        <path android:strokeColor="#2BB6E8" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,1010 C240,900 560,1120 1284,950" />
+        <path android:strokeColor="#2FD0BB" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,880 C240,770 560,990 1284,820" />
+        <path android:strokeColor="#5CDC8A" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,750 C240,640 560,860 1284,690" />
+        <path android:strokeColor="#B6E34A" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,620 C240,510 560,730 1284,560" />
+        <path android:strokeColor="#FFE14D" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,490 C240,380 560,600 1284,430" />
+        <path android:strokeColor="#FFB627" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,360 C240,250 560,470 1284,300" />
+        <path android:strokeColor="#FF8A2B" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,230 C240,120 560,340 1284,170" />
+        <path android:strokeColor="#FF4D6D" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,100 C240,-10 560,210 1284,40" />
+        <path android:strokeColor="#FF5FA2" android:strokeWidth="170" android:strokeLineCap="round" android:pathData="M-260,-30 C240,-140 560,80 1284,-90" />
+        <path android:pathData="M400,292 L400,732 L742,512 Z"
+              android:fillColor="#0D0D10"
+              android:strokeColor="#0D0D10"
+              android:strokeWidth="74"
+              android:strokeLineJoin="round" />
+    </group>
+</vector>
