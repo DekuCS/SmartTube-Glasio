@@ -2,6 +2,8 @@ package io.github.ivanosh.stmaterial.browse
 
 import android.app.Activity
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
+import com.liskovsoft.sharedutils.rx.RxHelper
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SimpleMediaItem
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter
@@ -10,12 +12,14 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMe
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager
 import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil
+import com.liskovsoft.smartyoutubetv2.common.utils.SimpleEditDialog
 import com.liskovsoft.smartyoutubetv2.tv.R
+import com.liskovsoft.youtubeapi.service.YouTubeMediaItemService
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
 import io.github.ivanosh.stmaterial.ui.MenuItem
 
 /** What the menu of a card can do, in the order it shows them. */
-enum class VideoAction { QUEUE, PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY }
+enum class VideoAction { QUEUE, PLAYLIST, CREATE_PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY }
 
 /** What the menu needs to know about a card and about the session, to leave out what cannot work. */
 data class VideoFacts(val signedIn: Boolean, val hasVideo: Boolean, val hasChannel: Boolean, val hasAuthor: Boolean, val hasFeedback: Boolean)
@@ -36,6 +40,8 @@ fun availableVideoActions(section: Int, facts: VideoFacts): List<VideoAction> =
         when (it) {
             VideoAction.QUEUE -> facts.hasVideo
             VideoAction.PLAYLIST -> facts.signedIn && facts.hasVideo
+            // A new list needs the account. With a video it gets that video; on the playlists tab it starts empty.
+            VideoAction.CREATE_PLAYLIST -> facts.signedIn && (facts.hasVideo || section == MediaGroup.TYPE_USER_PLAYLISTS)
             VideoAction.CHANNEL -> facts.hasChannel
             VideoAction.BLOCK_CHANNEL -> facts.hasAuthor
             VideoAction.NOT_INTERESTED -> facts.signedIn && facts.hasFeedback
@@ -52,6 +58,7 @@ class CardMenu(
     private val activity: Activity,
     private val onGone: (VideoGroup) -> Unit,
     private val onMessage: (String) -> Unit,
+    private val onReload: () -> Unit = {},
 ) {
     fun items(video: Video, section: Int): List<MenuItem> {
         val token = video.mediaItem
@@ -72,6 +79,9 @@ class CardMenu(
                 VideoAction.PLAYLIST -> MenuItem(activity.getString(R.string.material_video_playlist)) {
                     AppDialogUtil.showAddToPlaylistDialog(activity, video, removalCallback(null, false))
                 }
+                VideoAction.CREATE_PLAYLIST -> MenuItem(activity.getString(R.string.material_playlist_create)) {
+                    createPlaylist(video)
+                }
                 VideoAction.CHANNEL -> MenuItem(activity.getString(R.string.material_video_channel)) {
                     MediaServiceManager.chooseChannelPresenter(activity, video)
                 }
@@ -87,6 +97,27 @@ class CardMenu(
                     menu.removeFromHistory(video, removalCallback(R.string.material_video_removed_history, false))
                 }
             }
+        }
+    }
+
+    /** A new list of the account: with the card's video, or empty on the playlists tab, which then reloads. */
+    private fun createPlaylist(video: Video) {
+        SimpleEditDialog.show(
+            activity,
+            activity.getString(R.string.material_playlist_create),
+            activity.getString(R.string.material_playlist_create_note),
+            null,
+        ) { name ->
+            val item = if (video.hasVideo()) video.mediaItem ?: SimpleMediaItem.from(video) else null
+            RxHelper.execute(
+                YouTubeMediaItemService.instance().createPlaylistObserve(name, item),
+                null,
+                { error: Throwable -> onMessage(error.localizedMessage.orEmpty()) },
+                {
+                    if (video.hasVideo()) onMessage(activity.getString(R.string.material_playlist_added)) else onReload()
+                },
+            )
+            true
         }
     }
 

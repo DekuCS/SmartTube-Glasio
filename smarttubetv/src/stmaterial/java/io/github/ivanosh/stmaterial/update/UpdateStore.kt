@@ -32,8 +32,13 @@ class UpdateStore(context: Context) {
      */
     fun currentOffer(context: Context): UpdateOffer? {
         val raw = prefs.getString(KEY_OFFER, null)
+        // Nothing stored is the common case: skip the binder call of the installed version.
+        if (raw == null) {
+            shown = null
+            return null
+        }
         val offer = badgeOffer(offerFromJson(raw), channel, UpdateService.installedVersionName(context))
-        if (offer == null && raw != null) prefs.edit().remove(KEY_OFFER).apply()
+        if (offer == null) prefs.edit().remove(KEY_OFFER).apply()
         shown = offer
         return offer
     }

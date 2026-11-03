@@ -41,6 +41,7 @@ import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.logic.PanelFocus
 import io.github.ivanosh.stmaterial.logic.PanelRowShape
 import io.github.ivanosh.stmaterial.logic.upNextRowShape
+import io.github.ivanosh.stmaterial.browse.videoKey
 import io.github.ivanosh.stmaterial.ui.ItemShape
 import io.github.ivanosh.stmaterial.ui.ItemStyle
 import io.github.ivanosh.stmaterial.ui.MenuFill
@@ -124,7 +125,7 @@ fun UpNextRow(state: PlayerOverlayState) {
                 contentPadding = PaddingValues(start = RowSide, end = RowSide, top = CardRoom, bottom = CardRoom),
                 horizontalArrangement = Arrangement.spacedBy(CardGap),
             ) {
-                itemsIndexed(videos) { index, video ->
+                itemsIndexed(videos, key = { _, video -> videoKey(video) }) { index, video ->
                     VideoCard(
                         video = video,
                         focused = index == focusedIndex,

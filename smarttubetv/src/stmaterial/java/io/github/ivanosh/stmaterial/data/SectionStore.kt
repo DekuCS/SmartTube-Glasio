@@ -19,7 +19,9 @@ class SectionStore(context: Context) {
     private val mirror = SectionMirror(SidebarServicePort(SidebarService.instance(context)))
 
     init {
-        if (!prefs.contains(KEY_ORDER)) {
+        // The default order changed: a list the user never touched follows it, a customized one stays.
+        val stored = parseIds(prefs.getString(KEY_ORDER, null))
+        if (stored.isEmpty() || stored == Sections.LEGACY_SHOWN) {
             save(defaults())
         }
     }

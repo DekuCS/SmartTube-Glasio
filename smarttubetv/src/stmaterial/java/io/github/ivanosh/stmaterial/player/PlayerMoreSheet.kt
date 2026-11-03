@@ -37,12 +37,12 @@ import io.github.ivanosh.stmaterial.logic.buttonIsOn
 import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.StrokeIcon
 
-private val PanelFill = Color(0xFF1D2024)
+private val PanelFill = Color(0xFF15161A)
 private val SheetTitle = TextStyle(fontSize = 40.sp, lineHeight = 50.sp, fontWeight = FontWeight.Medium, color = Palette.OnBackground)
 private val GroupStyle = TextStyle(fontSize = 26.sp, lineHeight = 40.sp, fontWeight = FontWeight.Medium, color = Palette.Accent)
 private val RowStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp)
 private val ValueStyle = TextStyle(fontSize = 24.sp)
-private val SheetShape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+private val SheetShape = RoundedCornerShape(topStart = 34.dp, bottomStart = 34.dp)
 private val RowShape = RoundedCornerShape(14.dp)
 private const val ROWS_ABOVE_CURSOR = 3
 
@@ -128,12 +128,12 @@ private fun SheetRow(icon: String, label: String, value: String, focused: Boolea
             .fillMaxWidth()
             .height(68.dp)
             .clip(RowShape)
-            .background(if (focused) Palette.OnBackground else Color.Transparent)
+            .background(if (focused) Palette.Accent else Color.Transparent)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        StrokeIcon(icon, color, Modifier.size(32.dp))
+        StrokeIcon(icon, color, Modifier.size(30.dp))
         Text(label, style = RowStyle.copy(color = color), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (value.isNotEmpty()) Text(value, style = ValueStyle.copy(color = if (focused) PanelFill else Palette.OnBackgroundVariant))
     }

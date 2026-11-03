@@ -63,7 +63,7 @@ class SectionMirrorTest {
         assertFalse(MediaGroup.TYPE_SHORTS in fake.items)
         assertFalse(MediaGroup.TYPE_KIDS_HOME in fake.items)
         assertTrue(MediaGroup.TYPE_SETTINGS in fake.items)
-        assertEquals(MediaGroup.TYPE_SUBSCRIPTIONS, fake.booted)
+        assertEquals(Sections.START_DEFAULT, fake.booted)
     }
 
     @Test

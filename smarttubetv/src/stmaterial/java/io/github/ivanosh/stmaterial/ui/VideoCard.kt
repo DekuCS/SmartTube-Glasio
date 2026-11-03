@@ -234,7 +234,11 @@ private class CardImageLoader(private val glide: RequestManager) {
 /** Runs on a Glide thread, with the decoded thumbnail. */
 private class CardBake(private val face: CardFace) : BitmapTransformation() {
     override fun transform(pool: BitmapPool, toTransform: Bitmap, outWidth: Int, outHeight: Int): Bitmap =
-        pool.get(THUMB_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888).also { bakeCard(it, toTransform, face, 0) }
+        // get() returns a dirty bitmap: the corners and the text area are never painted, so clear it first.
+        pool.get(THUMB_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888).also {
+            it.eraseColor(android.graphics.Color.TRANSPARENT)
+            bakeCard(it, toTransform, face, 0)
+        }
 
     override fun equals(other: Any?) = other is CardBake && other.face == face
 

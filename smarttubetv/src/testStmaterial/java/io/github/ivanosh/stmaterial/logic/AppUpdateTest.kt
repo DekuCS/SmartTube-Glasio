@@ -186,7 +186,7 @@ class UrlTest {
 
     @Test fun downloadUrlIsBuiltNotCopied() {
         assertEquals(
-            "https://github.com/ivanosh/SmartTube-Material/releases/download/material-v32.68-2/SmartTube_material_32.68-2_arm64-v8a.apk",
+            "https://github.com/DekuCS/SmartTube-Glasio/releases/download/material-v32.68-2/SmartTube_material_32.68-2_arm64-v8a.apk",
             downloadUrl("material-v32.68-2", "SmartTube_material_32.68-2_arm64-v8a.apk"),
         )
         assertNull(downloadUrl("material-v32.68-2/../../x", "SmartTube_material_32.68-2_arm64-v8a.apk"))
@@ -276,7 +276,7 @@ class VerifyTest {
     @Test fun extraSignerIsRefused() = assertEquals(Refusal.SIGNER, check(archive = good.copy(signerSha256 = listOf(PINNED_CERT_SHA256, "a".repeat(64)))))
     @Test fun signerCaseIsIgnored() = assertNull(check(archive = good.copy(signerSha256 = listOf(PINNED_CERT_SHA256.uppercase()))))
     @Test fun pinnedCertIsTheDocumentedOne() =
-        assertEquals("8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c", PINNED_CERT_SHA256)
+        assertEquals("603f13038c55147c8bfbb34e6f577494beb7214467d44d2ef448ac7d69cbf145", PINNED_CERT_SHA256)
 }
 
 class StaleOfferTest {

@@ -97,7 +97,7 @@ fun ChapterRow(state: PlayerOverlayState) {
                 contentPadding = PaddingValues(start = RowSide, end = RowSide, top = RingRoom, bottom = RingRoom),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(RowGap),
             ) {
-                itemsIndexed(chapters) { index, chapter ->
+                itemsIndexed(chapters, key = { _, chapter -> chapter.startMs }) { index, chapter ->
                     ChapterCard(
                         chapter = chapter,
                         state = state,

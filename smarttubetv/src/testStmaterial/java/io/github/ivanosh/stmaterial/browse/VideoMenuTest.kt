@@ -3,6 +3,7 @@ package io.github.ivanosh.stmaterial.browse
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
 import io.github.ivanosh.stmaterial.browse.VideoAction.BLOCK_CHANNEL
 import io.github.ivanosh.stmaterial.browse.VideoAction.CHANNEL
+import io.github.ivanosh.stmaterial.browse.VideoAction.CREATE_PLAYLIST
 import io.github.ivanosh.stmaterial.browse.VideoAction.NOT_INTERESTED
 import io.github.ivanosh.stmaterial.browse.VideoAction.PLAYLIST
 import io.github.ivanosh.stmaterial.browse.VideoAction.QUEUE
@@ -16,7 +17,7 @@ class VideoMenuTest {
     @Test
     fun `history adds remove from history last`() {
         assertEquals(
-            listOf(QUEUE, PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY),
+            listOf(QUEUE, PLAYLIST, CREATE_PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY),
             videoMenuActions(MediaGroup.TYPE_HISTORY)
         )
     }
@@ -24,7 +25,7 @@ class VideoMenuTest {
     @Test
     fun `other sections have the five`() {
         listOf(MediaGroup.TYPE_HOME, MediaGroup.TYPE_SUBSCRIPTIONS, MediaGroup.TYPE_USER_PLAYLISTS, MediaGroup.TYPE_TRENDING).forEach {
-            assertEquals(listOf(QUEUE, PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL), videoMenuActions(it))
+            assertEquals(listOf(QUEUE, PLAYLIST, CREATE_PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL), videoMenuActions(it))
         }
     }
 
@@ -44,7 +45,7 @@ class VideoMenuTest {
     @Test
     fun `a card that cannot open a channel hides go to channel only`() {
         assertEquals(
-            listOf(QUEUE, PLAYLIST, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY),
+            listOf(QUEUE, PLAYLIST, CREATE_PLAYLIST, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY),
             availableVideoActions(MediaGroup.TYPE_HISTORY, all.copy(hasChannel = false))
         )
     }
@@ -53,7 +54,7 @@ class VideoMenuTest {
     @Test
     fun `no author hides block channel only`() {
         assertEquals(
-            listOf(QUEUE, PLAYLIST, CHANNEL, NOT_INTERESTED, REMOVE_FROM_HISTORY),
+            listOf(QUEUE, PLAYLIST, CREATE_PLAYLIST, CHANNEL, NOT_INTERESTED, REMOVE_FROM_HISTORY),
             availableVideoActions(MediaGroup.TYPE_HISTORY, all.copy(hasAuthor = false))
         )
     }
@@ -61,7 +62,7 @@ class VideoMenuTest {
     @Test
     fun `no feedback tokens hides not interested`() {
         assertEquals(
-            listOf(QUEUE, PLAYLIST, CHANNEL, BLOCK_CHANNEL),
+            listOf(QUEUE, PLAYLIST, CREATE_PLAYLIST, CHANNEL, BLOCK_CHANNEL),
             availableVideoActions(MediaGroup.TYPE_HOME, all.copy(hasFeedback = false))
         )
     }
@@ -71,6 +72,15 @@ class VideoMenuTest {
         assertEquals(
             listOf(CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL),
             availableVideoActions(MediaGroup.TYPE_HOME, all.copy(hasVideo = false))
+        )
+    }
+
+    /** The playlists tab is where an empty list is started, so a playlist card offers it too. */
+    @Test
+    fun `playlists tab offers a new list for a card without video`() {
+        assertEquals(
+            listOf(CREATE_PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL),
+            availableVideoActions(MediaGroup.TYPE_USER_PLAYLISTS, all.copy(hasVideo = false))
         )
     }
 }

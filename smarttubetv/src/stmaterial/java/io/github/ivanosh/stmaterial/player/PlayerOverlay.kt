@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -77,12 +78,13 @@ import io.github.ivanosh.stmaterial.logic.layoutTrack
 import io.github.ivanosh.stmaterial.logic.trackBufferSize
 import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.focusRing
+import java.util.Calendar
 
 private val MarkColor = Color(0xFFF2B84B)
 private val titleStyle = TextStyle(fontSize = 44.sp, lineHeight = 54.sp, fontWeight = FontWeight.Medium, color = Palette.OnBackground)
 private val subtitleStyle = TextStyle(fontSize = 26.sp, lineHeight = 34.sp, color = Palette.OnBackgroundVariant)
 private val timeStyle = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, color = Palette.OnBackgroundVariant)
-internal val buttonLabelStyle = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, color = Palette.OnBackground)
+internal val buttonLabelStyle = TextStyle(fontSize = 21.sp, lineHeight = 28.sp, fontWeight = FontWeight.Medium, color = Palette.OnBackground)
 
 /**
  * Draws only: the view holds no focus, and [MaterialPlaybackActivity] handles every key.
@@ -158,6 +160,13 @@ fun PlayerOverlay(state: PlayerOverlayState) {
             }
         }
         MoreSheet(state)
+        // The clock island of the Nuvio player: the time now and when the video ends, top right.
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 36.dp, end = 58.dp)
+                .graphicsLayer { this.alpha = alpha.value }
+        ) { ClockIsland(state) }
         // A hold on an Up next card: the menu stands over the middle of the screen.
         state.cardMenu?.let { Box(Modifier.align(Alignment.Center)) { PickMenuCard(it) } }
         // A hold on a line of More: the menu stands to the left of the sheet.
@@ -165,7 +174,43 @@ fun PlayerOverlay(state: PlayerOverlayState) {
     }
 }
 
-private val DiscOutline = Color.White.copy(alpha = 0.45f)
+private val DiscOutline = Color.White.copy(alpha = 0.16f)
+private val islandText = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, color = Palette.OnBackground)
+
+/**
+ * The time and the end of the video, in a pill in the corner, as in the Nuvio player. One derived pair of strings: the
+ * position ticks twice a second, the island changes once a minute. It fades with the panel through the layer.
+ */
+@Composable
+private fun ClockIsland(state: PlayerOverlayState) {
+    val clock by remember(state) {
+        derivedStateOf {
+            val remaining = state.durationMs - state.positionMs
+            if (remaining <= 0) null else {
+                val end = Calendar.getInstance().apply { add(Calendar.MILLISECOND, remaining.toInt()) }
+                clockHourMinute(Calendar.getInstance()) to clockHourMinute(end)
+            }
+        }
+    }
+    val (now, end) = clock ?: return
+    Row(
+        Modifier
+            .height(56.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Palette.Background.copy(alpha = 0.85f))
+            .border(1.5.dp, Palette.ProgressTrack, RoundedCornerShape(28.dp))
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(now, style = islandText)
+        Text("·", style = islandText.copy(color = Palette.OnBackgroundVariant))
+        Text(stringResource(R.string.material_player_ends, end), style = islandText.copy(color = Palette.OnBackgroundVariant))
+    }
+}
+
+private fun clockHourMinute(c: Calendar): String =
+    String.format("%02d:%02d", c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
 private const val OPEN_MS = 220
 private const val CLOSE_MS = 180
 private val LiftDistance = 40.dp
@@ -253,11 +298,11 @@ private fun Header(state: PlayerOverlayState) {
     }
 }
 
-private val TrackThin = 12.dp
-private val TrackThick = 16.dp
-private val HandleWidth = 4.dp
-private val HandleWidthFocused = 6.dp
-private val HandleHeight = 32.dp
+private val TrackThin = 6.dp
+private val TrackThick = 10.dp
+private val HandleWidth = 3.dp
+private val HandleWidthFocused = 5.dp
+private val HandleHeight = 26.dp
 private val HandleGap = 6.dp
 private val ChapterGap = 4.dp
 private val ChapterRadius = 2.dp
@@ -371,29 +416,24 @@ private fun Legend(entries: List<LegendEntry>) {
     }
 }
 
-/** Nine items (eight buttons and More) take 9 x 150 + 8 x 20 = 1510 of the 1804 units inside the panel's padding. */
+private val ButtonSize = 68.dp
+private val ButtonGap = 12.dp
+private val PillShape = RoundedCornerShape(percent = 50)
+
+/**
+ * The row under the bar, as in the Nuvio player: 68 dp discs, 12 dp apart, and the one in focus grows into an accent
+ * pill that carries its label, so the row needs no line of names under it. Its neighbours are pushed by the layout.
+ */
 @Composable
 private fun Buttons(state: PlayerOverlayState) {
     Box {
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
-        state.buttons.forEachIndexed { index, button ->
-            val paused = button == PlayerButton.PlayPause && !state.playing
-            PanelButton(
-                label = when {
-                    button != PlayerButton.PlayPause -> stringResource(buttonLabel(button))
-                    paused -> stringResource(R.string.material_player_play)
-                    else -> stringResource(R.string.material_player_pause)
-                },
-                iconPath = if (paused) PLAY_ICON_PATH else buttonIcon(button),
-                focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == index,
-                on = button in STATEFUL_BUTTONS && buttonIsOn(button, viewId(button)?.let { state.buttonStates[it] }),
-                lifted = state.moving && state.buttonIndex == index,
-            )
-        }
+    Row(horizontalArrangement = Arrangement.spacedBy(ButtonGap), verticalAlignment = Alignment.CenterVertically) {
+        state.buttons.forEachIndexed { index, button -> PanelSlot(state, index, button) }
+        val moreFocused by remember(state) { derivedStateOf { state.focus == PanelFocus.BUTTONS && state.buttonIndex == state.buttons.size } }
         PanelButton(
             label = stringResource(R.string.material_player_more),
             iconPath = MORE_ICON_PATH,
-            focused = state.focus == PanelFocus.BUTTONS && state.buttonIndex == state.buttons.size,
+            focused = moreFocused,
             on = false,
         )
     }
@@ -402,33 +442,68 @@ private fun Buttons(state: PlayerOverlayState) {
         Box(
             Modifier.layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity))
-                layout(0, 0) { placeable.place((menu.anchor * (150 + 20)).dp.roundToPx(), -placeable.height - 20.dp.roundToPx()) }
+                val left = (ButtonSize + ButtonGap) * menu.anchor.toFloat()
+                layout(0, 0) { placeable.place(left.roundToPx(), -placeable.height - 20.dp.roundToPx()) }
             }
         ) { ButtonMenuCard(menu) }
     }
     }
 }
 
-/** A button of the panel: [on] marks a switched-on state with the accent colour. */
+/**
+ * One slot of the row. It reads its own focus, so moving along the row recomposes the two slots that changed, not the
+ * whole row with its ten icons and labels.
+ */
 @Composable
-internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: Boolean, size: Dp = 84.dp, labelStyle: TextStyle = buttonLabelStyle, lifted: Boolean = false) {
-    Column(
-        Modifier.width(150.dp).then(if (lifted) Modifier.offset(y = (-14).dp) else Modifier),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+private fun PanelSlot(state: PlayerOverlayState, index: Int, button: PlayerButton) {
+    val focused by remember(state) { derivedStateOf { state.focus == PanelFocus.BUTTONS && state.buttonIndex == index } }
+    val lifted by remember(state) { derivedStateOf { state.moving && state.buttonIndex == index } }
+    val paused = button == PlayerButton.PlayPause && !state.playing
+    PanelButton(
+        label = when {
+            button != PlayerButton.PlayPause -> stringResource(buttonLabel(button))
+            paused -> stringResource(R.string.material_player_play)
+            else -> stringResource(R.string.material_player_pause)
+        },
+        iconPath = if (paused) PLAY_ICON_PATH else buttonIcon(button),
+        focused = focused,
+        on = button in STATEFUL_BUTTONS && buttonIsOn(button, viewId(button)?.let { state.buttonStates[it] }),
+        lifted = lifted,
+    )
+}
+
+/**
+ * A button of the panel: a disc at rest, and in focus a pill with its label. [on] marks a switched-on state with the
+ * accent colour, [lifted] the button being moved.
+ */
+@Composable
+internal fun PanelButton(label: String, iconPath: String, focused: Boolean, on: Boolean, lifted: Boolean = false) {
+    val accent = focused || on || lifted
+    Row(
+        Modifier
+            .height(ButtonSize)
+            .then(if (lifted) Modifier.offset(y = (-14).dp) else Modifier)
+            .clip(PillShape)
+            .background(if (accent) Palette.Accent else Palette.TabSelected)
+            // A light outline so that the disc reads on the scrim over a white frame.
+            .then(if (accent) Modifier else Modifier.border(2.dp, DiscOutline, PillShape))
+            .focusRing(focused, corner = ButtonSize / 2, gap = 4.dp)
+            .animateContentSize()
+            .padding(start = if (focused) 20.dp else 0.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(size)
-                .focusRing(focused, corner = size / 2, gap = 3.dp)
-                .background(if (lifted) Palette.Accent else if (focused) Color.White else if (on) Palette.Accent else Palette.TabSelected, CircleShape)
-                // A light outline so that the disc reads on the scrim over a white frame.
-                .then(if (focused || on || lifted) Modifier else Modifier.border(2.dp, DiscOutline, CircleShape)),
-            contentAlignment = Alignment.Center
-        ) {
-            PanelIcon(iconPath, if (focused || on || lifted) Palette.Background else Palette.OnBackground)
+        Box(Modifier.size(ButtonSize), contentAlignment = Alignment.Center) {
+            PanelIcon(iconPath, if (accent) Palette.Background else Palette.OnBackground, 30.dp)
         }
-        Text(label, style = labelStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (focused) {
+            Text(
+                label,
+                style = buttonLabelStyle.copy(color = Palette.Background),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 4.dp, end = 24.dp),
+            )
+        }
     }
 }
 

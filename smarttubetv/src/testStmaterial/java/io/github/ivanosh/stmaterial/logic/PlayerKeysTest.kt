@@ -128,9 +128,10 @@ class PlayerKeysTest {
     }
 
     @Test
-    fun progressUpStays() {
-        val progress = ui(PanelFocus.PROGRESS)
-        assertEquals(progress to emptyList<PlayerCommand>(), press(progress, PlayerKey.Up))
+    fun progressUpHides() {
+        val (next, commands) = press(ui(PanelFocus.PROGRESS), PlayerKey.Up)
+        assertEquals(PanelFocus.HIDDEN, next.focus)
+        assertTrue(commands.isEmpty())
     }
 
     @Test

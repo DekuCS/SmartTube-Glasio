@@ -49,7 +49,7 @@ class MaterialBrowseActivity : LeanbackActivity(), BrowseView {
     private lateinit var store: SectionStore
     private var initializing = false
 
-    private val cardMenu = CardMenu(this, onGone = { state.updateSection(it) }, onMessage = { state.message = it })
+    private val cardMenu = CardMenu(this, onGone = { state.updateSection(it) }, onMessage = { state.message = it }, onReload = { presenter.refresh(false) })
 
     private val actions = object : BrowseActions {
         override fun onTabFocused(id: Int) {

@@ -9,7 +9,6 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.YTSignInPresenter
-import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
 import com.liskovsoft.smartyoutubetv2.tv.R
 import io.github.ivanosh.stmaterial.logic.SubscribeAction
@@ -36,6 +35,7 @@ class ChannelSubscription(
     private var signedIn by mutableStateOf(isSignedIn())
     private var loading = false
     private var call: Disposable? = null
+    private var learning: Disposable? = null
     /** The cards last seen, so the state can be asked again after a sign-in without reloading the page. */
     private var lastVideos: List<Video>? = null
 
@@ -68,24 +68,29 @@ class ChannelSubscription(
         if (!signedIn || subscribed != null || loading || id == null) return
         val video = videos?.firstOrNull { it.videoId != null } ?: return
         loading = true
-        MediaServiceManager.instance().loadMetadata(
-            video,
-            { metadata ->
-                activity.runOnUiThread {
-                    loading = false
-                    // A playlist row may hold videos of other channels: only the channel's own answer counts.
-                    if (channelId() == id && metadata.channelId == id && subscribed == null) subscribed = metadata.isSubscribed
-                }
-            },
-            { activity.runOnUiThread { loading = false } },
-            null,
-        )
+        // Not MediaServiceManager.loadMetadata: the player's suggestions keep loading metadata in the
+        // background and would cancel this one, leaving the button disabled for good.
+        learning = YouTubeServiceManager.instance().mediaItemService
+            .getMetadataObserve(video.videoId, video.playlistId, video.playlistIndex, video.playlistParams)
+            .subscribe(
+                { metadata ->
+                    activity.runOnUiThread {
+                        loading = false
+                        // A playlist row may hold videos of other channels: only the channel's own answer counts.
+                        val sameChannel = metadata.channelId == id || (metadata.channelId == null && video.channelId == id)
+                        if (channelId() == id && sameChannel && subscribed == null) subscribed = metadata.isSubscribed
+                    }
+                },
+                { activity.runOnUiThread { loading = false } },
+            )
     }
 
     /** The page was left or shows another channel. */
     fun reset() {
         call?.dispose()
         call = null
+        learning?.dispose()
+        learning = null
         subscribed = null
         pending = false
         loading = false

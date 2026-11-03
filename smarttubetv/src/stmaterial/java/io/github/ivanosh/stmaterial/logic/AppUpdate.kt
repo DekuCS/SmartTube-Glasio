@@ -33,11 +33,11 @@ data class UpdateOffer(
 )
 
 /** The signing certificate of every release, as in the release workflow and README-Material.md. */
-const val PINNED_CERT_SHA256 = "8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c"
+const val PINNED_CERT_SHA256 = "603f13038c55147c8bfbb34e6f577494beb7214467d44d2ef448ac7d69cbf145"
 const val CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
 const val MAX_APK_BYTES = 150L * 1024 * 1024
 
-const val REPO = "ivanosh/SmartTube-Material"
+const val REPO = "DekuCS/SmartTube-Glasio"
 const val RELEASES_URL = "https://api.github.com/repos/$REPO/releases?per_page=30"
 
 private const val TAG_PREFIX = "material-v"

@@ -1,4 +1,4 @@
-package io.github.ivanosh.stmaterial.ui
+﻿package io.github.ivanosh.stmaterial.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
@@ -27,7 +27,11 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
@@ -47,19 +51,23 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 
 /** A data class: the screen rebuilds the list on every recomposition, and equal items let the tabs that did not change skip. */
-data class TabItem(val id: Int, val title: String, val isStart: Boolean)
+data class TabItem(val id: Int, val title: String, val icon: String?)
 
-private const val HOME_ICON = "M4 11l8-7 8 7M6 10v10h12V10"
 // A gear outline: eight teeth around a hub ring. Drawn with a 2 stroke it still shows teeth at 36 px.
 private const val GEAR_ICON = "M10.0 4.7L10.4 1.7L13.6 1.7L14.0 4.7L15.8 5.4L18.1 3.6L20.4 5.9L18.6 8.2L19.3 10.0L22.3 10.4L22.3 13.6L19.3 14.0L18.6 15.8L20.4 18.1L18.1 20.4L15.8 18.6L14.0 19.3L13.6 22.3L10.4 22.3L10.0 19.3L8.2 18.6L5.9 20.4L3.6 18.1L5.4 15.8L4.7 14.0L1.7 13.6L1.7 10.4L4.7 10.0L5.4 8.2L3.6 5.9L5.9 3.6L8.2 5.4zM15.2 12a3.2 3.2 0 1 0-6.4 0 3.2 3.2 0 0 0 6.4 0z"
 
-private val GEAR_SLOT = 80.dp
+// The dock is centred; the same gutter on both sides keeps it centred and clear of the gear.
+private val DockGutter = 92.dp
+private val DockCorner = 40.dp
+private val DockHeight = 80.dp
+private val GearSize = 64.dp
 private val PillShape = RoundedCornerShape(32.dp)
+private val DockShape = RoundedCornerShape(DockCorner)
 private val LabelStyle = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Medium)
 
 /**
- * The bar of the canvas: the tabs on the left and the Settings icon, outside the list, on the right.
- * Focus entering the bar always lands on the selected item.
+ * The floating glass dock of the canvas: the tabs in a pill in the middle and the Settings button, outside
+ * the pill, on the right. Focus entering the bar always lands on the selected item.
  */
 @Composable
 fun Tabs(
@@ -75,74 +83,87 @@ fun Tabs(
     updateAvailable: () -> Boolean = { false },
     modifier: Modifier = Modifier,
 ) {
-    // The 8 dp inside the list keeps the focus ring of the first and last tab out of the scroll clip;
-    // the bar is 12 dp taller than the tabs for the same reason. The gear stays put at the right.
     Box(
         modifier
             .fillMaxWidth()
-            .padding(start = 50.dp, end = 58.dp, top = 28.dp)
-            .height(76.dp)
+            .padding(start = 50.dp, end = 58.dp, top = 22.dp)
+            .height(84.dp)
             .focusProperties {
                 onEnter = {
                     val target = selected?.takeIf { id -> id == settingsId || tabs.any { it.id == id } }
                         ?: tabs.firstOrNull()?.id
                     if (target != null) requesterFor(target).requestFocus()
                 }
-            }
-            .focusGroup(),
+            },
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(end = GEAR_SLOT)
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp)
-                .align(Alignment.CenterStart),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            tabs.forEach { tab ->
-                key(tab.id) {
-                    BarButton(
-                        selected = tab.id == selected,
-                        shape = PillShape,
-                        onFocused = { onFocused(tab.id) },
-                        onClick = { onClick(tab.id) },
-                        onLongPress = { onLongPress(tab.id) },
-                        requester = requesterFor(tab.id),
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 30.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (tab.isStart) StrokeIcon(HOME_ICON, Palette.Accent, Modifier.size(26.dp))
-                            Text(tab.title, style = LabelStyle, maxLines = 1, softWrap = false)
+        // The pill hugs its tabs and only scrolls when they stop fitting, so it stays a floating dock.
+        // The focus group is the pill alone: with the gear inside it, Down from a tab landed on the gear.
+        Box(Modifier.fillMaxWidth().padding(horizontal = DockGutter).focusGroup()) {
+            Row(
+                Modifier
+                    .align(Alignment.Center)
+                    .shadow(22.dp, DockShape, clip = false)
+                    .liquidGlass(DockCorner)
+                    .horizontalScroll(rememberScrollState())
+                    // Inside the scroll, so the 80 dp apply to the row and its items centre in the pill.
+                    .height(DockHeight)
+                    // The 8 dp inside the list keeps the focus ring of the first and last tab out of the scroll clip.
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                tabs.forEach { tab ->
+                    key(tab.id) {
+                        BarButton(
+                            selected = tab.id == selected,
+                            shape = PillShape,
+                            onFocused = { onFocused(tab.id) },
+                            onClick = { onClick(tab.id) },
+                            onLongPress = { onLongPress(tab.id) },
+                            requester = requesterFor(tab.id),
+                        ) { color ->
+                            Row(
+                                Modifier.padding(horizontal = 30.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                tab.icon?.let { StrokeIcon(it, color, Modifier.size(26.dp)) }
+                                Text(tab.title, style = LabelStyle, maxLines = 1, softWrap = false)
+                            }
                         }
                     }
                 }
             }
         }
-        BarButton(
-            selected = settingsId == selected,
-            shape = PillShape,
-            onFocused = { onFocused(settingsId) },
-            onClick = { onClick(settingsId) },
-            onLongPress = { onLongPress(settingsId) },
-            requester = requesterFor(settingsId),
-            modifier = Modifier.align(Alignment.CenterEnd).size(64.dp).semantics { contentDescription = settingsLabel },
-        ) {
-            StrokeIcon(GEAR_ICON, Palette.OnBackgroundVariant, Modifier.fillMaxSize().padding(14.dp))
-        }
-        // The mark of an update that has arrived: a filled dot at the top right of the gear, focused or not.
-        Box(
-            Modifier.align(Alignment.CenterEnd).size(64.dp).drawBehind {
-                if (updateAvailable()) {
-                    val r = 6.dp.toPx()
-                    drawCircle(Palette.Accent, r, Offset(size.width - 14.dp.toPx() - r, 14.dp.toPx() + r))
-                }
+        Box(Modifier.align(Alignment.CenterEnd).size(GearSize).liquidGlass(GearSize / 2)) {
+            BarButton(
+                selected = settingsId == selected,
+                shape = PillShape,
+                onFocused = { onFocused(settingsId) },
+                onClick = { onClick(settingsId) },
+                onLongPress = { onLongPress(settingsId) },
+                requester = requesterFor(settingsId),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .semantics { contentDescription = settingsLabel }
+                    // The gear stands outside the pill, so Down from it has no neighbour to find: it joins
+                    // the bar at the selected tab, and the next Down reaches the content.
+                    .focusProperties {
+                        down = requesterFor(tabs.firstOrNull { it.id == selected }?.id ?: tabs.firstOrNull()?.id ?: settingsId)
+                    },
+            ) { _ ->
+                StrokeIcon(GEAR_ICON, Palette.OnBackground, Modifier.fillMaxSize().padding(15.dp))
             }
-        )
+            // The mark of an update that has arrived: a filled dot at the top right of the gear, focused or not.
+            Box(
+                Modifier.fillMaxSize().drawBehind {
+                    if (updateAvailable()) {
+                        val r = 6.dp.toPx()
+                        drawCircle(Palette.Accent, r, Offset(size.width - 10.dp.toPx() - r, 10.dp.toPx() + r))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -156,15 +177,33 @@ private fun BarButton(
     onLongPress: () -> Unit,
     requester: FocusRequester,
     modifier: Modifier = Modifier.height(64.dp),
-    content: @Composable () -> Unit,
+    content: @Composable (Color) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val container = if (selected) Palette.TabSelected else Color.Transparent
-    val label = if (selected) Palette.OnBackground else Palette.OnBackgroundVariant
+    // The selected item keeps a quiet chip and the blue line; focus lights the same chip up a little more.
+    val container = when {
+        focused -> Glass.ItemFocused
+        selected -> Glass.ItemSelected
+        else -> Color.Transparent
+    }
+    val label = if (focused || selected) Palette.OnBackground else Palette.OnBackgroundVariant
     Surface(
         onClick = onClick,
         modifier = modifier
             .focusRing(focused, corner = 32.dp, gap = 2.dp)
+            .drawWithContent {
+                drawContent()
+                if (selected) {
+                    val w = 26.dp.toPx()
+                    val h = 3.dp.toPx()
+                    drawRoundRect(
+                        color = Palette.Accent,
+                        topLeft = Offset((size.width - w) / 2f, size.height - h - 6.dp.toPx()),
+                        size = Size(w, h),
+                        cornerRadius = CornerRadius(h / 2f)
+                    )
+                }
+            }
             .onLongOk(onLongPress)
             .focusRequester(requester)
             .onFocusChanged {
@@ -182,7 +221,7 @@ private fun BarButton(
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f, pressedScale = 1f),
     ) {
-        Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) { content() }
+        Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) { content(label) }
     }
 }
 

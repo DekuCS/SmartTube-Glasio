@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -138,10 +139,7 @@ fun Feed(state: BrowseState, actions: FeedActions) {
         if (state.focusOnTabs) listState.scrollToItem(0)
     }
 
-    val pending = state.pendingFocus
-    LaunchedEffect(pending) {
-        if (pending != null && !scrollTo(pending, state, listState, rowStates)) state.pendingFocus = null
-    }
+    FocusRestorer(state, listState, rowStates)
 
     val density = LocalDensity.current
     // Room under the last row for the anchor to reach it whatever has loaded: one viewport.
@@ -242,6 +240,18 @@ private suspend fun scrollTo(
     return true
 }
 
+/**
+ * Brings back the focus a menu left behind. A child of the feed, so that writing [BrowseState.pendingFocus] (from a
+ * card, on every menu close) re-executes this and not the feed body and its rows.
+ */
+@Composable
+private fun FocusRestorer(state: BrowseState, listState: LazyListState, rowStates: Map<String, LazyListState>) {
+    val pending = state.pendingFocus
+    LaunchedEffect(pending) {
+        if (pending != null && !scrollTo(pending, state, listState, rowStates)) state.pendingFocus = null
+    }
+}
+
 @Composable
 private fun FeedCard(state: BrowseState, actions: FeedActions, row: VideoRow, video: Video, index: Int, rowIndex: Int) {
     val id = videoKey(video)
@@ -249,7 +259,7 @@ private fun FeedCard(state: BrowseState, actions: FeedActions, row: VideoRow, vi
     val requester = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
 
-    val wanted = state.pendingFocus == key
+    val wanted by remember(key) { derivedStateOf { state.pendingFocus == key } }
     LaunchedEffect(wanted) {
         if (wanted) {
             requester.requestFocus()

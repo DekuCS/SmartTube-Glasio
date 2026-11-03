@@ -3,6 +3,7 @@ package io.github.ivanosh.stmaterial.logic
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,12 +14,19 @@ class SectionsTest {
     fun defaultsAreInSpecifiedOrder() {
         assertEquals(
             listOf(
-                MediaGroup.TYPE_SUBSCRIPTIONS, MediaGroup.TYPE_HOME, MediaGroup.TYPE_HISTORY,
-                MediaGroup.TYPE_USER_PLAYLISTS, Sections.SEARCH_SECTION_ID
+                MediaGroup.TYPE_HOME, Sections.SEARCH_SECTION_ID, MediaGroup.TYPE_SUBSCRIPTIONS,
+                MediaGroup.TYPE_USER_PLAYLISTS, MediaGroup.TYPE_HISTORY
             ),
             Sections.DEFAULT_SHOWN
         )
         assertEquals(8, Sections.LIMIT)
+    }
+
+    @Test
+    fun untouchedLegacyOrderFollowsTheNewDefault() {
+        // SectionStore rewrites a saved list that still equals the old default, and keeps a customized one.
+        assertNotEquals(Sections.LEGACY_SHOWN, Sections.DEFAULT_SHOWN)
+        assertEquals(Sections.DEFAULT_SHOWN.toSet(), Sections.LEGACY_SHOWN.toSet())
     }
 
     @Test

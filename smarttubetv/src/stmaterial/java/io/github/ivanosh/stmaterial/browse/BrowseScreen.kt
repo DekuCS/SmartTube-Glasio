@@ -4,7 +4,6 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -45,8 +44,8 @@ import io.github.ivanosh.stmaterial.ui.FeedPageActions
 import io.github.ivanosh.stmaterial.ui.rememberCardMenuHost
 import io.github.ivanosh.stmaterial.ui.MessageLine
 import io.github.ivanosh.stmaterial.ui.MaterialTvTheme
-import io.github.ivanosh.stmaterial.ui.Palette
 import io.github.ivanosh.stmaterial.ui.TabItem
+import io.github.ivanosh.stmaterial.ui.gradientBackground
 import io.github.ivanosh.stmaterial.ui.Tabs
 import io.github.ivanosh.stmaterial.update.UpdateStore
 
@@ -95,10 +94,20 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
             requesterFor(target).requestFocus()
         }
 
+        // Tab ids and titles are derived and rebuilt only when they change, not on every key event.
+        val searchTitle = stringResource(R.string.material_search)
+        val tabIds by remember(state) { derivedStateOf { state.tabs() } }
+        val tabs = remember(tabIds) {
+            tabIds.map { id ->
+                val title = if (id == Sections.SEARCH_SECTION_ID) searchTitle else state.sections.firstOrNull { it.id == id }?.title.orEmpty()
+                TabItem(id, title, sectionIcon(id))
+            }
+        }
+
         // Nothing holds focus: the first frame, or what had it is gone (error replaced, card removed,
         // section cleared). A card takes it back if there is one, otherwise the selected tab.
         val orphaned = !barFocused && !contentFocused && menuFor == null && cardMenu.items == null
-        CardFocusEffects(state, cardMenu, orphaned, hasTargets = state.tabs().isNotEmpty(), fallback = ::focusTabs)
+        CardFocusEffects(state, cardMenu, orphaned, hasTargets = tabIds.isNotEmpty(), fallback = ::focusTabs)
 
         var menuClosedOn by remember { mutableStateOf<Int?>(null) }
         LaunchedEffect(menuFor) {
@@ -118,20 +127,15 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
         // Derived, so that focus moving between rows below the first does not recompose this screen and every tab.
         val tabsVisible by remember(state) { derivedStateOf { state.tabsVisible } }
         val tabsAway = animateFloatAsState(if (tabsVisible) 0f else 1f, tween(TABS_ANIMATION_MS), label = "tabsAway")
-        val searchTitle = stringResource(R.string.material_search)
-        val tabs = state.tabs().map { id ->
-            val title = if (id == Sections.SEARCH_SECTION_ID) searchTitle else state.sections.firstOrNull { it.id == id }?.title.orEmpty()
-            TabItem(id, title, id == state.start)
-        }
 
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Palette.Background)
+                .gradientBackground()
                 .onPreviewKeyEvent { event ->
                     // Back on a tab that is not the start tab goes to the start tab. Menus keep their own Back.
                     if (event.key == Key.Back && menuFor == null && cardMenu.items == null &&
-                        backStep(contentFocused, state.selected, state.start, state.tabs()) == BackStep.SELECT_START
+                        backStep(contentFocused, state.selected, state.start, tabIds) == BackStep.SELECT_START
                     ) {
                         when (event.type) {
                             KeyEventType.KeyDown -> tabBackPressed = true
@@ -200,7 +204,7 @@ fun BrowseScreen(state: BrowseState, actions: BrowseActions) {
                     if (id != MediaGroup.TYPE_SETTINGS) {
                         add(MenuItem(openFirst) { actions.onOpenFirst(id) })
                         // The last tab cannot go: a screen without tabs has no way back to them.
-                        if (id in state.shown && state.tabs().size > 1) add(MenuItem(hide) { actions.onHide(id) })
+                        if (id in state.shown && tabs.size > 1) add(MenuItem(hide) { actions.onHide(id) })
                     }
                     add(MenuItem(customize) { actions.onCustomize() })
                 }

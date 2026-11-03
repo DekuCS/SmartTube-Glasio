@@ -9,6 +9,15 @@ object Sections {
     const val LIMIT = 8
 
     val DEFAULT_SHOWN: List<Int> = listOf(
+        MediaGroup.TYPE_HOME,
+        SEARCH_SECTION_ID,
+        MediaGroup.TYPE_SUBSCRIPTIONS,
+        MediaGroup.TYPE_USER_PLAYLISTS,
+        MediaGroup.TYPE_HISTORY
+    )
+
+    /** The order shipped before this build: an untouched saved list follows the new default once. */
+    val LEGACY_SHOWN: List<Int> = listOf(
         MediaGroup.TYPE_SUBSCRIPTIONS,
         MediaGroup.TYPE_HOME,
         MediaGroup.TYPE_HISTORY,
@@ -36,7 +45,7 @@ object Sections {
 
     val KNOWN: Set<Int> = (DEFAULT_SHOWN + HIDDEN_ADDABLE).toSet()
 
-    val START_DEFAULT: Int = MediaGroup.TYPE_SUBSCRIPTIONS
+    val START_DEFAULT: Int = MediaGroup.TYPE_HOME
 }
 
 /** Keeps known ids in saved order, without duplicates or Settings; empty result falls back to defaults. */

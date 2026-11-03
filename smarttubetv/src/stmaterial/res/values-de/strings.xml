@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string translatable="false" name="material_search">Suche</string>
+    <string translatable="false" name="material_search_hint">OK drücken zum Suchen</string>
+    <string translatable="false" name="material_settings">Einstellungen</string>
+    <string translatable="false" name="material_retry">Erneut versuchen</string>
+    <string translatable="false" name="material_refresh_failed">Aktualisierung fehlgeschlagen</string>
+    <string translatable="false" name="material_signed_out_empty">Ohne Konto zeigt YouTube hier nichts an.</string>
+    <string translatable="false" name="material_signed_out_home">Melde dich an, oder sieh dir etwas an, dann füllt sich Start.</string>
+    <string translatable="false" name="material_loading">Wird geladen…</string>
+    <string translatable="false" name="material_empty">Noch nichts hier</string>
+    <string translatable="false" name="material_menu_open_first">Zuerst öffnen</string>
+    <string translatable="false" name="material_menu_hide">Ausblenden</string>
+    <string translatable="false" name="material_menu_customize">Bereiche anpassen</string>
+    <string translatable="false" name="material_video_queue">Zur Warteschlange</string>
+    <string translatable="false" name="material_video_playlist">In Wiedergabeliste speichern</string>
+    <string translatable="false" name="material_playlist_create">Neue Wiedergabeliste</string>
+    <string translatable="false" name="material_playlist_create_note">Diese wird nicht in der YouTube-App angezeigt</string>
+    <string translatable="false" name="material_playlist_added">Zur Wiedergabeliste hinzugefügt</string>
+    <string translatable="false" name="material_video_channel">Zum Kanal</string>
+    <string translatable="false" name="material_video_not_interested">Kein Interesse</string>
+    <string translatable="false" name="material_video_block_channel">Kanal blockieren</string>
+    <string translatable="false" name="material_video_remove_history">Aus Verlauf entfernen</string>
+    <string translatable="false" name="material_video_queued">Zur Warteschlange hinzugefügt</string>
+    <string translatable="false" name="material_video_hidden">Verstanden, wir zeigen weniger davon</string>
+    <string translatable="false" name="material_video_blocked">Kanal blockiert</string>
+    <string translatable="false" name="material_video_removed_history">Aus dem Verlauf entfernt</string>
+    <string translatable="false" name="material_start_moved">%1$s öffnet jetzt zuerst</string>
+    <string translatable="false" name="material_editor_subtitle">Einstellungen bleiben immer im Menü.</string>
+    <string translatable="false" name="material_editor_in_menu">Im Menü</string>
+    <string translatable="false" name="material_editor_hidden">Ausgeblendet</string>
+    <string translatable="false" name="material_editor_count">%1$s · %2$d von %3$d</string>
+    <string translatable="false" name="material_editor_total">%1$d insgesamt, scrollen</string>
+    <string translatable="false" name="material_editor_moving">Wird verschoben</string>
+    <string translatable="false" name="material_editor_reset">Auf Standard zurücksetzen</string>
+    <string translatable="false" name="material_editor_hint_select">auswählen</string>
+    <string translatable="false" name="material_editor_hint_list">andere Liste</string>
+    <string translatable="false" name="material_editor_hint_pick">aufnehmen</string>
+    <string translatable="false" name="material_editor_hint_save">speichern</string>
+    <string translatable="false" name="material_editor_hint_reorder">umsortieren</string>
+    <string translatable="false" name="material_editor_hint_move">in die andere Liste</string>
+    <string translatable="false" name="material_editor_hint_drop">ablegen</string>
+    <string translatable="false" name="material_editor_keep_one">Mindestens ein Bereich muss im Menü bleiben</string>
+    <string translatable="false" name="material_editor_was_reset">Bereiche zurückgesetzt</string>
+    <string translatable="false" name="material_editor_displaced">%1$s nach Ausgeblendet verschoben: Das Menü fasst %2$d</string>
+    <string translatable="false" name="material_row_continue">Weiterschauen</string>
+    <string translatable="false" name="material_row_new">Neu in Abos</string>
+    <string translatable="false" name="material_row_earlier">Älter</string>
+    <string translatable="false" name="material_section_subscriptions">Abos</string>
+    <string translatable="false" name="material_section_home">Start</string>
+    <string translatable="false" name="material_section_history">Verlauf</string>
+    <string translatable="false" name="material_section_playlists">Wiedergabelisten</string>
+    <string translatable="false" name="material_section_trending">Trends</string>
+    <string translatable="false" name="material_section_live">Live</string>
+    <string translatable="false" name="material_section_my_videos">Meine Videos</string>
+    <string translatable="false" name="material_section_gaming">Gaming</string>
+    <string translatable="false" name="material_section_news">Nachrichten</string>
+    <string translatable="false" name="material_section_music">Musik</string>
+    <string translatable="false" name="material_section_sports">Sport</string>
+    <string translatable="false" name="material_section_queue">Warteschlange</string>
+    <string translatable="false" name="material_section_notifications">Benachrichtigungen</string>
+    <string translatable="false" name="material_section_blocked">Blockierte Kanäle</string>
+    <string translatable="false" name="material_section_kids">Kinder</string>
+    <string translatable="false" name="material_player_pause">Pause</string>
+    <string translatable="false" name="material_player_play">Wiedergabe</string>
+    <string translatable="false" name="material_player_next">Weiter</string>
+    <string translatable="false" name="material_player_quality">Qualität</string>
+    <string translatable="false" name="material_player_subtitles">Untertitel</string>
+    <string translatable="false" name="material_player_speed">Tempo</string>
+    <string translatable="false" name="material_player_more">Mehr</string>
+    <string translatable="false" name="material_player_ends">Ende %1$s</string>
+    <string translatable="false" name="material_player_up_next">Als Nächstes</string>
+    <string translatable="false" name="material_player_marks">Von SponsorBlock markiert</string>
+    <string translatable="false" name="material_skip_skipped">Übersprungen: %1$s</string>
+    <string translatable="false" name="material_skip_undo">Rückgängig</string>
+    <string translatable="false" name="material_skip_skip">Überspringen</string>
+    <string translatable="false" name="material_learn_off">Auto-Überspringen für diesen Kanal aus</string>
+    <string translatable="false" name="material_learn_on">Auto-Überspringen für diesen Kanal an</string>
+    <string translatable="false" name="material_learn_row">Gelerntes Überspringen pro Kanal: %1$s</string>
+    <string translatable="false" name="material_learn_reset">Gelernte Kanäle zurücksetzen (%1$d)</string>
+    <string translatable="false" name="material_learn_state_on">An</string>
+    <string translatable="false" name="material_learn_state_off">Aus</string>
+    <string translatable="false" name="material_sb_sponsor">Sponsor</string>
+    <string translatable="false" name="material_sb_intro">Intro</string>
+    <string translatable="false" name="material_sb_outro">Outro</string>
+    <string translatable="false" name="material_sb_interaction">Abo-Erinnerung</string>
+    <string translatable="false" name="material_sb_selfpromo">Eigenwerbung</string>
+    <string translatable="false" name="material_sb_music_offtopic">Keine Musik</string>
+    <string translatable="false" name="material_sb_preview">Rückblick</string>
+    <string translatable="false" name="material_sb_poi_highlight">Höhepunkt</string>
+    <string translatable="false" name="material_sb_filler">Füllmaterial</string>
+    <string translatable="false" name="material_group_playback">Wiedergabe</string>
+    <string translatable="false" name="material_group_picture">Bild und Ton</string>
+    <string translatable="false" name="material_group_video">Video und Kanal</string>
+    <string translatable="false" name="material_btn_play_pause">Wiedergabe/Pause</string>
+    <string translatable="false" name="material_btn_previous">Zurück</string>
+    <string translatable="false" name="material_btn_like">Gefällt mir</string>
+    <string translatable="false" name="material_btn_dislike">Mag ich nicht</string>
+    <string translatable="false" name="material_btn_subscribe">Abonnieren</string>
+    <string translatable="false" name="material_btn_channel">Kanal öffnen</string>
+    <string translatable="false" name="material_btn_playlist">In Wiedergabeliste</string>
+    <string translatable="false" name="material_btn_queue">Warteschlange</string>
+    <string translatable="false" name="material_btn_repeat">Wiederholen</string>
+    <string translatable="false" name="material_btn_search">Suche</string>
+    <string translatable="false" name="material_btn_info">Video-Info</string>
+    <string translatable="false" name="material_btn_share">Teilen</string>
+    <string translatable="false" name="material_btn_zoom">Zoom</string>
+    <string translatable="false" name="material_btn_stats">Statistik</string>
+    <string translatable="false" name="material_btn_seek_interval">Sprungintervall</string>
+    <string translatable="false" name="material_btn_sponsorblock">SponsorBlock</string>
+    <string translatable="false" name="material_btn_dimming">Bildschirmdimmen</string>
+    <string translatable="false" name="material_btn_mute">Stumm</string>
+    <string translatable="false" name="material_btn_afr">Bildrate (AFR)</string>
+    <string translatable="false" name="material_state_on">An</string>
+    <string translatable="false" name="material_state_off">Aus</string>
+    <string translatable="false" name="material_player_customize">Tasten anpassen</string>
+    <string translatable="false" name="material_menu_open_channel">Kanal öffnen</string>
+    <string translatable="false" name="material_menu_move">Verschieben</string>
+    <string translatable="false" name="material_menu_remove">Aus Leiste entfernen</string>
+    <string translatable="false" name="material_menu_add">Zur Leiste hinzufügen</string>
+    <string translatable="false" name="material_buttons_subtitle">Bis zu acht Tasten in der Leiste, der Rest unter Mehr.</string>
+    <string translatable="false" name="material_buttons_on_panel">In der Leiste</string>
+    <string translatable="false" name="material_buttons_in_more">Unter Mehr</string>
+    <string translatable="false" name="material_buttons_was_reset">Tasten zurückgesetzt</string>
+    <string translatable="false" name="material_buttons_displaced">%1$s nach Mehr verschoben: Die Leiste fasst %2$d</string>
+    <string translatable="false" name="material_set_account">Konto</string>
+    <string translatable="false" name="material_set_sections">Bereiche anpassen</string>
+    <string translatable="false" name="material_set_buttons">Tasten anpassen</string>
+    <string translatable="false" name="material_set_sponsor">Werbung und Sponsoren überspringen</string>
+    <string translatable="false" name="material_set_quality">Standard-Videoqualität</string>
+    <string translatable="false" name="material_set_language">Sprache</string>
+    <string translatable="false" name="material_set_blocked">Blockierte Kanäle</string>
+    <string translatable="false" name="material_set_advanced">Erweitert</string>
+    <string translatable="false" name="material_set_about">Über</string>
+    <string translatable="false" name="material_adv_player">Player</string>
+    <string translatable="false" name="material_adv_subtitles">Untertitel</string>
+    <string translatable="false" name="material_adv_dearrow">DeArrow</string>
+    <string translatable="false" name="material_adv_afr">Automatische Bildrate</string>
+    <string translatable="false" name="material_account_signed_in">Angemeldet als %1$s</string>
+    <string translatable="false" name="material_account_none">Du bist nicht angemeldet</string>
+    <string translatable="false" name="material_account_signed_out">Abgemeldet</string>
+    <string translatable="false" name="material_account_sign_in">Anmelden</string>
+    <string translatable="false" name="material_account_sign_out">Abmelden</string>
+    <string translatable="false" name="material_account_sign_out_ask">Abmelden?</string>
+    <string translatable="false" name="material_account_revoke">Um den Zugriff vollständig zu entziehen, entferne dieses Gerät in den Sicherheitseinstellungen deines Google-Kontos.</string>
+    <string translatable="false" name="material_account_token_stays">Weder Abmelden noch Deinstallieren entzieht das Zugriffstoken.</string>
+    <string translatable="false" name="material_blocked_none">Keine blockierten Kanäle</string>
+    <string translatable="false" name="material_blocked_hint">Wähle einen Kanal, um ihn zu entsperren</string>
+    <string translatable="false" name="material_blocked_unblocked">%1$s entsperrt</string>
+    <string translatable="false" name="material_about_version">Version %1$s</string>
+    <string translatable="false" name="material_about_based_on">Basiert auf SmartTube von yuliskov, verwendet unter der MIT-Lizenz:</string>
+    <string translatable="false" name="material_search_title">Suche</string>
+    <string translatable="false" name="material_search_placeholder">Tippen zum Suchen</string>
+    <string translatable="false" name="material_key_space">Leertaste</string>
+    <string translatable="false" name="material_key_delete">Löschen</string>
+    <string translatable="false" name="material_key_search">Suchen</string>
+    <string translatable="false" name="material_signin_getting">Code wird geholt…</string>
+    <string translatable="false" name="material_signin_instruction">Öffne diese Adresse auf einem Telefon oder Computer und gib den Code ein. Zurück bricht ab.</string>
+    <string translatable="false" name="material_signin_scan">Mit dem Telefon scannen oder die Adresse öffnen und den Code eingeben.</string>
+    <string translatable="false" name="material_about_qr">QR-Codes werden mit ZXing gezeichnet, verwendet unter der Apache-Lizenz 2.0.</string>
+    <string translatable="false" name="material_signin_failed_hint">Drücke Zurück zum Schließen.</string>
+    <string translatable="false" name="material_set_updates">Updates</string>
+    <string translatable="false" name="material_upd_off">Aus</string>
+    <string translatable="false" name="material_upd_off_desc">Nie nach einer neuen Version suchen.</string>
+    <string translatable="false" name="material_upd_stable">Stabil</string>
+    <string translatable="false" name="material_upd_stable_desc">Nur Releases, die der Eigentümer freigegeben hat.</string>
+    <string translatable="false" name="material_upd_prerelease">Vorabversion</string>
+    <string translatable="false" name="material_upd_prerelease_desc">Der neueste Build, ohne Prüfung veröffentlicht.</string>
+    <string translatable="false" name="material_upd_available">Update verfügbar: %1$s</string>
+    <string translatable="false" name="material_upd_check_now">Jetzt prüfen</string>
+    <string translatable="false" name="material_upd_installed">Installiert: %1$s</string>
+    <string translatable="false" name="material_upd_checking">Wird geprüft…</string>
+    <string translatable="false" name="material_upd_is_off">Updates sind aus. Wähle zuerst Stabil oder Vorabversion.</string>
+    <string translatable="false" name="material_upd_latest">Du hast die neueste Version.</string>
+    <string translatable="false" name="material_upd_net">GitHub ist nicht erreichbar.</string>
+    <string translatable="false" name="material_upd_rate">GitHub begrenzt die Anfragen. Versuche es später erneut.</string>
+    <string translatable="false" name="material_upd_bad_feed">Die Liste der Releases konnte nicht gelesen werden.</string>
+    <string translatable="false" name="material_update_title">SmartTube Glasio %1$s</string>
+    <string translatable="false" name="material_update_prerelease_tag">(Vorabversion)</string>
+    <string translatable="false" name="material_update_heading">Update</string>
+    <string translatable="false" name="material_update_install">Herunterladen und installieren</string>
+    <string translatable="false" name="material_update_later">Jetzt nicht</string>
+    <string translatable="false" name="material_update_close">Schließen</string>
+    <string translatable="false" name="material_update_cancel">Abbrechen</string>
+    <string translatable="false" name="material_update_downloading">Wird heruntergeladen … %1$d%%</string>
+    <string translatable="false" name="material_update_preparing">Installer wird vorbereitet … %1$d%%</string>
+    <string translatable="false" name="material_update_finishing">Wird abgeschlossen…</string>
+    <string translatable="false" name="material_update_confirming">Bestätige die Installation im Systemdialog.</string>
+    <string translatable="false" name="material_update_cancelled">Abgebrochen. Es wurde nichts installiert.</string>
+    <string translatable="false" name="material_update_install_failed">Der System-Installer hat das Update nicht angenommen.</string>
+    <string translatable="false" name="material_update_download_failed">Der Download ist fehlgeschlagen. Es wurde nichts installiert.</string>
+    <string translatable="false" name="material_update_not_installed">Nicht installiert</string>
+    <string translatable="false" name="material_update_channel_changed">Dieses Update wird im jetzt gewählten Kanal nicht angeboten.</string>
+    <string translatable="false" name="material_channel_subscribe">Abonnieren</string>
+    <string translatable="false" name="material_channel_subscribed">Abonniert</string>
+    <string translatable="false" name="material_channel_sign_in_to_subscribe">Zum Abonnieren anmelden</string>
+    <string translatable="false" name="material_channel_unsubscribe_ask">%1$s abbestellen?</string>
+    <string translatable="false" name="material_channel_unsubscribe">Abbestellen</string>
+    <string translatable="false" name="material_channel_subscribe_failed">Das Abo wurde nicht geändert</string>
+    <string translatable="false" name="material_channel_this_channel">diesen Kanal</string>
+</resources>

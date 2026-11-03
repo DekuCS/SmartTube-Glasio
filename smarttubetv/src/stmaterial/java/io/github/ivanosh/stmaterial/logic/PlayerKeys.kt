@@ -43,7 +43,8 @@ fun playerKey(ui: PlayerUi, key: PlayerKey, seekStepMs: Long): Pair<PlayerUi, Li
         }
         PanelFocus.PROGRESS -> when (key) {
             PlayerKey.Ok -> ui to listOf(PlayerCommand.TogglePlay)
-            PlayerKey.Up -> ui to emptyList()
+            // As in the Nuvio player: up from the bar puts the controls away instead of doing nothing.
+            PlayerKey.Up -> ui.copy(focus = PanelFocus.HIDDEN) to emptyList()
             PlayerKey.Down -> ui.copy(focus = PanelFocus.BUTTONS) to emptyList()
             PlayerKey.Left -> ui to listOf(PlayerCommand.Seek(-seekStepMs))
             PlayerKey.Right -> ui to listOf(PlayerCommand.Seek(seekStepMs))
@@ -80,7 +81,7 @@ fun playerKey(ui: PlayerUi, key: PlayerKey, seekStepMs: Long): Pair<PlayerUi, Li
     }
 
 const val SEEK_DEBOUNCE_MS = 300L
-const val PANEL_AUTO_HIDE_MS = 5_000L
+const val PANEL_AUTO_HIDE_MS = 4_000L
 
 /**
  * A seek on its way to the engine. Every key moves [targetMs], which the overlay shows at once; the engine
