@@ -6,9 +6,11 @@ import com.liskovsoft.sharedutils.rx.RxHelper
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.SimpleMediaItem
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter.VideoMenuCallback
+import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager
 import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil
@@ -19,7 +21,7 @@ import com.liskovsoft.youtubeapi.service.YouTubeServiceManager
 import io.github.ivanosh.stmaterial.ui.MenuItem
 
 /** What the menu of a card can do, in the order it shows them. */
-enum class VideoAction { QUEUE, PLAYLIST, CREATE_PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY }
+enum class VideoAction { QUEUE, PLAYLIST, REMOVE_FROM_PLAYLIST, CREATE_PLAYLIST, CHANNEL, NOT_INTERESTED, BLOCK_CHANNEL, REMOVE_FROM_HISTORY }
 
 /** What the menu needs to know about a card and about the session, to leave out what cannot work. */
 data class VideoFacts(val signedIn: Boolean, val hasVideo: Boolean, val hasChannel: Boolean, val hasAuthor: Boolean, val hasFeedback: Boolean)
@@ -40,6 +42,7 @@ fun availableVideoActions(section: Int, facts: VideoFacts): List<VideoAction> =
         when (it) {
             VideoAction.QUEUE -> facts.hasVideo
             VideoAction.PLAYLIST -> facts.signedIn && facts.hasVideo
+            VideoAction.REMOVE_FROM_PLAYLIST -> facts.signedIn && facts.hasVideo
             // A new list needs the account. With a video it gets that video; on the playlists tab it starts empty.
             VideoAction.CREATE_PLAYLIST -> facts.signedIn && (facts.hasVideo || section == MediaGroup.TYPE_USER_PLAYLISTS)
             VideoAction.CHANNEL -> facts.hasChannel
@@ -78,6 +81,9 @@ class CardMenu(
                 }
                 VideoAction.PLAYLIST -> MenuItem(activity.getString(R.string.material_video_playlist)) {
                     AppDialogUtil.showAddToPlaylistDialog(activity, video, removalCallback(null, false))
+                }
+                VideoAction.REMOVE_FROM_PLAYLIST -> MenuItem(activity.getString(R.string.material_video_playlist_remove)) {
+                    removeFromPlaylist(video)
                 }
                 VideoAction.CREATE_PLAYLIST -> MenuItem(activity.getString(R.string.material_playlist_create)) {
                     createPlaylist(video)
@@ -119,6 +125,39 @@ class CardMenu(
             )
             true
         }
+    }
+
+    /** The lists the video is in: choosing one takes it out. */
+    private fun removeFromPlaylist(video: Video) {
+        val service = YouTubeMediaItemService.instance()
+        RxHelper.execute(
+            service.getPlaylistsInfoObserve(video.videoId),
+            { infos ->
+                val lists = infos.filter { it.isSelected }
+                if (lists.isEmpty()) {
+                    onMessage(activity.getString(R.string.material_playlist_not_in_any))
+                    return@execute
+                }
+                val title = activity.getString(R.string.material_video_playlist_remove)
+                val dialog = AppDialogPresenter.instance(activity)
+                dialog.appendRadioCategory(title, lists.map { info ->
+                    UiOptionItem.from(info.title) {
+                        dialog.goBack()
+                        RxHelper.execute(
+                            service.removeFromPlaylistObserve(info.playlistId, video.videoId),
+                            null,
+                            { error: Throwable -> onMessage(error.localizedMessage.orEmpty()) },
+                            {
+                                onMessage(activity.getString(R.string.material_playlist_removed, info.title))
+                                onReload()
+                            },
+                        )
+                    }
+                })
+                dialog.showDialog(title)
+            },
+            { error: Throwable -> onMessage(error.localizedMessage.orEmpty()) },
+        )
     }
 
     /** The presenter says a card is gone, maybe from another thread; blocking a channel takes its other cards too. */

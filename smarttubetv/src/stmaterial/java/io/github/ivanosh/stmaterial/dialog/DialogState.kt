@@ -31,6 +31,9 @@ data class TextRow(override val key: Int, override val title: String) : DialogRo
 /** A line that opens a page of [size] lines, built by [open] when it is chosen so that it shows the current state. */
 class EntryRow(override val key: Int, override val title: String, val size: Int, val open: () -> DialogPage) : DialogRow
 
+/** A QR code of [link] with [title] under it. Not focusable: the d-pad steps over it. */
+data class QrRow(override val key: Int, override val title: String, val link: String) : DialogRow
+
 class DialogPage private constructor(val id: Int, val title: String?, val rows: List<DialogRow>) {
     fun withRows(rows: List<DialogRow>) = DialogPage(id, title, rows)
     internal fun withId(id: Int) = DialogPage(id, title, rows)

@@ -17,8 +17,11 @@
     <string translatable="false" name="material_video_queue">Add to queue</string>
     <string translatable="false" name="material_video_playlist">Save to playlist</string>
     <string translatable="false" name="material_playlist_create">New playlist</string>
-    <string translatable="false" name="material_playlist_create_note">It will not appear in the YouTube app</string>
+    <string translatable="false" name="material_playlist_create_note">The list is created in your YouTube account</string>
     <string translatable="false" name="material_playlist_added">Added to playlist</string>
+    <string translatable="false" name="material_video_playlist_remove">Remove from playlist</string>
+    <string translatable="false" name="material_playlist_not_in_any">This video is in no playlist</string>
+    <string translatable="false" name="material_playlist_removed">Removed from %1$s</string>
     <string translatable="false" name="material_video_channel">Go to channel</string>
     <string translatable="false" name="material_video_not_interested">Not interested</string>
     <string translatable="false" name="material_video_block_channel">Block channel</string>
@@ -171,6 +174,7 @@
     <string translatable="false" name="material_upd_available">Update available: %1$s</string>
     <string translatable="false" name="material_upd_check_now">Check now</string>
     <string translatable="false" name="material_upd_installed">Installed: %1$s</string>
+    <string translatable="false" name="material_upd_qr_hint">Scan for the repository</string>
     <string translatable="false" name="material_upd_checking">Checking…</string>
     <string translatable="false" name="material_upd_is_off">Updates are off. Choose Stable or Prerelease first.</string>
     <string translatable="false" name="material_upd_latest">You have the latest version.</string>

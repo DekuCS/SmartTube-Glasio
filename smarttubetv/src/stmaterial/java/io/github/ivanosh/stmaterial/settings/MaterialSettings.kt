@@ -31,6 +31,7 @@ import io.github.ivanosh.stmaterial.dialog.DialogRow
 import io.github.ivanosh.stmaterial.dialog.DialogScreen
 import io.github.ivanosh.stmaterial.dialog.DialogState
 import io.github.ivanosh.stmaterial.dialog.EntryRow
+import io.github.ivanosh.stmaterial.dialog.QrRow
 import io.github.ivanosh.stmaterial.dialog.TextRow
 import io.github.ivanosh.stmaterial.player.MaterialButtonsEditorActivity
 import io.github.ivanosh.stmaterial.logic.UpdateChannel
@@ -239,6 +240,7 @@ class MaterialSettingsActivity : ComponentActivity() {
             TextRow(5, getString(R.string.material_upd_installed, UpdateService.installedVersionName(this))),
         )
         if (status != null) rows += TextRow(6, status)
+        rows += QrRow(9, getString(R.string.material_upd_qr_hint), "https://github.com/DekuCS/SmartTube-Glasio")
         return DialogPage.of(getString(R.string.material_set_updates), rows)
     }
 

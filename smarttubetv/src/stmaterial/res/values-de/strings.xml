@@ -15,8 +15,11 @@
     <string translatable="false" name="material_video_queue">Zur Warteschlange</string>
     <string translatable="false" name="material_video_playlist">In Wiedergabeliste speichern</string>
     <string translatable="false" name="material_playlist_create">Neue Wiedergabeliste</string>
-    <string translatable="false" name="material_playlist_create_note">Diese wird nicht in der YouTube-App angezeigt</string>
+    <string translatable="false" name="material_playlist_create_note">Die Liste wird in deinem YouTube-Konto angelegt</string>
     <string translatable="false" name="material_playlist_added">Zur Wiedergabeliste hinzugefügt</string>
+    <string translatable="false" name="material_video_playlist_remove">Aus Wiedergabeliste entfernen</string>
+    <string translatable="false" name="material_playlist_not_in_any">Dieses Video ist in keiner Wiedergabeliste</string>
+    <string translatable="false" name="material_playlist_removed">Aus %1$s entfernt</string>
     <string translatable="false" name="material_video_channel">Zum Kanal</string>
     <string translatable="false" name="material_video_not_interested">Kein Interesse</string>
     <string translatable="false" name="material_video_block_channel">Kanal blockieren</string>
@@ -169,6 +172,7 @@
     <string translatable="false" name="material_upd_available">Update verfügbar: %1$s</string>
     <string translatable="false" name="material_upd_check_now">Jetzt prüfen</string>
     <string translatable="false" name="material_upd_installed">Installiert: %1$s</string>
+    <string translatable="false" name="material_upd_qr_hint">Zum Repository scannen</string>
     <string translatable="false" name="material_upd_checking">Wird geprüft…</string>
     <string translatable="false" name="material_upd_is_off">Updates sind aus. Wähle zuerst Stabil oder Vorabversion.</string>
     <string translatable="false" name="material_upd_latest">Du hast die neueste Version.</string>

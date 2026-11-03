@@ -221,6 +221,7 @@ class MaterialDialogActivity : MotherActivity(), AppDialogView {
                 state.choose(row.key)
                 item?.onSelect(true)
             }
+            is QrRow -> Unit
         }
     }
 

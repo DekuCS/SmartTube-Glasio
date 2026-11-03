@@ -51,6 +51,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import io.github.ivanosh.stmaterial.signin.signInQrMatrix
 import io.github.ivanosh.stmaterial.ui.Palette
 
 private val PanelFill = Color(0xFF1D2024)
@@ -124,11 +125,39 @@ private fun Rows(state: DialogState, page: DialogPage, onActivate: (DialogRow) -
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         itemsIndexed(page.rows, key = { _, row -> row.key }) { index, row ->
-            DialogLine(row, onActivate, Modifier.focusRequester(requesterFor(row.key))) {
-                lastKey = row.key
-                lastIndex = index
+            if (row is QrRow) {
+                QrLine(row)
+            } else {
+                DialogLine(row, onActivate, Modifier.focusRequester(requesterFor(row.key))) {
+                    lastKey = row.key
+                    lastIndex = index
+                }
             }
         }
+    }
+}
+
+/** The code of [QrRow] as squares, white behind, with its caption. Drawn from the matrix so it stays crisp on a TV. */
+@Composable
+private fun QrLine(row: QrRow) {
+    val matrix = remember(row.link) { signInQrMatrix(row.link) }
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (matrix != null) {
+            Canvas(Modifier.size(320.dp)) {
+                drawRect(Color.White)
+                val cell = size.width / matrix.width
+                for (y in 0 until matrix.height) {
+                    for (x in 0 until matrix.width) {
+                        if (matrix.get(x, y)) drawRect(Color.Black, Offset(x * cell, y * cell), Size(cell, cell))
+                    }
+                }
+            }
+        }
+        Text(row.title, style = DescriptionStyle, color = Palette.OnBackgroundVariant)
     }
 }
 
