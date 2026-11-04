@@ -20,8 +20,9 @@
         android:dataExtractionRules="@xml/material_data_extraction_rules"
         android:icon="@drawable/ic_material_logo"
         android:roundIcon="@drawable/ic_material_logo"
+        android:logo="@drawable/ic_material_logo"
         android:banner="@drawable/app_banner"
-        tools:replace="android:name,android:allowBackup,android:icon,android:roundIcon,android:banner">
+        tools:replace="android:name,android:allowBackup,android:icon,android:roundIcon,android:logo,android:banner">
 
         <!-- MATERIAL: no external zip import -->
         <activity android:name="com.liskovsoft.smartyoutubetv2.common.misc.BackupReceiverActivity"
