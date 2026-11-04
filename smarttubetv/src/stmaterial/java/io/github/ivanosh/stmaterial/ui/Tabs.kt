@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,7 +61,7 @@ data class TabItem(val id: Int, val title: String, val icon: String?)
 private const val GEAR_ICON = "M10.0 4.7L10.4 1.7L13.6 1.7L14.0 4.7L15.8 5.4L18.1 3.6L20.4 5.9L18.6 8.2L19.3 10.0L22.3 10.4L22.3 13.6L19.3 14.0L18.6 15.8L20.4 18.1L18.1 20.4L15.8 18.6L14.0 19.3L13.6 22.3L10.4 22.3L10.0 19.3L8.2 18.6L5.9 20.4L3.6 18.1L5.4 15.8L4.7 14.0L1.7 13.6L1.7 10.4L4.7 10.0L5.4 8.2L3.6 5.9L5.9 3.6L8.2 5.4zM15.2 12a3.2 3.2 0 1 0-6.4 0 3.2 3.2 0 0 0 6.4 0z"
 
 // The dock is centred; the same gutter on both sides keeps it centred and clear of the gear.
-private val DockGutter = 92.dp
+private val DockGutter = 128.dp
 private val DockCorner = 40.dp
 private val DockHeight = 80.dp
 private val GearSize = 64.dp
@@ -99,11 +100,13 @@ fun Tabs(
                 }
             },
     ) {
-        // The mark on the left, the same size as the gear it mirrors on the right.
+        // Match the gear height; a square box would shrink this wide logo.
+        val logo = painterResource(R.drawable.ic_material_logo)
         Image(
-            painter = painterResource(R.drawable.ic_material_logo),
+            painter = logo,
             contentDescription = null,
-            modifier = Modifier.align(Alignment.CenterStart).size(GearSize),
+            modifier = Modifier.align(Alignment.CenterStart).height(GearSize)
+                .aspectRatio(logo.intrinsicSize.width / logo.intrinsicSize.height),
         )
         // The pill hugs its tabs and only scrolls when they stop fitting, so it stays a floating dock.
         // The focus group is the pill alone: with the gear inside it, Down from a tab landed on the gear.
