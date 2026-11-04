@@ -215,7 +215,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          EXPECTED=8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c
+          EXPECTED=306a3b18e9463534cfa451d83ebae6ac63cbd136d6d13baa65fe659d8e8e051a
           APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner"
           for apk in "$RUNNER_TEMP"/signed/*.apk; do
             ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
@@ -239,7 +239,7 @@ jobs:
         run: |
           gh release create "$TAG" "$RUNNER_TEMP"/signed/*.apk \
             --repo "$GITHUB_REPOSITORY" --title "$TAG" --prerelease --target "$SHA" \
-            --notes "Version ${TAG#material-v}. Signing certificate SHA-256 8619c34516110bf503c6850f1c405778fae8fd318beb82b138db207724748e8c."
+            --notes "Version ${TAG#material-v}. Signing certificate SHA-256 306a3b18e9463534cfa451d83ebae6ac63cbd136d6d13baa65fe659d8e8e051a."
 
       - name: Remove the signing material
         if: always()

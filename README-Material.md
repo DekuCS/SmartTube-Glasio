@@ -40,9 +40,11 @@ own key, set `MATERIAL_KEYSTORE_FILE`, `MATERIAL_KEYSTORE_PASSWORD`, `MATERIAL_K
 attestation (`gh attestation verify <apk> --repo ivanosh/SmartTube-Material`).
 
 Release signing certificate SHA-256:
-`86:19:C3:45:16:11:0B:F5:03:C6:85:0F:1C:40:57:78:FA:E8:FD:31:8B:EB:82:B1:38:DB:20:77:24:74:8E:8C`
+`30:6A:3B:18:E9:46:35:34:CF:A4:51:D8:3E:BA:E6:AC:63:CB:D1:36:D6:D1:3B:AA:65:FE:65:9D:8E:8E:05:1A`
 
 ## Install
+
+Version 32.68-10 starts a new Glasio signing key. Uninstall versions up to 32.68-8 before installing it; Android cannot update across these keys. Uninstalling removes local settings and sign-ins. Keep the new signing key backed up for future updates.
 
 With adb (TV in developer mode, adb over the network):
 
@@ -87,7 +89,7 @@ Before the system installer sees a file, all of these must hold, or nothing is i
 - the APK for this device's ABI (`arm64-v8a`, `armeabi-v7a`, else the universal one);
 - the package manager reads it as `io.github.ivanosh.smarttubematerial`, with the version name of the release and a
   version code above the installed one (a downgrade is refused);
-- its one signing certificate has SHA-256 `8619c345...748e8c` (the key above), checked in code with
+- its one signing certificate has SHA-256 `306a3b18e9463534cfa451d83ebae6ac63cbd136d6d13baa65fe659d8e8e051a` (the key above), checked in code with
   `PackageManager.getPackageArchiveInfo`.
 
 The install goes through the system installer, which asks for confirmation; the TV asks once to allow this app to install
